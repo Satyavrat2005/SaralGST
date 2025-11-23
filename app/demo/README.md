@@ -1,55 +1,47 @@
 # GST Reconciliation Demo Workflow
 
 ## Overview
-This demo showcases the complete end-to-end GST reconciliation workflow powered by n8n automation and AI validation.
+This demo showcases the complete end-to-end GST reconciliation workflow powered by n8n automation and AI validation. The interface is inspired by the reconciliation run page, providing a familiar and intuitive experience.
+
+## User Experience
+
+The demo follows a **3-state workflow** similar to the reconciliation run page:
+
+### 1. **Idle State** - Ready to Start
+- Overview of system capabilities
+- Statistics on available data (invoices, GSTR 2B entries, vendors)
+- Feature highlights (AI OCR, WhatsApp alerts, compliance scoring)
+- Prominent "Start Demo Workflow" button
+
+### 2. **Running State** - Live Processing
+- Circular progress indicator showing completion percentage
+- Real-time step-by-step progress through 9 automated stages
+- Live statistics updating during processing
+- Cancel option available
+
+### 3. **Completed State** - Results & Downloads
+- Success metrics (validated invoices, match rate, ITC available)
+- Issue summary (discrepancies found, vendor compliance score)
+- **Downloadable reports section**:
+  - Reconciliation Report (PDF)
+  - Discrepancy Report (Excel)
+  - Draft GSTR 3B (JSON)
+  - Draft GSTR 9B (JSON)
+- Options to run again or start free trial
 
 ## Features
 
 ### 9-Step Automated Workflow
 
-1. **Invoice Capture from WhatsApp**
-   - Receives invoices from multiple suppliers via WhatsApp
-   - Real-time processing with status tracking
-
-2. **AI OCR & Validation**
-   - Automated data extraction using OCR
-   - Validates GSTIN, amounts, tax rates, and quantities
-   - Instant validation feedback
-
-3. **Auto WhatsApp Notifications**
-   - Sends correction requests for failed validations
-   - Tracks delivery status and responses
-   - Automated follow-ups
-
-4. **Purchase Register Update**
-   - Inserts validated invoices automatically
-   - Detects duplicates and conflicts
-   - Maintains data integrity
-
-5. **GSTR 2B Upload & Parsing**
-   - Processes uploaded GSTR 2B files
-   - Validates schema and data integrity
-   - Extracts all entries for reconciliation
-
-6. **Intelligent Reconciliation**
-   - Cross-references Purchase Register with GSTR 2B
-   - Matches entries with fuzzy logic
-   - Identifies discrepancies
-
-7. **Discrepancy Analysis**
-   - Categorizes issues by type and severity
-   - Calculates ITC impact
-   - Prioritizes critical items
-
-8. **Vendor Compliance Scoring**
-   - Calculates compliance scores
-   - Tracks filing history and reliability
-   - Identifies at-risk vendors
-
-9. **Report Generation & Filing**
-   - Creates comprehensive forensic reports
-   - Generates draft GSTR 3B and 9B
-   - Exports in multiple formats
+1. **Invoice Capture from WhatsApp** - Receive invoices from suppliers
+2. **AI OCR & Validation** - Extract and validate data automatically
+3. **Auto WhatsApp Notifications** - Send alerts for failed validations
+4. **Purchase Register Update** - Insert validated invoices
+5. **GSTR 2B Processing** - Parse and validate government data
+6. **Intelligent Reconciliation** - Match invoices with GSTR 2B
+7. **Discrepancy Analysis** - Categorize and calculate ITC impact
+8. **Vendor Compliance Scoring** - Assess vendor reliability
+9. **Report Generation & Filing** - Create reports and draft returns
 
 ## n8n Integration
 
