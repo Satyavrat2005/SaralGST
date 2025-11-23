@@ -1,12 +1,13 @@
+'use client';
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, ShieldCheck, Clock, Sparkles, Zap } from 'lucide-react';
 import BentoCard from '../components/ui/BentoCard';
 import { AreaChart, Area, XAxis, CartesianGrid, ResponsiveContainer, LineChart as ReLineChart, Line } from 'recharts';
 
-const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
+export default function LandingPage() {
+  const router = useRouter();
 
   // Mock data for the 3D-style floating card
   const taxData = [
@@ -29,8 +30,8 @@ const LandingPage: React.FC = () => {
            <span className="text-xl font-bold tracking-tight">Saral<span className="text-primary">GST</span></span>
         </div>
         <div className="flex gap-4">
-          <button onClick={() => navigate('/auth')} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Log In</button>
-          <button onClick={() => navigate('/auth')} className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">Get Started</button>
+          <button onClick={() => router.push('/auth')} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Log In</button>
+          <button onClick={() => router.push('/auth')} className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">Get Started</button>
         </div>
       </nav>
 
@@ -54,7 +55,7 @@ const LandingPage: React.FC = () => {
               Automate GSTR-1 & 3B filing with XAI-powered reconciliation and Deadline Guardian technology. Stop losing money to unclaimed credits.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <button onClick={() => navigate('/auth')} className="h-12 px-8 rounded-lg bg-primary text-white font-medium text-lg hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2">
+              <button onClick={() => router.push('/auth')} className="h-12 px-8 rounded-lg bg-primary text-white font-medium text-lg hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2">
                 Start Free Trial <ArrowRight className="h-5 w-5" />
               </button>
               <button className="h-12 px-8 rounded-lg bg-secondary text-secondary-foreground font-medium text-lg hover:bg-secondary/80 transition-all border border-white/5">
@@ -183,6 +184,4 @@ const LandingPage: React.FC = () => {
       </section>
     </div>
   );
-};
-
-export default LandingPage;
+}

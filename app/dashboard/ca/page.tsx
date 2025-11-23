@@ -1,9 +1,10 @@
+'use client';
 
 import React from 'react';
 import BentoCard from '../../../components/ui/BentoCard';
 import { FileCheck, AlertOctagon, ChevronRight, Search, Filter } from 'lucide-react';
 
-const CADashboard: React.FC = () => {
+export default function CADashboard() {
   const clients = [
     { name: 'Alpha Tech Solutions', gstin: '27ABCDE1234F1Z5', gstr1: 'Filed', gstr3b: 'Filed', score: 98 },
     { name: 'Beta Retailers', gstin: '29XYZZZ9876G2Z1', gstr1: 'Pending', gstr3b: 'Pending', score: 45 },
@@ -158,6 +159,4 @@ const CADashboard: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default CADashboard;
+}

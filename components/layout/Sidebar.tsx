@@ -1,6 +1,7 @@
+'use client';
 
-import React, { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -86,17 +87,17 @@ const SIDEBAR_CONFIG = {
   ]
 };
 
-const Sidebar: React.FC = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
+export default function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
   
   // Determine current dashboard type based on URL
-  const currentRole = location.pathname.includes('/dashboard/ca') ? 'ca' : 'sme';
+  const currentRole = pathname?.includes('/dashboard/ca') ? 'ca' : 'sme';
   const menuGroups = SIDEBAR_CONFIG[currentRole];
 
   const isActive = (path: string) => {
      // Exact match or sub-path match for nested routes
-     return location.pathname === path || (location.pathname.startsWith(path) && path !== '/dashboard/sme' && path !== '/dashboard/ca');
+     return pathname === path || (pathname?.startsWith(path) && path !== '/dashboard/sme' && path !== '/dashboard/ca');
   };
 
   return (
@@ -127,7 +128,7 @@ const Sidebar: React.FC = () => {
                 return (
                   <button
                     key={item.path}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => router.push(item.path)}
                     className={`
                       w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative overflow-hidden
                       ${active ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'}
@@ -147,7 +148,7 @@ const Sidebar: React.FC = () => {
       {/* User Footer */}
       <div className="p-4 border-t border-white/5">
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => router.push('/')}
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
         >
           <LogOut className="h-4 w-4" />
@@ -156,6 +157,4 @@ const Sidebar: React.FC = () => {
       </div>
     </aside>
   );
-};
-
-export default Sidebar;
+}

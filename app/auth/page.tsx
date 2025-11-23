@@ -1,18 +1,19 @@
+'use client';
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, Briefcase, CheckCircle2 } from 'lucide-react';
 
-const AuthPage: React.FC = () => {
-  const navigate = useNavigate();
+export default function AuthPage() {
+  const router = useRouter();
   const [role, setRole] = useState<'sme' | 'ca'>('sme');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (role === 'sme') {
-      navigate('/dashboard/sme');
+      router.push('/dashboard/sme');
     } else {
-      navigate('/dashboard/ca');
+      router.push('/dashboard/ca');
     }
   };
 
@@ -132,6 +133,4 @@ const AuthPage: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default AuthPage;
+}

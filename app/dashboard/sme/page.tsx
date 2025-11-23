@@ -1,3 +1,4 @@
+'use client';
 
 import React from 'react';
 import BentoCard from '../../../components/ui/BentoCard';
@@ -5,7 +6,7 @@ import GlassPanel from '../../../components/ui/GlassPanel';
 import { UploadCloud, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-const SMEDashboard: React.FC = () => {
+export default function SMEDashboard() {
   // Mock Data
   const itcData = [
     { name: 'Jan', output: 4000, itc: 2400 },
@@ -150,6 +151,4 @@ const SMEDashboard: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default SMEDashboard;
+}

@@ -1,10 +1,14 @@
+'use client';
 
 import React from 'react';
-import { Outlet } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import { Bell, User, Search } from 'lucide-react';
 
-const DashboardLayout: React.FC = () => {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       {/* Intelligent Sidebar that adapts to the route */}
@@ -36,11 +40,9 @@ const DashboardLayout: React.FC = () => {
         
         {/* Scrollable Content Area */}
         <main className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>
   );
-};
-
-export default DashboardLayout;
+}
