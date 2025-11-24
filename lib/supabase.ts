@@ -137,3 +137,30 @@ export async function getGSTR3BData(): Promise<any | null> {
     return null;
   }
 }
+
+// Function to fetch invoice data from pdf table
+export interface PDFInvoice {
+  company_name: string;
+  invoice_number: string;
+  status: string;
+  reason: string | null;
+  links: string;
+}
+
+export async function getPDFInvoices(): Promise<PDFInvoice[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('pdf')
+      .select('company_name, invoice_number, status, reason, links');
+
+    if (error) {
+      console.error('Error fetching PDF invoices:', error);
+      return null;
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Exception fetching PDF invoices:', err);
+    return null;
+  }
+}

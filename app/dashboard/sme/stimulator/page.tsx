@@ -41,7 +41,7 @@ import {
   BarChart as BarChartIcon,
   Info
 } from 'lucide-react';
-import { getGSTR1BUrl, downloadFileFromUrl, getReconciliationData, getGSTR3BData } from '../../../../lib/supabase';
+import { getGSTR1BUrl, downloadFileFromUrl, getReconciliationData, getGSTR3BData, getPDFInvoices } from '../../../../lib/supabase';
 import { 
   PieChart, 
   Pie, 
@@ -102,6 +102,21 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'email' | 'manual'>('whatsapp');
   const [processing, setProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setLoading(true);
+      const data = await getPDFInvoices();
+      if (data) {
+        setInvoices(data);
+      }
+      setLoading(false);
+    };
+
+    fetchInvoices();
+  }, []);
 
   const handleSimulateProcess = () => {
     setProcessing(true);
@@ -133,9 +148,9 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
         {/* Sidebar Tabs */}
         <div className="lg:col-span-1 space-y-2">
            {[
-             { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, count: 5 },
-             { id: 'email', label: 'Email', icon: Mail, count: 12 },
-             { id: 'manual', label: 'Manual Upload', icon: UploadCloud, count: 0 },
+             { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, count: invoices.length },
+             // { id: 'email', label: 'Email', icon: Mail, count: 12 },
+             // { id: 'manual', label: 'Manual Upload', icon: UploadCloud, count: 0 },
            ].map((tab) => (
              <button
                key={tab.id}
@@ -172,27 +187,56 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
            </div>
            
            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {[1,2,3,4,5].map((i) => (
-                 <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-white/5 hover:border-white/10 transition-all group">
-                    <div className="flex items-center gap-4">
-                       <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-zinc-500">
-                          <FileText className="h-5 w-5" />
-                       </div>
-                       <div>
-                          <p className="text-sm font-medium text-white">INV-2025-00{i}</p>
-                          <p className="text-xs text-zinc-500">TechSol Pvt Ltd • {activeTab === 'whatsapp' ? '+91 98765...' : 'billing@techsol.com'}</p>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                       <span className={`text-xs px-2 py-1 rounded border ${i === 2 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
-                          {i === 2 ? 'Error' : 'Validated'}
-                       </span>
-                       <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                          <Eye className="h-4 w-4" />
-                       </button>
-                    </div>
+              {loading ? (
+                 <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2 text-sm text-zinc-400">Loading invoices...</span>
                  </div>
-              ))}
+              ) : invoices.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FileText className="h-12 w-12 text-zinc-600 mb-2" />
+                    <p className="text-sm text-zinc-400">No invoices found</p>
+                 </div>
+              ) : (
+                 invoices.map((invoice, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-white/5 hover:border-white/10 transition-all group">
+                       <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-zinc-500">
+                             <FileText className="h-5 w-5" />
+                          </div>
+                          <div>
+                             <p className="text-sm font-medium text-white">{invoice.invoice_number}</p>
+                             <p className="text-xs text-zinc-500">{invoice.company_name}</p>
+                             {invoice.reason && (
+                                <p className="text-xs text-red-400 mt-0.5" title={invoice.reason}>
+                                   {invoice.reason.length > 50 ? invoice.reason.substring(0, 50) + '...' : invoice.reason}
+                                </p>
+                             )}
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-4">
+                          <span className={`text-xs px-2 py-1 rounded border ${
+                             invoice.status.toLowerCase() === 'error' || invoice.status.toLowerCase() === 'failed' 
+                                ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+                                : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          }`}>
+                             {invoice.status}
+                          </span>
+                          {invoice.links && (
+                             <a 
+                                href={invoice.links} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                title="View PDF"
+                             >
+                                <Eye className="h-4 w-4" />
+                             </a>
+                          )}
+                       </div>
+                    </div>
+                 ))
+              )}
            </div>
         </GlassPanel>
       </div>
