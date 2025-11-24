@@ -58,7 +58,7 @@ export default function LandingPage() {
               <button onClick={() => router.push('/auth')} className="h-12 px-8 rounded-lg bg-primary text-white font-medium text-lg hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2">
                 Start Free Trial <ArrowRight className="h-5 w-5" />
               </button>
-              <button onClick={() => router.push('/demo')} className="h-12 px-8 rounded-lg bg-secondary text-secondary-foreground font-medium text-lg hover:bg-secondary/80 transition-all border border-white/5">
+              <button onClick={() => router.push('/dashboard/sme/stimulator')} className="h-12 px-8 rounded-lg bg-secondary text-secondary-foreground font-medium text-lg hover:bg-secondary/80 transition-all border border-white/5">
                 Watch Demo
               </button>
             </div>
