@@ -793,75 +793,60 @@ const ReconciliationEngine = () => {
     setCurrentTask(0);
     setLoading(true);
     
-    // Simulate progress while fetching
+    // Smooth progress over 15 seconds total (15000ms / 100 steps = 150ms per 1%)
     const progressInterval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 90) {
+        if (prev >= 100) {
           clearInterval(progressInterval);
-          return 90;
+          return 100;
         }
         const taskIndex = Math.min(Math.floor((prev / 100) * tasks.length), tasks.length - 1);
         setCurrentTask(taskIndex);
-        return prev + 2;
+        return prev + 1;
       });
-    }, 50);
+    }, 150);
 
-    // Fetch reconciliation data from Supabase
-    try {
-      const data = await getReconciliationData();
-      console.log('Fetched reconciliation data:', data);
-      console.log('Data type:', typeof data);
-      console.log('Data keys:', data ? Object.keys(data) : 'null');
-      
-      if (data) {
-        // Check if data has an 'output' property (from your JSON structure)
-        const reconOutput = data.output || data;
-        console.log('Recon output:', reconOutput);
-        console.log('Recon output keys:', reconOutput ? Object.keys(reconOutput) : 'null');
+    // Wait for progress animation to complete (15 seconds), then fetch and display data
+    setTimeout(async () => {
+      try {
+        const data = await getReconciliationData();
+        console.log('Fetched reconciliation data:', data);
+        console.log('Data type:', typeof data);
+        console.log('Data keys:', data ? Object.keys(data) : 'null');
         
-        // More flexible validation - just check if data exists and has some expected properties
-        if (reconOutput && (reconOutput.metadata || reconOutput.summary || reconOutput.matched_invoices)) {
-          setReconData(reconOutput);
-          setProgress(100);
-          setState('completed');
+        if (data) {
+          // Check if data has an 'output' property (from your JSON structure)
+          const reconOutput = data.output || data;
+          console.log('Recon output:', reconOutput);
+          console.log('Recon output keys:', reconOutput ? Object.keys(reconOutput) : 'null');
+          
+          // More flexible validation - just check if data exists and has some expected properties
+          if (reconOutput && (reconOutput.metadata || reconOutput.summary || reconOutput.matched_invoices)) {
+            setReconData(reconOutput);
+            setState('completed');
+          } else {
+            console.error('Invalid data structure. Expected properties not found.');
+            console.error('Data received:', JSON.stringify(data, null, 2).substring(0, 500));
+            alert('Invalid reconciliation data structure. Check console for details.');
+            setState('idle');
+          }
         } else {
-          console.error('Invalid data structure. Expected properties not found.');
-          console.error('Data received:', JSON.stringify(data, null, 2).substring(0, 500));
-          alert('Invalid reconciliation data structure. Check console for details.');
+          console.error('No data returned from Supabase');
+          alert('No reconciliation data found. Please run reconciliation first.');
           setState('idle');
         }
-      } else {
-        console.error('No data returned from Supabase');
-        alert('No reconciliation data found. Please run reconciliation first.');
+      } catch (error) {
+        console.error('Error fetching reconciliation data:', error);
+        alert('Failed to fetch reconciliation data: ' + (error as Error).message);
         setState('idle');
+      } finally {
+        clearInterval(progressInterval);
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching reconciliation data:', error);
-      alert('Failed to fetch reconciliation data: ' + (error as Error).message);
-      setState('idle');
-    } finally {
-      clearInterval(progressInterval);
-      setLoading(false);
-    }
+    }, 15000); // Wait 15 seconds for progress animation to complete
   };
 
-  useEffect(() => {
-    if (state === 'running' && !loading) {
-      const interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setState('completed');
-            return 100;
-          }
-          const taskIndex = Math.min(Math.floor((prev / 100) * tasks.length), tasks.length - 1);
-          setCurrentTask(taskIndex);
-          return prev + 1;
-        });
-      }, 50);
-      return () => clearInterval(interval);
-    }
-  }, [state, loading]);
+  // Progress is now handled directly in handleRun for smooth 15-second completion
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -905,11 +890,11 @@ const ReconciliationEngine = () => {
                   <div className="grid grid-cols-3 gap-4">
                      <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
                         <p className="text-xs text-zinc-500 uppercase font-bold">Purchase Invoices</p>
-                        <p className="text-2xl font-bold text-white mt-1">823</p>
+                        <p className="text-2xl font-bold text-white mt-1">21</p>
                      </div>
                      <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
                         <p className="text-xs text-zinc-500 uppercase font-bold">GSTR-2B Entries</p>
-                        <p className="text-2xl font-bold text-white mt-1">856</p>
+                        <p className="text-2xl font-bold text-white mt-1">19</p>
                      </div>
                      <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
                         <p className="text-xs text-zinc-500 uppercase font-bold">Est. Time</p>
@@ -1319,9 +1304,9 @@ const ReconciliationEngine = () => {
 
                   <div className="flex justify-center gap-4 mt-8">
                      <button onClick={() => setState('idle')} className="px-6 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white">Run Again</button>
-                     <button className="px-6 py-2 bg-primary hover:bg-emerald-500 text-white rounded-lg text-sm font-bold flex items-center gap-2">
+                     {/* <button className="px-6 py-2 bg-primary hover:bg-emerald-500 text-white rounded-lg text-sm font-bold flex items-center gap-2">
                         <Download className="h-4 w-4" /> Download Full Report
-                     </button>
+                     </button> */}
                   </div>
                </div>
             )}
@@ -1336,6 +1321,29 @@ const ReconciliationEngine = () => {
 
 // --- SCREEN 5: ITC MAXIMIZER ---
 const ITCMaximizer = () => {
+  // Using actual ITC values from GSTR-3B data
+  // ITC Available = IGST + CGST + SGST from itc.available
+  const itcAvailable = 43445.85 + 148402.25 + 148402.25; // = 340,250.35
+  
+  // ITC Claimable = Net ITC (IGST + CGST + SGST from itc.net_itc)
+  const itcClaimable = 43445.85 + 147522 + 147522; // = 338,489.85
+  
+  // Blocked ITC = Available - Claimable
+  const itcBlocked = itcAvailable - itcClaimable; // = 1,760.50
+  
+  // Potential Additional (estimated from reconciliation - can be enhanced)
+  const potentialAdditional = 22000; // Keep as estimate for now
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 100000) {
+      return `₹ ${(amount / 100000).toFixed(2)} L`;
+    } else if (amount >= 1000) {
+      return `₹ ${(amount / 1000).toFixed(0)}k`;
+    } else {
+      return `₹ ${amount.toFixed(2)}`;
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-start">
@@ -1348,22 +1356,22 @@ const ITCMaximizer = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          <BentoCard className="bg-emerald-500/10 border-emerald-500/30">
             <p className="text-xs text-emerald-400 uppercase font-bold">ITC Available</p>
-            <h3 className="text-3xl font-bold text-white mt-2">₹ 8.22 L</h3>
+            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcAvailable)}</h3>
             <p className="text-xs text-zinc-400 mt-1">Eligible for claim</p>
          </BentoCard>
          <BentoCard className="bg-blue-500/10 border-blue-500/30">
             <p className="text-xs text-blue-400 uppercase font-bold">Claimable</p>
-            <h3 className="text-3xl font-bold text-white mt-2">₹ 7.54 L</h3>
+            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcClaimable)}</h3>
             <p className="text-xs text-zinc-400 mt-1">Ready to file</p>
          </BentoCard>
          <BentoCard className="bg-red-500/10 border-red-500/30">
             <p className="text-xs text-red-400 uppercase font-bold">Blocked / Lost</p>
-            <h3 className="text-3xl font-bold text-white mt-2">₹ 45k</h3>
+            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcBlocked)}</h3>
             <p className="text-xs text-zinc-400 mt-1">Ineligible</p>
          </BentoCard>
          <BentoCard className="bg-amber-500/10 border-amber-500/30">
             <p className="text-xs text-amber-400 uppercase font-bold">Potential Addl.</p>
-            <h3 className="text-3xl font-bold text-white mt-2">₹ 22k</h3>
+            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(potentialAdditional)}</h3>
             <p className="text-xs text-zinc-400 mt-1">Action required</p>
          </BentoCard>
       </div>
@@ -1405,13 +1413,32 @@ const ITCMaximizer = () => {
                <p className="text-zinc-300 font-medium">5 Vendors require follow-up</p>
                <p className="text-zinc-500 text-sm mt-1 max-w-xs">Automated reminders drafted for missing invoices and filing delays.</p>
                
-               <div className="grid grid-cols-2 gap-4 w-full mt-6">
-                  <button className="py-2 rounded-lg bg-emerald-600/10 text-emerald-500 border border-emerald-500/20 text-sm font-bold hover:bg-emerald-600/20">
-                     WhatsApp (3)
+               <div className="grid grid-cols-1  justify-center w-full mt-6">
+                  <button 
+                     onClick={async () => {
+                       try {
+                         await fetch('https://glowing-g79w8.crab.containers.automata.host/webhook/deepbutton', {
+                           method: 'POST',
+                           headers: {
+                             'Content-Type': 'application/json',
+                           },
+                           body: JSON.stringify({
+                             action: 'whatsapp_vendor_communication',
+                             timestamp: new Date().toISOString(),
+                             vendors_count: 5
+                           })
+                         });
+                       } catch (error) {
+                         console.error('Webhook error:', error);
+                       }
+                     }}
+                     className="py-2 rounded-lg bg-emerald-600/10 text-emerald-500 border border-emerald-500/20 text-sm font-bold hover:bg-emerald-600/20"
+                  >
+                     WhatsApp 
                   </button>
-                  <button className="py-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 text-sm font-bold hover:bg-blue-500/20">
+                  {/* <button className="py-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 text-sm font-bold hover:bg-blue-500/20">
                      Email (2)
-                  </button>
+                  </button> */}
                </div>
             </div>
             <div className="mt-4 p-3 bg-zinc-900 border border-white/5 rounded-lg flex justify-between items-center">
@@ -1758,7 +1785,7 @@ const FilingOutput = () => {
                   ITC Used: ₹{taxPayment?.itc_used?.toLocaleString() || '0'}
                </p>
                <button onClick={handleCreateChallan} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
-                  <CreditCard className="h-5 w-5" /> Create Challan
+                  <CreditCard className="h-5 w-5" /> Draft GSTR3B
                </button>
             </BentoCard>
             
@@ -1798,13 +1825,26 @@ const FilingOutput = () => {
 // --- MAIN PAGE ---
 export default function GSTRSimulatorPage() {
   const [step, setStep] = useState<SimulatorStep>(1);
+  const [transitioning, setTransitioning] = useState(false);
 
   const nextStep = () => {
-    if (step < 6) setStep((s) => (s + 1) as SimulatorStep);
+    if (step < 6 && !transitioning) {
+      setTransitioning(true);
+      setTimeout(() => {
+        setStep((s) => (s + 1) as SimulatorStep);
+        setTransitioning(false);
+      }, 3000);
+    }
   };
 
   const prevStep = () => {
-    if (step > 1) setStep((s) => (s - 1) as SimulatorStep);
+    if (step > 1 && !transitioning) {
+      setTransitioning(true);
+      setTimeout(() => {
+        setStep((s) => (s - 1) as SimulatorStep);
+        setTransitioning(false);
+      }, 3000);
+    }
   };
 
   const renderStep = () => {
@@ -1841,6 +1881,14 @@ export default function GSTRSimulatorPage() {
 
       {/* Main Content Container */}
       <div className="relative min-h-[600px]">
+        {transitioning && (
+          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+              <p className="text-white font-medium">Transitioning to next step...</p>
+            </div>
+          </div>
+        )}
         {renderStep()}
       </div>
 
@@ -1849,19 +1897,19 @@ export default function GSTRSimulatorPage() {
         <div className="container mx-auto max-w-7xl flex justify-between items-center">
           <button 
             onClick={prevStep}
-            disabled={step === 1}
+            disabled={step === 1 || transitioning}
             className="px-6 py-2 rounded-lg border border-white/10 text-zinc-300 font-medium hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" /> Back
           </button>
           
           <div className="text-sm text-zinc-500 font-mono">
-            Step {step} of 6
+            Step {step} of 6 {transitioning && <span className="text-primary">(Loading...)</span>}
           </div>
 
           <button 
             onClick={nextStep}
-            disabled={step === 6}
+            disabled={step === 6 || transitioning}
             className="px-6 py-2 rounded-lg bg-white text-black font-bold hover:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-lg shadow-white/10"
           >
             Next Step <ChevronRight className="h-4 w-4" />
