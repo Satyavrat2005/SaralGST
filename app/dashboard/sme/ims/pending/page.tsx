@@ -36,145 +36,150 @@ export default function IMSPendingPage() {
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {
-      case 'High': return <span className="text-red-500 font-medium">High</span>;
-      case 'Medium': return <span className="text-amber-500 font-medium">Medium</span>;
-      case 'Low': return <span className="text-emerald-500 font-medium">Low</span>;
-      default: return <span className="text-zinc-500">Unknown</span>;
+      case 'High': return <span className="text-red-600 font-semibold">High</span>;
+      case 'Medium': return <span className="text-amber-600 font-semibold">Medium</span>;
+      case 'Low': return <span className="text-emerald-600 font-semibold">Low</span>;
+      default: return <span className="text-gray-500">Unknown</span>;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Assigned': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      case 'Not Assigned': return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
-      case 'Waiting Approval': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case 'Returned': return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-      default: return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+      case 'Assigned': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'Not Assigned': return 'bg-gray-100 text-gray-600 border-gray-200';
+      case 'Waiting Approval': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Returned': return 'bg-orange-50 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       {/* 1. PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Pending Approvals</h1>
-          <p className="text-muted-foreground text-sm mt-1">Invoices awaiting decision from accountant or manager</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+            <Clock className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Pending Actions</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Pending Approvals</h1>
+          <p className="text-gray-600 text-sm mt-1">Invoices awaiting decision from accountant or manager</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
+           <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2 font-medium">
              <User className="h-4 w-4" /> Assign Selected
            </button>
-           <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
+           <button className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2">
              <CheckCircle2 className="h-4 w-4" /> Approve All
            </button>
         </div>
       </div>
 
       {/* Quick Filters */}
-      <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex flex-wrap items-center gap-3">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-3">
          <div className="relative">
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block pl-3 pr-8 py-2 appearance-none cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block pl-3 pr-8 py-2.5 appearance-none cursor-pointer hover:border-gray-300 outline-none transition-all">
                <option>All Vendors</option>
                <option>Alpha Systems</option>
                <option>TechSol</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
          </div>
          <div className="relative">
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block pl-3 pr-8 py-2 appearance-none cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block pl-3 pr-8 py-2.5 appearance-none cursor-pointer hover:border-gray-300 outline-none transition-all">
                <option>Assigned To: All</option>
                <option>Me</option>
                <option>Rahul S.</option>
                <option>Priya M.</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
          </div>
          <div className="relative">
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block pl-3 pr-8 py-2 appearance-none cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block pl-3 pr-8 py-2.5 appearance-none cursor-pointer hover:border-gray-300 outline-none transition-all">
                <option>Age: All</option>
                <option>0-3 days</option>
                <option>4-7 days</option>
                <option>8+ days</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
          </div>
          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <input 
               type="text" 
               placeholder="Search invoice..." 
-              className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary outline-none w-full"
+              className="pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full transition-all"
             />
          </div>
       </div>
 
       {/* 2. PENDING APPROVAL TABLE */}
-      <GlassPanel className="p-0 overflow-hidden flex flex-col min-h-[500px]">
-         <div className="px-6 py-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
-            <span className="text-sm text-white font-medium">4 Invoices Pending</span>
-            {selectedRows.length > 0 && <span className="text-sm text-zinc-400">{selectedRows.length} selected</span>}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden flex flex-col min-h-[500px]">
+         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
+            <span className="text-sm text-gray-900 font-semibold">4 Invoices Pending</span>
+            {selectedRows.length > 0 && <span className="text-sm text-gray-600">{selectedRows.length} selected</span>}
          </div>
 
          <div className="flex-1 overflow-auto">
             <table className="w-full text-left text-sm">
-               <thead className="bg-white/5 text-zinc-500 font-medium sticky top-0 backdrop-blur-sm z-10">
+               <thead className="bg-gradient-to-r from-gray-50 to-white text-gray-700 font-semibold sticky top-0 backdrop-blur-sm z-10 border-b border-gray-200">
                   <tr>
-                     <th className="px-6 py-3 w-12"></th>
-                     <th className="px-6 py-3">Invoice No</th>
-                     <th className="px-6 py-3">Date</th>
-                     <th className="px-6 py-3">Vendor</th>
-                     <th className="px-6 py-3 text-right">Amount</th>
-                     <th className="px-6 py-3 text-right">GST</th>
-                     <th className="px-6 py-3">Assigned To</th>
-                     <th className="px-6 py-3 text-center">Pending</th>
-                     <th className="px-6 py-3 text-center">Risk</th>
-                     <th className="px-6 py-3 text-center">Status</th>
-                     <th className="px-6 py-3 text-right">Actions</th>
+                     <th className="px-4 py-3 w-12"></th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Invoice No</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Date</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Vendor</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Amount</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">GST</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Assigned To</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Pending</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Risk</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Status</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-white/5">
+               <tbody className="divide-y divide-gray-100">
                   {pendingInvoices.map((inv) => (
-                     <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
-                        <td className="px-6 py-4">
+                     <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
+                        <td className="px-4 py-3">
                            <input 
                              type="checkbox" 
-                             className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                             className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500"
                              checked={selectedRows.includes(inv.id)}
                              onChange={() => toggleRowSelection(inv.id)}
                            />
                         </td>
-                        <td className="px-6 py-4 font-medium text-white">{inv.id}</td>
-                        <td className="px-6 py-4 text-zinc-400">{inv.date}</td>
-                        <td className="px-6 py-4 text-zinc-200">{inv.vendor}</td>
-                        <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.amount.toLocaleString()}</td>
-                        <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.gst.toLocaleString()}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3 font-semibold text-gray-900">{inv.id}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{inv.date}</td>
+                        <td className="px-4 py-3 text-gray-900 text-xs font-medium">{inv.vendor}</td>
+                        <td className="px-4 py-3 text-right text-gray-900 font-semibold text-xs">₹{inv.amount.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-gray-700 font-semibold text-xs">₹{inv.gst.toLocaleString()}</td>
+                        <td className="px-4 py-3">
                            <div className="flex items-center gap-2">
-                              <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${inv.assignedTo === 'Unassigned' ? 'bg-zinc-800 text-zinc-500' : 'bg-primary/20 text-primary'}`}>
+                              <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${inv.assignedTo === 'Unassigned' ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>
                                  {inv.assignedTo === 'Unassigned' ? '?' : inv.assignedTo.charAt(0)}
                               </div>
-                              <span className={`text-xs ${inv.assignedTo === 'Unassigned' ? 'text-zinc-500 italic' : 'text-white'}`}>{inv.assignedTo}</span>
+                              <span className={`text-xs ${inv.assignedTo === 'Unassigned' ? 'text-gray-500 italic' : 'text-gray-900'}`}>{inv.assignedTo}</span>
                            </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                           <span className={`text-xs font-bold ${inv.daysPending > 7 ? 'text-red-500' : 'text-zinc-400'}`}>{inv.daysPending} Days</span>
+                        <td className="px-4 py-3 text-center">
+                           <span className={`text-xs font-bold ${inv.daysPending > 7 ? 'text-red-600' : 'text-gray-600'}`}>{inv.daysPending} Days</span>
                         </td>
-                        <td className="px-6 py-4 text-center text-xs">{getRiskBadge(inv.risk)}</td>
-                        <td className="px-6 py-4 text-center">
-                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusBadge(inv.status)}`}>
+                        <td className="px-4 py-3 text-center text-xs">{getRiskBadge(inv.risk)}</td>
+                        <td className="px-4 py-3 text-center">
+                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${getStatusBadge(inv.status)}`}>
                               {inv.status}
                            </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-3 text-right">
                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-emerald-500" title="Approve">
+                              <button className="p-1.5 hover:bg-emerald-50 rounded-lg text-gray-400 hover:text-emerald-600 transition-all" title="Approve">
                                  <CheckCircle2 className="h-4 w-4" />
                               </button>
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-red-500" title="Reject">
+                              <button className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-all" title="Reject">
                                  <XCircle className="h-4 w-4" />
                               </button>
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white">
+                              <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all">
                                  <MoreVertical className="h-4 w-4" />
                               </button>
                            </div>
@@ -184,7 +189,8 @@ export default function IMSPendingPage() {
                </tbody>
             </table>
          </div>
-      </GlassPanel>
+      </div>
+    </div>
     </div>
   );
 }

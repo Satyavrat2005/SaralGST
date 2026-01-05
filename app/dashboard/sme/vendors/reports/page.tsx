@@ -34,17 +34,22 @@ const invoiceVolume = [
 
 export default function VendorReportsPage() {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Vendor Reports</h1>
-          <p className="text-muted-foreground text-sm mt-1">Analyze vendor performance and compliance trends</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+            <BarChart3 className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Analytics</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vendor Reports</h1>
+          <p className="text-gray-600 text-sm mt-1">Analyze vendor performance and compliance trends</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
+           <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2 font-medium">
              <Calendar className="h-4 w-4" /> Schedule Report
            </button>
-           <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20">
+           <button className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2">
              <Download className="h-4 w-4" /> Download PDF
            </button>
         </div>
@@ -52,65 +57,65 @@ export default function VendorReportsPage() {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-         <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5">
-            <p className="text-xs text-zinc-500">Avg Compliance</p>
-            <p className="text-2xl font-bold text-white mt-1">87% <span className="text-xs text-emerald-500 font-normal">+3%</span></p>
+         <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold">Avg Compliance</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">87% <span className="text-xs text-emerald-600 font-semibold">+3%</span></p>
          </div>
-         <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5">
-            <p className="text-xs text-zinc-500">On-time Filing</p>
-            <p className="text-2xl font-bold text-white mt-1">82% <span className="text-xs text-red-500 font-normal">-2%</span></p>
+         <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold">On-time Filing</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">82% <span className="text-xs text-red-600 font-semibold">-2%</span></p>
          </div>
-         <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5">
-            <p className="text-xs text-zinc-500">Invoice Accuracy</p>
-            <p className="text-2xl font-bold text-white mt-1">94% <span className="text-xs text-emerald-500 font-normal">+1%</span></p>
+         <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold">Invoice Accuracy</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">94% <span className="text-xs text-emerald-600 font-semibold">+1%</span></p>
          </div>
-         <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5">
-            <p className="text-xs text-zinc-500">ITC Secured</p>
-            <p className="text-2xl font-bold text-white mt-1">₹45.6L</p>
+         <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold">ITC Secured</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">₹45.6L</p>
          </div>
       </div>
 
       {/* Report Selection */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <BentoCard className="cursor-pointer border-primary/50 bg-primary/5">
+         <div className="bg-white rounded-2xl border-2 border-emerald-300 shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all">
             <div className="flex items-center gap-4">
-               <div className="p-3 rounded-lg bg-primary/20 text-primary">
+               <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
                   <ShieldCheck className="h-6 w-6" />
                </div>
                <div>
-                  <h3 className="font-bold text-white">Compliance Report</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Risk assessment & scoring</p>
+                  <h3 className="font-bold text-gray-900">Compliance Report</h3>
+                  <p className="text-xs text-gray-600 mt-1">Risk assessment & scoring</p>
                </div>
             </div>
-         </BentoCard>
-         <BentoCard className="cursor-pointer hover:border-white/20">
+         </div>
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all">
             <div className="flex items-center gap-4">
-               <div className="p-3 rounded-lg bg-zinc-800 text-zinc-400">
+               <div className="p-3 rounded-xl bg-gray-100 text-gray-600">
                   <Calendar className="h-6 w-6" />
                </div>
                <div>
-                  <h3 className="font-bold text-white">Filing Performance</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Timeliness analysis</p>
+                  <h3 className="font-bold text-gray-900">Filing Performance</h3>
+                  <p className="text-xs text-gray-600 mt-1">Timeliness analysis</p>
                </div>
             </div>
-         </BentoCard>
-         <BentoCard className="cursor-pointer hover:border-white/20">
+         </div>
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all">
             <div className="flex items-center gap-4">
-               <div className="p-3 rounded-lg bg-zinc-800 text-zinc-400">
+               <div className="p-3 rounded-xl bg-gray-100 text-gray-600">
                   <FileText className="h-6 w-6" />
                </div>
                <div>
-                  <h3 className="font-bold text-white">Invoice Analytics</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Volume & error trends</p>
+                  <h3 className="font-bold text-gray-900">Invoice Analytics</h3>
+                  <p className="text-xs text-gray-600 mt-1">Volume & error trends</p>
                </div>
             </div>
-         </BentoCard>
+         </div>
       </div>
 
       {/* Main Report Area */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[400px]">
-         <GlassPanel className="p-6 flex flex-col">
-            <h3 className="text-lg font-semibold text-white mb-6">Compliance Trend (6 Months)</h3>
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 flex flex-col">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Compliance Trend (6 Months)</h3>
             <div className="flex-1 w-full min-h-0">
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={complianceTrend}>
@@ -120,31 +125,32 @@ export default function VendorReportsPage() {
                            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
                         </linearGradient>
                      </defs>
-                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                     <XAxis dataKey="month" stroke="#666" tick={{fill: '#9ca3af', fontSize: 12}} />
-                     <YAxis stroke="#666" tick={{fill: '#9ca3af', fontSize: 12}} domain={[0, 100]} />
-                     <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#333', borderRadius: '8px' }} itemStyle={{ fontSize: '12px', color: '#fff' }} />
+                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                     <XAxis dataKey="month" stroke="#9ca3af" tick={{fill: '#6b7280', fontSize: 12}} />
+                     <YAxis stroke="#9ca3af" tick={{fill: '#6b7280', fontSize: 12}} domain={[0, 100]} />
+                     <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e5e7eb', borderRadius: '8px' }} itemStyle={{ fontSize: '12px', color: '#111' }} />
                      <Area type="monotone" dataKey="score" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
                   </AreaChart>
                </ResponsiveContainer>
             </div>
-         </GlassPanel>
+         </div>
 
-         <GlassPanel className="p-6 flex flex-col">
-            <h3 className="text-lg font-semibold text-white mb-6">Invoice Volume Growth</h3>
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 flex flex-col">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Invoice Volume Growth</h3>
             <div className="flex-1 w-full min-h-0">
                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={invoiceVolume}>
-                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                     <XAxis dataKey="month" stroke="#666" tick={{fill: '#9ca3af', fontSize: 12}} />
-                     <YAxis stroke="#666" tick={{fill: '#9ca3af', fontSize: 12}} />
-                     <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#333', borderRadius: '8px' }} itemStyle={{ fontSize: '12px', color: '#fff' }} />
+                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                     <XAxis dataKey="month" stroke="#9ca3af" tick={{fill: '#6b7280', fontSize: 12}} />
+                     <YAxis stroke="#9ca3af" tick={{fill: '#6b7280', fontSize: 12}} />
+                     <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e5e7eb', borderRadius: '8px' }} itemStyle={{ fontSize: '12px', color: '#111' }} />
                      <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                </ResponsiveContainer>
             </div>
-         </GlassPanel>
+         </div>
       </div>
+    </div>
     </div>
   );
 }

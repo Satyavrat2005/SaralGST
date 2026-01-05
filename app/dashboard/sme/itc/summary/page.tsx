@@ -39,137 +39,136 @@ export default function ITCSummaryPage() {
   const [activeTab, setActiveTab] = useState<'eligible' | 'claimed' | 'blocked' | 'risk'>('eligible');
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       {/* 1. PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">ITC Summary</h1>
-          <p className="text-muted-foreground text-sm mt-1">Input Tax Credit overview and detailed breakdown</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <div className="relative">
-             <select className="appearance-none bg-zinc-900 border border-white/10 text-sm rounded-lg pl-9 pr-8 py-2 focus:ring-1 focus:ring-primary outline-none text-zinc-300 cursor-pointer hover:bg-zinc-800">
-               <option>This Month</option>
-               <option>Last Month</option>
-               <option>This Quarter</option>
-             </select>
-             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
-           </div>
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
-             <Download className="h-4 w-4" /> ITC Report
-           </button>
-           <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
-             <Eye className="h-4 w-4" /> GSTR-3B Preview
-           </button>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-[11px] font-semibold text-emerald-700">ITC Overview</span>
+            </div>
+            <h1 className="text-[28px] font-semibold text-gray-900 tracking-tight mb-1">ITC Summary</h1>
+            <p className="text-sm text-gray-600">Input Tax Credit overview and detailed breakdown</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <div className="relative">
+               <select className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-10 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-700 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
+                 <option>This Month</option>
+                 <option>Last Month</option>
+                 <option>This Quarter</option>
+               </select>
+               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+             </div>
+             <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2">
+               <Download className="h-4 w-4" /> ITC Report
+             </button>
+             <button className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+               <Eye className="h-4 w-4" /> GSTR-3B Preview
+             </button>
+          </div>
         </div>
       </div>
 
       {/* 2. ITC OVERVIEW CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <BentoCard className="p-6">
-           <div className="flex justify-between items-start">
-             <div>
-               <p className="text-sm text-muted-foreground">Total ITC Eligible</p>
-               <h3 className="text-3xl font-bold text-white mt-2">₹ 8,22,020</h3>
-               <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1"><TrendingUp className="h-3 w-3" /> +12% vs last month</p>
-             </div>
-             <div className="p-2 bg-blue-500/10 rounded-lg">
-               <CheckCircle2 className="h-5 w-5 text-blue-500" />
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-5 hover:shadow-xl transition-all h-[140px] flex flex-col">
+           <div className="flex justify-between items-start mb-2">
+             <p className="text-sm text-gray-600 font-medium">Total ITC Eligible</p>
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+               <CheckCircle2 className="h-4 w-4 text-white" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+           <h3 className="text-2xl font-bold text-gray-900 whitespace-nowrap">₹ 8,22,020</h3>
+           <p className="text-xs text-emerald-600 mt-auto flex items-center gap-1 font-medium"><TrendingUp className="h-3 w-3" /> +12% vs last month</p>
+        </div>
 
-        <BentoCard className="p-6 border-emerald-500/30 bg-emerald-500/5">
-           <div className="flex justify-between items-start">
-             <div>
-               <p className="text-sm text-emerald-400/80">ITC Claimed</p>
-               <h3 className="text-3xl font-bold text-emerald-500 mt-2">₹ 7,54,230</h3>
-               <p className="text-xs text-zinc-500 mt-1">92% of eligible ITC</p>
-             </div>
-             <div className="p-2 bg-emerald-500/10 rounded-lg">
-               <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-lg p-5 hover:shadow-xl transition-all h-[140px] flex flex-col">
+           <div className="flex justify-between items-start mb-2">
+             <p className="text-sm text-gray-600 font-medium">ITC Claimed</p>
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
+               <CheckCircle2 className="h-4 w-4 text-white" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+           <h3 className="text-2xl font-bold text-emerald-600 whitespace-nowrap">₹ 7,54,230</h3>
+           <p className="text-xs text-gray-500 mt-auto">92% of eligible ITC</p>
+        </div>
 
-        <BentoCard className="p-6 border-red-500/30 bg-red-500/5">
-           <div className="flex justify-between items-start">
-             <div>
-               <p className="text-sm text-red-400/80">Blocked/Reversed</p>
-               <h3 className="text-3xl font-bold text-red-500 mt-2">₹ 45,600</h3>
-               <p className="text-xs text-zinc-500 mt-1">5.5% of eligible ITC</p>
-             </div>
-             <div className="p-2 bg-red-500/10 rounded-lg">
-               <XCircle className="h-5 w-5 text-red-500" />
+        <div className="bg-white rounded-2xl border border-red-200 shadow-lg p-5 hover:shadow-xl transition-all h-[140px] flex flex-col">
+           <div className="flex justify-between items-start mb-2">
+             <p className="text-sm text-gray-600 font-medium">Blocked/Reversed</p>
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 shrink-0">
+               <XCircle className="h-4 w-4 text-white" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+           <h3 className="text-2xl font-bold text-red-600 whitespace-nowrap">₹ 45,600</h3>
+           <p className="text-xs text-gray-500 mt-auto">5.5% of eligible ITC</p>
+        </div>
 
-        <BentoCard className="p-6 border-amber-500/30 bg-amber-500/5">
-           <div className="flex justify-between items-start">
-             <div>
-               <p className="text-sm text-amber-400/80">ITC at Risk</p>
-               <h3 className="text-3xl font-bold text-amber-500 mt-2">₹ 22,190</h3>
-               <p className="text-xs text-zinc-500 mt-1">Vendor action pending</p>
-             </div>
-             <div className="p-2 bg-amber-500/10 rounded-lg">
-               <AlertTriangle className="h-5 w-5 text-amber-500" />
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-lg p-5 hover:shadow-xl transition-all h-[140px] flex flex-col">
+           <div className="flex justify-between items-start mb-2">
+             <p className="text-sm text-gray-600 font-medium">ITC at Risk</p>
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+               <AlertTriangle className="h-4 w-4 text-white" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+           <h3 className="text-2xl font-bold text-amber-600 whitespace-nowrap">₹ 22,190</h3>
+           <p className="text-xs text-gray-500 mt-auto">Vendor action pending</p>
+        </div>
       </div>
 
       {/* 3. ITC FLOW DIAGRAM */}
       <div className="w-full overflow-x-auto">
-         <GlassPanel className="p-8 min-w-[800px]">
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 min-w-[800px]">
             <div className="flex justify-between items-center relative">
                {/* Total */}
                <div className="flex flex-col items-center z-10">
-                  <div className="w-40 p-4 bg-zinc-900 border border-white/10 rounded-xl text-center shadow-lg">
-                     <p className="text-xs text-zinc-500 uppercase mb-1">Total Available</p>
-                     <p className="text-lg font-bold text-white">₹ 8,22,020</p>
+                  <div className="w-40 p-4 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl text-center shadow-md">
+                     <p className="text-xs text-gray-600 uppercase mb-1 font-semibold">Total Available</p>
+                     <p className="text-lg font-bold text-gray-900">₹ 8,22,020</p>
                   </div>
                </div>
 
                {/* Connecting Lines */}
-               <div className="absolute top-1/2 left-20 right-20 h-px bg-zinc-700 -z-0"></div>
+               <div className="absolute top-1/2 left-20 right-20 h-px bg-gray-300 -z-0"></div>
                
                {/* Split */}
                <div className="flex-1 flex justify-around items-center relative z-10 px-10">
                   <div className="flex flex-col items-center gap-8">
                      <div 
-                        className="w-40 p-4 bg-zinc-900 border border-emerald-500/30 rounded-xl text-center shadow-lg cursor-pointer hover:bg-zinc-800 transition-colors"
+                        className="w-40 p-4 bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 rounded-xl text-center shadow-md cursor-pointer hover:shadow-lg transition-all"
                         onClick={() => setActiveTab('eligible')}
                      >
-                        <p className="text-xs text-emerald-500 uppercase mb-1">Eligible (94%)</p>
-                        <p className="text-lg font-bold text-white">₹ 7,76,420</p>
+                        <p className="text-xs text-emerald-700 uppercase mb-1 font-semibold">Eligible (94%)</p>
+                        <p className="text-lg font-bold text-gray-900">₹ 7,76,420</p>
                      </div>
-                     <ArrowRight className="h-5 w-5 text-zinc-600 rotate-90" />
+                     <ArrowRight className="h-5 w-5 text-gray-400 rotate-90" />
                      <div 
-                        className="w-40 p-4 bg-emerald-900/20 border border-emerald-500/50 rounded-xl text-center shadow-lg cursor-pointer hover:bg-emerald-900/30 transition-colors"
+                        className="w-40 p-4 bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-300 rounded-xl text-center shadow-md cursor-pointer hover:shadow-lg transition-all"
                         onClick={() => setActiveTab('claimed')}
                      >
-                        <p className="text-xs text-emerald-400 uppercase mb-1">Claimed</p>
-                        <p className="text-lg font-bold text-white">₹ 7,54,230</p>
+                        <p className="text-xs text-emerald-700 uppercase mb-1 font-semibold">Claimed</p>
+                        <p className="text-lg font-bold text-emerald-700">₹ 7,54,230</p>
                      </div>
                   </div>
 
                   <div className="flex flex-col items-center">
                      <div 
-                        className="w-40 p-4 bg-zinc-900 border border-red-500/30 rounded-xl text-center shadow-lg cursor-pointer hover:bg-zinc-800 transition-colors"
+                        className="w-40 p-4 bg-gradient-to-br from-red-50 to-white border border-red-200 rounded-xl text-center shadow-md cursor-pointer hover:shadow-lg transition-all"
                         onClick={() => setActiveTab('blocked')}
                      >
-                        <p className="text-xs text-red-500 uppercase mb-1">Blocked (6%)</p>
-                        <p className="text-lg font-bold text-white">₹ 45,600</p>
+                        <p className="text-xs text-red-700 uppercase mb-1 font-semibold">Blocked (6%)</p>
+                        <p className="text-lg font-bold text-red-600">₹ 45,600</p>
                      </div>
                   </div>
                </div>
             </div>
-         </GlassPanel>
+         </div>
       </div>
 
       {/* 4. DETAILED BREAKDOWN TABS */}
-      <div className="flex border-b border-white/5">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1">
          {[
             { id: 'eligible', label: 'Eligible ITC', count: 789 },
             { id: 'claimed', label: 'Claimed ITC', count: 750 },
@@ -180,14 +179,14 @@ export default function ITCSummaryPage() {
                key={tab.id}
                onClick={() => setActiveTab(tab.id as any)}
                className={`
-                  px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2
+                  px-4 py-2.5 text-sm font-medium rounded-xl transition-all flex items-center gap-2
                   ${activeTab === tab.id 
-                     ? 'border-primary text-white bg-white/5' 
-                     : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}
+                     ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm border border-emerald-200' 
+                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
                `}
             >
                {tab.label}
-               <span className={`text-xs px-1.5 py-0.5 rounded ${activeTab === tab.id ? 'bg-primary/20 text-primary' : 'bg-zinc-800 text-zinc-500'}`}>
+               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${activeTab === tab.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
                   {tab.count}
                </span>
             </button>
@@ -197,159 +196,160 @@ export default function ITCSummaryPage() {
       {/* 5. TAB CONTENT */}
       <div className="min-h-[400px]">
          {activeTab === 'eligible' && (
-            <GlassPanel className="p-0 overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="flex items-center justify-between p-4 border-b border-white/5">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
                   <div className="flex gap-3">
                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-                        <input type="text" placeholder="Search..." className="pl-9 pr-4 py-1.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary outline-none" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                        <input type="text" placeholder="Search..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
                      </div>
-                     <button className="p-1.5 bg-zinc-900 border border-white/10 rounded-lg text-zinc-400 hover:text-white"><Filter className="h-4 w-4" /></button>
+                     <button className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-all"><Filter className="h-4 w-4" /></button>
                   </div>
-                  <span className="text-sm text-white font-medium">Total: ₹7,76,420</span>
+                  <span className="text-sm text-gray-900 font-semibold">Total: ₹7,76,420</span>
                </div>
                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/5 text-zinc-500 font-medium">
+                  <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                      <tr>
-                        <th className="px-6 py-3">Invoice No</th>
-                        <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3">Vendor</th>
-                        <th className="px-6 py-3 text-right">Taxable</th>
-                        <th className="px-6 py-3 text-right">Total ITC</th>
-                        <th className="px-6 py-3 text-center">Status</th>
-                        <th className="px-6 py-3 text-center">Source</th>
-                        <th className="px-6 py-3 text-right">Actions</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Vendor</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Taxable</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Total ITC</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Status</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Source</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-100">
                      {eligibleITC.map((item) => (
-                        <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                           <td className="px-6 py-4 font-medium text-white">{item.id}</td>
-                           <td className="px-6 py-4 text-zinc-400">{item.date}</td>
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                           <td className="px-6 py-4 font-semibold text-gray-900">{item.id}</td>
+                           <td className="px-6 py-4 text-gray-600">{item.date}</td>
                            <td className="px-6 py-4">
                               <div>
-                                 <p className="text-zinc-200">{item.vendor}</p>
-                                 <p className="text-[10px] text-zinc-500 font-mono">{item.gstin}</p>
+                                 <p className="text-gray-900 font-medium">{item.vendor}</p>
+                                 <p className="text-[10px] text-gray-500 font-mono">{item.gstin}</p>
                               </div>
                            </td>
-                           <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{item.taxable.toLocaleString()}</td>
-                           <td className="px-6 py-4 text-right font-bold text-white font-mono">₹{item.tax.toLocaleString()}</td>
+                           <td className="px-6 py-4 text-right text-gray-700 font-semibold">₹{item.taxable.toLocaleString()}</td>
+                           <td className="px-6 py-4 text-right font-bold text-gray-900">₹{item.tax.toLocaleString()}</td>
                            <td className="px-6 py-4 text-center">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${item.status === 'Eligible' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${item.status === 'Eligible' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                                  {item.status === 'Eligible' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                                  {item.status}
                               </span>
                            </td>
                            <td className="px-6 py-4 text-center">
-                              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-1 rounded">{item.source}</span>
+                              <span className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full font-medium">{item.source}</span>
                            </td>
                            <td className="px-6 py-4 text-right">
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><MoreVertical className="h-4 w-4" /></button>
+                              <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all"><MoreVertical className="h-4 w-4" /></button>
                            </td>
                         </tr>
                      ))}
                   </tbody>
                </table>
-            </GlassPanel>
+            </div>
          )}
 
          {activeTab === 'blocked' && (
-            <GlassPanel className="p-0 overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-white/5 bg-zinc-900/30">
-                  <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                     <p className="text-xs text-purple-400 font-medium">Blocked Credits (Rule 38/42/43)</p>
-                     <p className="text-lg font-bold text-white mt-1">₹ 25,000 <span className="text-xs font-normal text-zinc-500">(8 invoices)</span></p>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+               <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-white border border-purple-200 rounded-xl">
+                     <p className="text-xs text-purple-700 font-semibold uppercase tracking-wider">Blocked Credits (Rule 38/42/43)</p>
+                     <p className="text-lg font-bold text-gray-900 mt-2">₹ 25,000 <span className="text-xs font-normal text-gray-500">(8 invoices)</span></p>
                   </div>
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                     <p className="text-xs text-red-400 font-medium">Vendor Non-Filing</p>
-                     <p className="text-lg font-bold text-white mt-1">₹ 12,400 <span className="text-xs font-normal text-zinc-500">(10 invoices)</span></p>
+                  <div className="p-4 bg-gradient-to-br from-red-50 to-white border border-red-200 rounded-xl">
+                     <p className="text-xs text-red-700 font-semibold uppercase tracking-wider">Vendor Non-Filing</p>
+                     <p className="text-lg font-bold text-gray-900 mt-2">₹ 12,400 <span className="text-xs font-normal text-gray-500">(10 invoices)</span></p>
                   </div>
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                     <p className="text-xs text-amber-400 font-medium">Validation Failures</p>
-                     <p className="text-lg font-bold text-white mt-1">₹ 8,200 <span className="text-xs font-normal text-zinc-500">(6 invoices)</span></p>
+                  <div className="p-4 bg-gradient-to-br from-amber-50 to-white border border-amber-200 rounded-xl">
+                     <p className="text-xs text-amber-700 font-semibold uppercase tracking-wider">Validation Failures</p>
+                     <p className="text-lg font-bold text-gray-900 mt-2">₹ 8,200 <span className="text-xs font-normal text-gray-500">(6 invoices)</span></p>
                   </div>
                </div>
                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/5 text-zinc-500 font-medium">
+                  <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                      <tr>
-                        <th className="px-6 py-3">Invoice No</th>
-                        <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3">Vendor</th>
-                        <th className="px-6 py-3 text-right">ITC Amount</th>
-                        <th className="px-6 py-3">Reason</th>
-                        <th className="px-6 py-3">Blocked Date</th>
-                        <th className="px-6 py-3 text-center">Status</th>
-                        <th className="px-6 py-3 text-right">Actions</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Vendor</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">ITC Amount</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Reason</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Blocked Date</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Status</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-100">
                      {blockedITC.map((item) => (
-                        <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                           <td className="px-6 py-4 font-medium text-white">{item.id}</td>
-                           <td className="px-6 py-4 text-zinc-400">{item.date}</td>
-                           <td className="px-6 py-4 text-zinc-200">{item.vendor}</td>
-                           <td className="px-6 py-4 text-right font-bold text-red-400">₹{item.amount.toLocaleString()}</td>
-                           <td className="px-6 py-4 text-sm text-zinc-300">{item.reason}</td>
-                           <td className="px-6 py-4 text-zinc-400">{item.dateBlocked}</td>
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                           <td className="px-6 py-4 font-semibold text-gray-900">{item.id}</td>
+                           <td className="px-6 py-4 text-gray-600">{item.date}</td>
+                           <td className="px-6 py-4 text-gray-900 font-medium">{item.vendor}</td>
+                           <td className="px-6 py-4 text-right font-bold text-red-600">₹{item.amount.toLocaleString()}</td>
+                           <td className="px-6 py-4 text-sm text-gray-700">{item.reason}</td>
+                           <td className="px-6 py-4 text-gray-600">{item.dateBlocked}</td>
                            <td className="px-6 py-4 text-center">
-                              <span className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-500 border border-red-500/20">{item.status}</span>
+                              <span className="text-xs px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 font-semibold">{item.status}</span>
                            </td>
                            <td className="px-6 py-4 text-right">
-                              <button className="text-xs text-primary hover:underline">Details</button>
+                              <button className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold">Details</button>
                            </td>
                         </tr>
                      ))}
                   </tbody>
                </table>
-            </GlassPanel>
+            </div>
          )}
 
          {activeTab === 'risk' && (
-            <GlassPanel className="p-0 overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="p-4 flex justify-between items-center border-b border-white/5">
-                  <h3 className="text-white font-medium">Actionable Items</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+               <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                  <h3 className="text-gray-900 font-semibold">Actionable Items</h3>
                   <div className="flex gap-2">
-                     <button className="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500">Send Bulk Reminders</button>
-                     <button className="px-3 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700">Resolve All</button>
+                     <button className="btn-primary-custom px-3 py-2 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all">Send Bulk Reminders</button>
+                     <button className="px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-50 transition-all">Resolve All</button>
                   </div>
                </div>
                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/5 text-zinc-500 font-medium">
+                  <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                      <tr>
-                        <th className="px-6 py-3">Invoice No</th>
-                        <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3">Vendor</th>
-                        <th className="px-6 py-3 text-right">ITC at Risk</th>
-                        <th className="px-6 py-3">Risk Type</th>
-                        <th className="px-6 py-3 text-center">Days Pending</th>
-                        <th className="px-6 py-3 text-right">Action</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Vendor</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">ITC at Risk</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Risk Type</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Days Pending</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Action</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-100">
                      {atRiskITC.map((item) => (
-                        <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                           <td className="px-6 py-4 font-medium text-white">{item.id}</td>
-                           <td className="px-6 py-4 text-zinc-400">{item.date}</td>
-                           <td className="px-6 py-4 text-zinc-200">{item.vendor}</td>
-                           <td className="px-6 py-4 text-right font-bold text-amber-500">₹{item.amount.toLocaleString()}</td>
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                           <td className="px-6 py-4 font-semibold text-gray-900">{item.id}</td>
+                           <td className="px-6 py-4 text-gray-600">{item.date}</td>
+                           <td className="px-6 py-4 text-gray-900 font-medium">{item.vendor}</td>
+                           <td className="px-6 py-4 text-right font-bold text-amber-600">₹{item.amount.toLocaleString()}</td>
                            <td className="px-6 py-4">
-                              <span className="inline-flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 font-semibold">
                                  <AlertTriangle className="h-3 w-3" /> {item.risk}
                               </span>
                            </td>
                            <td className="px-6 py-4 text-center">
-                              <span className={`font-bold ${item.days > 15 ? 'text-red-500' : 'text-zinc-400'}`}>{item.days} Days</span>
+                              <span className={`font-bold ${item.days > 15 ? 'text-red-600' : 'text-gray-600'}`}>{item.days} Days</span>
                            </td>
                            <td className="px-6 py-4 text-right">
-                              <button className="px-3 py-1 rounded border border-white/10 text-xs text-white hover:bg-white/5">{item.action}</button>
+                              <button className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs text-gray-700 font-medium hover:bg-gray-50 transition-all">{item.action}</button>
                            </td>
                         </tr>
                      ))}
                   </tbody>
                </table>
-            </GlassPanel>
+            </div>
          )}
       </div>
+    </div>
     </div>
   );
 }

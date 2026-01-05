@@ -49,90 +49,99 @@ export default function GSTR1DraftPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       
       {/* 1. PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">GSTR-1 Draft</h1>
-          <p className="text-muted-foreground text-sm mt-1">Outward supplies return - auto-generated from sales register</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <div className="relative">
-             <select className="appearance-none bg-zinc-900 border border-white/10 text-sm rounded-lg pl-9 pr-8 py-2 focus:ring-1 focus:ring-primary outline-none text-zinc-300 cursor-pointer hover:bg-zinc-800">
-               <option>November 2025</option>
-               <option>October 2025</option>
-               <option>September 2025</option>
-             </select>
-             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
-           </div>
-           
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
-             <Upload className="h-4 w-4" /> Import Excel
-           </button>
-           <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
-             <Play className="h-4 w-4" /> Auto-Generate Draft
-           </button>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-[11px] font-semibold text-emerald-700">Filing Returns</span>
+            </div>
+            <h1 className="text-[28px] font-semibold text-gray-900 tracking-tight mb-1">GSTR-1 Draft</h1>
+            <p className="text-sm text-gray-600">Outward supplies return - auto-generated from sales register</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <div className="relative">
+               <select className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-10 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-700 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
+                 <option>November 2025</option>
+                 <option>October 2025</option>
+                 <option>September 2025</option>
+               </select>
+               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+             </div>
+             
+             <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2">
+               <Upload className="h-4 w-4" /> Import Excel
+             </button>
+             <button className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+               <Play className="h-4 w-4" /> Auto-Generate Draft
+             </button>
+          </div>
         </div>
       </div>
 
       {/* 2. STATUS CARD */}
-      <GlassPanel className="p-6 relative overflow-hidden">
-         <div className="flex flex-col md:flex-row justify-between gap-8">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
             {/* Left: Status */}
-            <div className="space-y-4">
-               <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-sm font-medium">
-                     <CheckCircle2 className="h-4 w-4" /> Draft Ready - 95% Complete
+            <div className="p-6 space-y-3">
+               <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                     <CheckCircle2 className="h-3.5 w-3.5" /> Draft Ready - 95% Complete
                   </span>
-                  <span className="text-xs text-zinc-500">Last gen: 23 Nov, 6:45 PM</span>
                </div>
-               <div className="flex items-center gap-2 text-sm text-zinc-400">
-                  <span className="h-2 w-2 rounded-full bg-zinc-600"></span>
-                  Generated by: <span className="text-white">Rahul Sharma</span>
+               <div className="text-xs text-gray-500">Last gen: 23 Nov, 6:45 PM</div>
+               <div className="flex items-center gap-2 text-sm text-gray-600 pt-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                  Generated by: <span className="text-gray-900 font-medium">Rahul Sharma</span>
                </div>
             </div>
 
             {/* Middle: Progress Checklist */}
-            <div className="flex-1 border-l border-r border-white/5 px-8 hidden md:block">
-               <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-3">Sections Completed (5 of 6)</p>
-               <div className="grid grid-cols-2 gap-y-2 gap-x-8">
-                  <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-3 w-3" /> B2B Invoices (380)</div>
-                  <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-3 w-3" /> Exports (10)</div>
-                  <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-3 w-3" /> B2C Large (10)</div>
-                  <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-3 w-3" /> HSN Summary</div>
-                  <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-3 w-3" /> B2C Small (34)</div>
-                  <div className="flex items-center gap-2 text-sm text-amber-500 animate-pulse"><AlertTriangle className="h-3 w-3" /> Documents (Missing)</div>
+            <div className="p-6">
+               <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold mb-3">Sections Completed (5 of 6)</p>
+               <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> B2B Invoices (380)</div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> Exports (10)</div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> B2C Large (10)</div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> HSN Summary</div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> B2C Small (34)</div>
+                  <div className="flex items-center gap-2 text-xs text-amber-600 font-medium animate-pulse"><AlertTriangle className="h-3.5 w-3.5" strokeWidth={2.5} /> Documents (Missing)</div>
                </div>
             </div>
 
             {/* Right: Deadline & Actions */}
-            <div className="space-y-4 text-right">
+            <div className="p-6 space-y-4">
                <div>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Filing Deadline</p>
-                  <div className="flex items-center justify-end gap-2 mt-1">
-                     <Clock className="h-4 w-4 text-emerald-500" />
-                     <span className="text-lg font-bold text-white">11 Dec 2025</span>
-                     <span className="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded border border-emerald-500/20">18 Days Left</span>
+                  <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold mb-2">Filing Deadline</p>
+                  <div className="flex items-center gap-2">
+                     <Clock className="h-4 w-4 text-emerald-600" />
+                     <span className="text-lg font-bold text-gray-900">11 Dec 2025</span>
                   </div>
+                  <span className="inline-block mt-2 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">18 Days Left</span>
                </div>
-               <div className="flex justify-end gap-2">
-                  <button className="px-3 py-1.5 rounded bg-zinc-900 border border-white/10 text-xs text-zinc-400 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-1">
-                     <Code className="h-3 w-3" /> Preview JSON
-                  </button>
-                  <button className="px-3 py-1.5 rounded bg-zinc-900 border border-white/10 text-xs text-zinc-400 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-1">
-                     <CheckCircle2 className="h-3 w-3" /> Validate
-                  </button>
-                  <button className="px-4 py-1.5 rounded bg-primary text-white text-xs font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 transition-colors">
+               <div className="flex flex-col gap-2 pt-2">
+                  <div className="flex gap-2">
+                     <button className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-300 text-xs text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5 font-medium">
+                        <Code className="h-3.5 w-3.5" /> Preview JSON
+                     </button>
+                     <button className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-300 text-xs text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5 font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Validate
+                     </button>
+                  </div>
+                  <button className="btn-primary-custom w-full px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all">
                      File Return
                   </button>
                </div>
             </div>
          </div>
-      </GlassPanel>
+      </div>
 
       {/* 3. TAB NAVIGATION */}
-      <div className="flex border-b border-white/5 overflow-x-auto">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1 overflow-x-auto">
          {[
             { id: 'b2b', label: 'B2B (380)' },
             { id: 'b2cl', label: 'B2C Large (10)' },
@@ -145,8 +154,8 @@ export default function GSTR1DraftPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
               className={`
-                px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
-                ${activeTab === tab.id ? 'border-primary text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}
+                px-4 py-2.5 text-sm font-medium rounded-xl transition-all whitespace-nowrap
+                ${activeTab === tab.id ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm border border-emerald-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
               `}
             >
                {tab.label}
@@ -161,133 +170,136 @@ export default function GSTR1DraftPage() {
          {activeTab === 'b2b' && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
                {/* Controls */}
-               <div className="flex justify-between items-center p-4 bg-zinc-900/50 border border-white/5 rounded-xl">
+               <div className="flex justify-between items-center px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                   <div className="flex items-center gap-2">
                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-                        <input type="text" placeholder="Search invoices..." className="pl-9 pr-4 py-1.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary outline-none w-64" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                        <input type="text" placeholder="Search invoices..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-64" />
                      </div>
-                     <button className="p-1.5 bg-zinc-900 border border-white/10 rounded-lg text-zinc-400 hover:text-white"><Filter className="h-4 w-4" /></button>
+                     <button className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-all"><Filter className="h-4 w-4" /></button>
                   </div>
                   <div className="flex gap-2">
-                     <button className="px-3 py-1.5 rounded border border-white/10 text-zinc-300 text-xs hover:bg-white/5">Refresh from Sales</button>
-                     <button className="px-3 py-1.5 rounded bg-zinc-800 text-white text-xs hover:bg-zinc-700 flex items-center gap-1"><Plus className="h-3 w-3" /> Add Manual Entry</button>
+                     <button className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-50 transition-all">Refresh from Sales</button>
+                     <button className="px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs font-medium hover:bg-gray-50 transition-all flex items-center gap-1"><Plus className="h-3 w-3" /> Add Manual Entry</button>
                   </div>
                </div>
 
                {/* Table */}
-               <GlassPanel className="p-0 overflow-hidden">
-                  <table className="w-full text-left text-sm">
-                     <thead className="bg-white/5 text-zinc-500 font-medium">
-                        <tr>
-                           <th className="px-6 py-3 w-12"><input type="checkbox" className="rounded bg-zinc-800 border-zinc-600" /></th>
-                           <th className="px-6 py-3">Invoice No</th>
-                           <th className="px-6 py-3">Date</th>
-                           <th className="px-6 py-3">Customer</th>
-                           <th className="px-6 py-3">Place of Supply</th>
-                           <th className="px-6 py-3 text-right">Value</th>
-                           <th className="px-6 py-3 text-right">Taxable</th>
-                           <th className="px-6 py-3 text-right">Tax</th>
-                           <th className="px-6 py-3 text-center">Status</th>
-                           <th className="px-6 py-3 text-right">Actions</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-white/5">
-                        {b2bInvoices.map((inv) => (
-                           <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
-                              <td className="px-6 py-4"><input type="checkbox" className="rounded bg-zinc-800 border-zinc-600" /></td>
-                              <td className="px-6 py-4 font-medium text-white cursor-pointer hover:text-primary">{inv.id}</td>
-                              <td className="px-6 py-4 text-zinc-400">{inv.date}</td>
-                              <td className="px-6 py-4">
-                                 <div className="flex flex-col">
-                                    <span className="text-white">{inv.customer}</span>
-                                    <span className="text-[10px] text-zinc-500 font-mono">{inv.gstin}</span>
-                                 </div>
-                              </td>
-                              <td className="px-6 py-4 text-zinc-400">{inv.pos}</td>
-                              <td className="px-6 py-4 text-right text-white font-mono">₹{inv.value.toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.taxable.toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{(inv.igst + inv.cgst + inv.sgst).toLocaleString()}</td>
-                              <td className="px-6 py-4 text-center">
-                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${inv.status === 'Validated' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                    {inv.status === 'Validated' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                                    {inv.status}
-                                 </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><Edit3 className="h-4 w-4" /></button>
-                                    <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-red-400"><Trash2 className="h-4 w-4" /></button>
-                                 </div>
-                              </td>
+               <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                     <table className="w-full text-left text-sm">
+                        <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                           <tr>
+                              <th className="px-4 py-3 w-10"><input type="checkbox" className="rounded bg-white border-gray-300" /></th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">Invoice No</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">Date</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[180px]">Customer</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">Place of Supply</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Value</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Taxable</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Tax</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center whitespace-nowrap">Status</th>
+                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                           {b2bInvoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
+                                 <td className="px-4 py-3"><input type="checkbox" className="rounded bg-white border-gray-300" /></td>
+                                 <td className="px-4 py-3 font-semibold text-gray-900 cursor-pointer hover:text-emerald-600 whitespace-nowrap">{inv.id}</td>
+                                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{inv.date}</td>
+                                 <td className="px-4 py-3 min-w-[180px]">
+                                    <div className="flex flex-col">
+                                       <span className="text-gray-900 font-medium text-xs">{inv.customer}</span>
+                                       <span className="text-[10px] text-gray-500 font-mono">{inv.gstin}</span>
+                                    </div>
+                                 </td>
+                                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{inv.pos}</td>
+                                 <td className="px-4 py-3 text-right text-gray-900 font-semibold whitespace-nowrap text-xs">₹{inv.value.toLocaleString()}</td>
+                                 <td className="px-4 py-3 text-right text-gray-700 font-semibold whitespace-nowrap text-xs">₹{inv.taxable.toLocaleString()}</td>
+                                 <td className="px-4 py-3 text-right text-gray-700 font-semibold whitespace-nowrap text-xs">₹{(inv.igst + inv.cgst + inv.sgst).toLocaleString()}</td>
+                                 <td className="px-4 py-3 text-center">
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${inv.status === 'Validated' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                       {inv.status === 'Validated' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                                       {inv.status}
+                                    </span>
+                                 </td>
+                                 <td className="px-4 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <button className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all"><Edit3 className="h-3.5 w-3.5" /></button>
+                                       <button className="p-1 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    </div>
+                                 </td>
                            </tr>
                         ))}
                      </tbody>
                   </table>
+                  </div>
                   {/* Summary Row */}
-                  <div className="bg-zinc-900/50 border-t border-white/10 px-6 py-3 flex justify-between items-center text-sm font-medium">
-                     <span className="text-zinc-400">Total: 380 Invoices</span>
+                  <div className="bg-gradient-to-r from-gray-50 to-white border-t border-gray-200 px-6 py-3 flex justify-between items-center text-sm font-medium">
+                     <span className="text-gray-600">Total: 380 Invoices</span>
                      <div className="flex gap-8">
-                        <span className="text-zinc-300">Taxable: <span className="text-white">₹64,56,789</span></span>
-                        <span className="text-zinc-300">Tax: <span className="text-white">₹12,22,000</span></span>
-                        <span className="text-zinc-300">Total: <span className="text-white font-bold">₹76,78,789</span></span>
+                        <span className="text-gray-700">Taxable: <span className="text-gray-900 font-semibold">₹64,56,789</span></span>
+                        <span className="text-gray-700">Tax: <span className="text-gray-900 font-semibold">₹12,22,000</span></span>
+                        <span className="text-gray-700">Total: <span className="text-gray-900 font-bold">₹76,78,789</span></span>
                      </div>
                   </div>
-               </GlassPanel>
+               </div>
             </div>
          )}
 
          {/* TAB: B2C Small */}
          {activeTab === 'b2cs' && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
-               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-blue-200 flex items-center gap-2">
+               <div className="p-4 bg-gradient-to-r from-blue-50 to-white border border-blue-200 rounded-xl text-sm text-blue-700 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Data aggregated based on Place of Supply and Tax Rate for invoices &lt; ₹2.5 Lakhs.
                </div>
-               <GlassPanel className="p-0 overflow-hidden">
+               <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
                   <table className="w-full text-left text-sm">
-                     <thead className="bg-white/5 text-zinc-500 font-medium">
+                     <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                         <tr>
-                           <th className="px-6 py-3">Place of Supply</th>
-                           <th className="px-6 py-3 text-center">Tax Rate</th>
-                           <th className="px-6 py-3 text-right">Taxable Value</th>
-                           <th className="px-6 py-3 text-right">IGST</th>
-                           <th className="px-6 py-3 text-right">CGST</th>
-                           <th className="px-6 py-3 text-right">SGST</th>
-                           <th className="px-6 py-3 text-center">Invoice Count</th>
-                           <th className="px-6 py-3 text-right">Actions</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">Place of Supply</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Tax Rate</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Taxable Value</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">IGST</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">CGST</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">SGST</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">Invoice Count</th>
+                           <th className="px-6 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-white/5">
+                     <tbody className="divide-y divide-gray-100">
                         {b2csSummary.map((row, idx) => (
-                           <tr key={idx} className="hover:bg-white/5 transition-colors">
-                              <td className="px-6 py-4 text-white">{row.pos}</td>
-                              <td className="px-6 py-4 text-center"><span className="bg-zinc-800 px-2 py-1 rounded text-xs text-zinc-300">{row.rate}</span></td>
-                              <td className="px-6 py-4 text-right font-mono text-zinc-300">₹{row.taxable.toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right font-mono text-zinc-400">₹{(row.igst || 0).toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right font-mono text-zinc-400">₹{(row.cgst || 0).toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right font-mono text-zinc-400">₹{(row.sgst || 0).toLocaleString()}</td>
-                              <td className="px-6 py-4 text-center text-white font-bold">{row.count}</td>
+                           <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 text-gray-900 font-medium">{row.pos}</td>
+                              <td className="px-6 py-4 text-center"><span className="bg-gray-100 px-2.5 py-1 rounded-full text-xs text-gray-700 font-semibold">{row.rate}</span></td>
+                              <td className="px-6 py-4 text-right font-semibold text-gray-700">₹{row.taxable.toLocaleString()}</td>
+                              <td className="px-6 py-4 text-right font-semibold text-gray-600">₹{(row.igst || 0).toLocaleString()}</td>
+                              <td className="px-6 py-4 text-right font-semibold text-gray-600">₹{(row.cgst || 0).toLocaleString()}</td>
+                              <td className="px-6 py-4 text-right font-semibold text-gray-600">₹{(row.sgst || 0).toLocaleString()}</td>
+                              <td className="px-6 py-4 text-center text-gray-900 font-bold">{row.count}</td>
                               <td className="px-6 py-4 text-right">
-                                 <button className="text-xs text-primary hover:underline">Edit</button>
+                                 <button className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold">Edit</button>
                               </td>
                            </tr>
                         ))}
                      </tbody>
                   </table>
-               </GlassPanel>
+               </div>
             </div>
          )}
 
          {/* Placeholder for other tabs */}
          {(activeTab !== 'b2b' && activeTab !== 'b2cs') && (
-            <div className="flex flex-col items-center justify-center h-64 text-zinc-500 bg-zinc-900/30 border border-white/5 rounded-xl animate-in fade-in">
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400 bg-white border border-gray-200 rounded-2xl shadow-sm animate-in fade-in">
                <FileText className="h-12 w-12 mb-4 opacity-20" />
-               <p>Section content available in full version.</p>
+               <p className="text-gray-500">Section content available in full version.</p>
             </div>
          )}
 
       </div>
+    </div>
     </div>
   );
 }
