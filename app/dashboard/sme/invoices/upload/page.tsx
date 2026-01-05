@@ -62,27 +62,7 @@ export default function UploadInvoicesPage() {
   ];
 
   // Helper to simulate upload progress
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setUploadQueue(prev => prev.map(file => {
-        if (file.status === 'completed' || file.status === 'failed') return file;
-        
-        let newProgress = file.progress + Math.random() * 10;
-        let newStatus: UploadStatus = file.status;
-
-        if (newProgress >= 30 && newStatus === 'uploading') newStatus = 'extracting';
-        if (newProgress >= 70 && newStatus === 'extracting') newStatus = 'validating';
-        if (newProgress >= 100) {
-          newProgress = 100;
-          newStatus = 'completed';
-        }
-
-        return { ...file, progress: newProgress, status: newStatus };
-      }));
-    }, 800);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Removed - using real API calls now
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -110,7 +90,7 @@ export default function UploadInvoicesPage() {
     }
   };
 
-  const handleFiles = (files: FileList) => {
+  const handleFiles = async (files: FileList) => {
     const newFiles: UploadedFile[] = Array.from(files).map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
@@ -119,6 +99,66 @@ export default function UploadInvoicesPage() {
       status: 'uploading'
     }));
     setUploadQueue(prev => [...newFiles, ...prev]);
+
+    // Process each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileId = newFiles[i].id;
+
+      try {
+        // Update to uploading
+        updateFileStatus(fileId, 'uploading', 10);
+
+        // Create FormData and upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('source', activeTab);
+
+        // Simulate progress during upload
+        updateFileStatus(fileId, 'uploading', 30);
+
+        const response = await fetch('/api/invoice/process', {
+          method: 'POST',
+          body: formData,
+        });
+
+        updateFileStatus(fileId, 'extracting', 50);
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to process invoice');
+        }
+
+        updateFileStatus(fileId, 'validating', 80);
+
+        // Wait a bit for validation animation
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        if (result.validation?.isValid) {
+          updateFileStatus(fileId, 'completed', 100);
+        } else {
+          updateFileStatus(fileId, 'completed', 100, 'Completed with warnings');
+        }
+
+      } catch (error: any) {
+        console.error('Error uploading file:', error);
+        updateFileStatus(fileId, 'failed', 100, error.message);
+      }
+    }
+  };
+
+  const updateFileStatus = (
+    fileId: string,
+    status: UploadStatus,
+    progress: number,
+    errorMessage?: string
+  ) => {
+    setUploadQueue(prev =>
+      prev.map(f =>
+        f.id === fileId ? { ...f, status, progress, errorMessage } : f
+      )
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -172,9 +212,9 @@ export default function UploadInvoicesPage() {
       <div className="flex flex-wrap gap-2 border-b border-white/5 pb-1">
          {[
            { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: stats.whatsapp },
-           { id: 'email', label: 'Email', icon: Mail, badge: stats.email },
+         //   { id: 'email', label: 'Gmail', icon: Mail, badge: stats.email },
            { id: 'manual', label: 'Manual Upload', icon: UploadCloud },
-           { id: 'bulk', label: 'Bulk Import (CSV)', icon: FileSpreadsheet },
+           //{ id: 'bulk', label: 'Bulk Import (CSV)', icon: FileSpreadsheet },
          ].map((tab) => (
            <button
              key={tab.id}
@@ -280,10 +320,10 @@ export default function UploadInvoicesPage() {
         )}
 
         {/* TAB 2: EMAIL */}
-        {activeTab === 'email' && (
+        {/* {activeTab === 'email' && (
           <div className="space-y-6 animate-in fade-in duration-300">
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Connected Accounts */}
+                
                 <GlassPanel className="p-5">
                    <div className="flex justify-between items-center mb-4">
                       <h3 className="font-semibold text-white">Connected Inboxes</h3>
@@ -319,7 +359,6 @@ export default function UploadInvoicesPage() {
                    </div>
                 </GlassPanel>
 
-                {/* Instructions */}
                 <BentoCard title="Email Auto-Capture">
                    <p className="text-sm text-zinc-400 mb-4">
                      We automatically scan your inbox for emails containing keywords like "Invoice", "Bill", or "GST" and extract attachments.
@@ -335,7 +374,7 @@ export default function UploadInvoicesPage() {
                 </BentoCard>
              </div>
 
-             {/* Inbox Preview */}
+       
              <GlassPanel className="p-0 overflow-hidden">
                <div className="px-6 py-4 border-b border-white/5 bg-white/5">
                  <h3 className="font-semibold text-white">Inbox Preview</h3>
@@ -381,7 +420,7 @@ export default function UploadInvoicesPage() {
                </div>
             </GlassPanel>
           </div>
-        )}
+        )} */}
 
         {/* TAB 3: MANUAL UPLOAD (Default) */}
         {activeTab === 'manual' && (
@@ -418,13 +457,13 @@ export default function UploadInvoicesPage() {
 
                 {/* Camera / Instructions */}
                 <div className="flex flex-col gap-4 h-64">
-                   <div className="flex-1 rounded-xl bg-zinc-900/50 border border-zinc-800 p-6 flex flex-col items-center justify-center text-center hover:border-zinc-600 transition-colors cursor-pointer group">
+                   {/* <div className="flex-1 rounded-xl bg-zinc-900/50 border border-zinc-800 p-6 flex flex-col items-center justify-center text-center hover:border-zinc-600 transition-colors cursor-pointer group">
                       <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center mb-3 group-hover:text-primary transition-colors">
                         <Camera className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
                       </div>
                       <h3 className="font-semibold text-white">Capture from Camera</h3>
                       <p className="text-xs text-zinc-500 mt-1">Take a photo of physical invoice</p>
-                   </div>
+                   </div> */}
                    <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
                       <div className="flex items-start gap-3">
                          <div className="p-1.5 bg-primary/20 rounded-full mt-0.5">

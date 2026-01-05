@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Filter, 
@@ -25,33 +25,91 @@ import {
   AlertCircle,
   ChevronDown,
   Save,
-  History
+  History,
+  Loader2
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import GlassPanel from '../../../../../components/ui/GlassPanel';
 import BentoCard from '../../../../../components/ui/BentoCard';
+import { PurchaseRegister } from '@/lib/services/purchaseInvoiceService';
 
-// Mock Data
+// Mock Data for validation chart
 const validationStatusData = [
-  { name: 'Validated', value: 789, color: '#10B981' },
-  { name: 'Partial', value: 23, color: '#F59E0B' },
-  { name: 'Failed', value: 11, color: '#EF4444' },
-];
-
-const purchaseInvoices = [
-  { id: 'INV-001234', date: '18 Nov 2025', vendor: 'ABC Enterprises Pvt Ltd', gstin: '27ABCDE1234F1Z5', taxable: 45600, gst: 8208, total: 53808, hsn: '8471', status: 'Validated', source: 'whatsapp' },
-  { id: 'INV-001235', date: '18 Nov 2025', vendor: 'TechSol Solutions', gstin: '29PQRST5678H1Z2', taxable: 12000, gst: 2160, total: 14160, hsn: '9983', status: 'Partial', source: 'email' },
-  { id: 'INV-001236', date: '17 Nov 2025', vendor: 'Global Logistics', gstin: '07KLMNO4321J1Z9', taxable: 85000, gst: 15300, total: 100300, hsn: '9967', status: 'Validated', source: 'manual' },
-  { id: 'INV-001237', date: '16 Nov 2025', vendor: 'Office Supplies Co', gstin: '19UVWXY8765K1Z3', taxable: 3500, gst: 630, total: 4130, hsn: '4820', status: 'Failed', source: 'bulk' },
-  { id: 'INV-001238', date: '16 Nov 2025', vendor: 'Reddy Traders', gstin: '33FGHIJ9876L1Z4', taxable: 24000, gst: 4320, total: 28320, hsn: '7318', status: 'Validated', source: 'whatsapp' },
+  { name: 'Validated', value: 0, color: '#10B981' },
+  { name: 'Partial', value: 0, color: '#F59E0B' },
+  { name: 'Failed', value: 0, color: '#EF4444' },
 ];
 
 export default function PurchaseRegisterPage() {
   const router = useRouter();
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(true);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null); // For Modal
+  const [selectedInvoice, setSelectedInvoice] = useState<PurchaseRegister | null>(null);
   const [modalTab, setModalTab] = useState<'details' | 'validation' | 'history'>('details');
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseRegister[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalPurchases: 0,
+    totalTax: 0,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    validated: 0,
+    partial: 0,
+    failed: 0,
+    count: 0
+  });
+
+  // Fetch invoices on mount
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/invoice/purchase');
+      const data = await response.json();
+
+      if (data.success && data.invoices) {
+        setPurchaseInvoices(data.invoices);
+        calculateStats(data.invoices);
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateStats = (invoices: PurchaseRegister[]) => {
+    const totalPurchases = invoices.reduce((sum, inv) => sum + (inv.total_invoice_value || 0), 0);
+    const cgst = invoices.reduce((sum, inv) => sum + (inv.cgst_amount || 0), 0);
+    const sgst = invoices.reduce((sum, inv) => sum + (inv.sgst_amount || 0), 0);
+    const igst = invoices.reduce((sum, inv) => sum + (inv.igst_amount || 0), 0);
+    const totalTax = cgst + sgst + igst;
+
+    const validated = invoices.filter(inv => inv.invoice_status === 'extracted' || inv.invoice_status === 'verified').length;
+    const partial = invoices.filter(inv => inv.invoice_status === 'needs_review').length;
+    const failed = invoices.filter(inv => inv.invoice_status === 'error').length;
+
+    setStats({
+      totalPurchases,
+      totalTax,
+      cgst,
+      sgst,
+      igst,
+      validated,
+      partial,
+      failed,
+      count: invoices.length
+    });
+
+    // Update validation chart
+    validationStatusData[0].value = validated;
+    validationStatusData[1].value = partial;
+    validationStatusData[2].value = failed;
+  };
 
   const toggleRowSelection = (id: string) => {
     setSelectedRows(prev => 
@@ -67,13 +125,30 @@ export default function PurchaseRegisterPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null | undefined) => {
     switch (status) {
-      case 'Validated': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case 'Partial': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case 'Failed': return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'Processing': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      default: return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+      case 'extracted':
+      case 'verified':
+        return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+      case 'needs_review':
+        return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case 'error':
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+      case 'pending':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      default:
+        return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+    }
+  };
+
+  const getStatusLabel = (status: string | null | undefined) => {
+    switch (status) {
+      case 'extracted': return 'Validated';
+      case 'verified': return 'Verified';
+      case 'needs_review': return 'Partial';
+      case 'error': return 'Failed';
+      case 'pending': return 'Processing';
+      default: return 'Unknown';
     }
   };
 
@@ -166,11 +241,17 @@ export default function PurchaseRegisterPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm text-muted-foreground">Total Purchases</p>
-              <h3 className="text-3xl font-bold text-white mt-2">₹ 45,67,890</h3>
-              <p className="text-xs text-zinc-500 mt-1">823 Invoices • This Month</p>
+              <h3 className="text-3xl font-bold text-white mt-2">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                ) : (
+                  `₹ ${Math.round(stats.totalPurchases).toLocaleString()}`
+                )}
+              </h3>
+              <p className="text-xs text-zinc-500 mt-1">{stats.count} Invoices • This Month</p>
             </div>
             <div className="px-2 py-1 bg-emerald-500/10 rounded text-emerald-500 text-xs font-medium flex items-center">
-              <ArrowUpRight className="h-3 w-3 mr-1" /> 15%
+              <ArrowUpRight className="h-3 w-3 mr-1" /> New
             </div>
           </div>
         </BentoCard>
@@ -179,7 +260,13 @@ export default function PurchaseRegisterPage() {
           <div className="flex justify-between items-start mb-4">
              <div>
                <p className="text-sm text-muted-foreground">Total Input Tax (ITC)</p>
-               <h3 className="text-3xl font-bold text-emerald-500 mt-2">₹ 8,22,020</h3>
+               <h3 className="text-3xl font-bold text-emerald-500 mt-2">
+                 {loading ? (
+                   <Loader2 className="h-8 w-8 animate-spin" />
+                 ) : (
+                   `₹ ${Math.round(stats.totalTax).toLocaleString()}`
+                 )}
+               </h3>
              </div>
              <div className="p-2 bg-emerald-500/10 rounded-lg">
                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
@@ -188,15 +275,15 @@ export default function PurchaseRegisterPage() {
           <div className="grid grid-cols-3 gap-2 text-center border-t border-white/5 pt-3">
              <div>
                <p className="text-[10px] text-zinc-500">CGST</p>
-               <p className="text-xs font-mono text-white">₹4.11L</p>
+               <p className="text-xs font-mono text-white">₹{(stats.cgst / 1000).toFixed(1)}K</p>
              </div>
              <div>
                <p className="text-[10px] text-zinc-500">SGST</p>
-               <p className="text-xs font-mono text-white">₹4.11L</p>
+               <p className="text-xs font-mono text-white">₹{(stats.sgst / 1000).toFixed(1)}K</p>
              </div>
              <div>
                <p className="text-[10px] text-zinc-500">IGST</p>
-               <p className="text-xs font-mono text-white">₹0</p>
+               <p className="text-xs font-mono text-white">₹{(stats.igst / 1000).toFixed(1)}K</p>
              </div>
           </div>
         </BentoCard>
@@ -251,7 +338,7 @@ export default function PurchaseRegisterPage() {
                  <span className="text-sm text-zinc-400">Select All</span>
               </div>
               <div className="h-4 w-px bg-white/10"></div>
-              <span className="text-sm text-white font-medium">823 Invoices Found</span>
+              <span className="text-sm text-white font-medium">{stats.count} Invoices Found</span>
            </div>
 
            {selectedRows.length > 0 && (
@@ -285,57 +372,97 @@ export default function PurchaseRegisterPage() {
                </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-               {purchaseInvoices.map((inv) => (
-                 <tr key={inv.id} className="group hover:bg-white/5 transition-colors">
-                   <td className="px-6 py-4">
-                     <input 
-                       type="checkbox" 
-                       className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
-                       checked={selectedRows.includes(inv.id)}
-                       onChange={() => toggleRowSelection(inv.id)}
-                     />
-                   </td>
-                   <td className="px-6 py-4">
-                      <button onClick={() => setSelectedInvoice(inv)} className="font-medium text-white hover:text-primary hover:underline text-left">
-                        {inv.id}
-                      </button>
-                   </td>
-                   <td className="px-6 py-4 text-zinc-400">{inv.date}</td>
-                   <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-zinc-200">{inv.vendor}</span>
-                        <span className="text-[10px] text-zinc-500 font-mono">{inv.gstin}</span>
-                      </div>
-                   </td>
-                   <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.taxable.toLocaleString()}</td>
-                   <td className="px-6 py-4 text-right text-zinc-300 font-mono group-hover:text-emerald-400 transition-colors cursor-help" title="CGST + SGST + IGST">₹{inv.gst.toLocaleString()}</td>
-                   <td className="px-6 py-4 text-right font-bold text-white font-mono">₹{inv.total.toLocaleString()}</td>
-                   <td className="px-6 py-4 text-center text-zinc-500 font-mono text-xs">{inv.hsn}</td>
-                   <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(inv.status)}`}>
-                         {inv.status}
-                      </span>
-                   </td>
-                   <td className="px-6 py-4 text-center flex justify-center">
-                      <div className="p-1.5 rounded-lg bg-zinc-900 border border-white/5" title={inv.source}>
-                        {getSourceIcon(inv.source)}
-                      </div>
-                   </td>
-                   <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button onClick={() => setSelectedInvoice(inv)} className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="View Details">
-                            <Eye className="h-4 w-4" />
-                         </button>
-                         <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="Download">
-                            <Download className="h-4 w-4" />
-                         </button>
-                         <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white">
-                            <MoreVertical className="h-4 w-4" />
-                         </button>
-                      </div>
+               {loading ? (
+                 <tr>
+                   <td colSpan={11} className="px-6 py-12 text-center">
+                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                     <p className="text-sm text-zinc-500 mt-2">Loading invoices...</p>
                    </td>
                  </tr>
-               ))}
+               ) : purchaseInvoices.length === 0 ? (
+                 <tr>
+                   <td colSpan={11} className="px-6 py-12 text-center">
+                     <FileText className="h-12 w-12 mx-auto text-zinc-700 mb-2" />
+                     <p className="text-sm text-zinc-500">No invoices found</p>
+                     <button 
+                       onClick={() => router.push('/dashboard/sme/invoices/upload')}
+                       className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90"
+                     >
+                       Upload First Invoice
+                     </button>
+                   </td>
+                 </tr>
+               ) : (
+                 purchaseInvoices.map((inv) => (
+                   <tr key={inv.id} className="group hover:bg-white/5 transition-colors">
+                     <td className="px-6 py-4">
+                       <input 
+                         type="checkbox" 
+                         className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                         checked={selectedRows.includes(inv.id || '')}
+                         onChange={() => toggleRowSelection(inv.id || '')}
+                       />
+                     </td>
+                     <td className="px-6 py-4">
+                        <button onClick={() => setSelectedInvoice(inv)} className="font-medium text-white hover:text-primary hover:underline text-left">
+                          {inv.invoice_number || 'N/A'}
+                        </button>
+                     </td>
+                     <td className="px-6 py-4 text-zinc-400">
+                       {inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'N/A'}
+                     </td>
+                     <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-zinc-200">{inv.supplier_name || 'Unknown'}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">{inv.supplier_gstin || 'N/A'}</span>
+                        </div>
+                     </td>
+                     <td className="px-6 py-4 text-right text-zinc-300 font-mono">
+                       ₹{(inv.taxable_value || 0).toLocaleString()}
+                     </td>
+                     <td className="px-6 py-4 text-right text-zinc-300 font-mono group-hover:text-emerald-400 transition-colors cursor-help" title="CGST + SGST + IGST">
+                       ₹{((inv.cgst_amount || 0) + (inv.sgst_amount || 0) + (inv.igst_amount || 0)).toLocaleString()}
+                     </td>
+                     <td className="px-6 py-4 text-right font-bold text-white font-mono">
+                       ₹{(inv.total_invoice_value || 0).toLocaleString()}
+                     </td>
+                     <td className="px-6 py-4 text-center text-zinc-500 font-mono text-xs">
+                       {inv.hsn_or_sac_code || 'N/A'}
+                     </td>
+                     <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(inv.invoice_status)}`}>
+                           {getStatusLabel(inv.invoice_status)}
+                        </span>
+                     </td>
+                     <td className="px-6 py-4 text-center flex justify-center">
+                        <div className="p-1.5 rounded-lg bg-zinc-900 border border-white/5" title={inv.source || 'unknown'}>
+                          {getSourceIcon(inv.source || 'manual')}
+                        </div>
+                     </td>
+                     <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => setSelectedInvoice(inv)} className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="View Details">
+                              <Eye className="h-4 w-4" />
+                           </button>
+                           {inv.invoice_bucket_url && (
+                             <a 
+                               href={inv.invoice_bucket_url} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                               title="Download"
+                             >
+                               <Download className="h-4 w-4" />
+                             </a>
+                           )}
+                           <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white">
+                              <MoreVertical className="h-4 w-4" />
+                           </button>
+                        </div>
+                     </td>
+                   </tr>
+                 ))
+               )}
             </tbody>
           </table>
         </div>
@@ -370,15 +497,31 @@ export default function PurchaseRegisterPage() {
                  <div className="flex justify-between items-center mb-4">
                     <h3 className="text-white font-semibold">Original Invoice</h3>
                     <div className="flex gap-2">
-                       <button className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white"><Download className="h-4 w-4" /></button>
+                       {selectedInvoice.invoice_bucket_url && (
+                         <a 
+                           href={selectedInvoice.invoice_bucket_url} 
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white"
+                         >
+                           <Download className="h-4 w-4" />
+                         </a>
+                       )}
                     </div>
                  </div>
                  <div className="flex-1 bg-zinc-950 rounded-xl border border-white/5 flex items-center justify-center relative overflow-hidden group">
-                    <FileText className="h-16 w-16 text-zinc-700" />
-                    <p className="mt-4 text-zinc-600 text-sm">Preview Unavailable in Demo</p>
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <button className="px-4 py-2 bg-white text-black rounded-lg font-medium text-sm">View PDF</button>
-                    </div>
+                    {selectedInvoice.invoice_bucket_url ? (
+                      <iframe 
+                        src={selectedInvoice.invoice_bucket_url} 
+                        className="w-full h-full"
+                        title="Invoice Preview"
+                      />
+                    ) : (
+                      <>
+                        <FileText className="h-16 w-16 text-zinc-700" />
+                        <p className="mt-4 text-zinc-600 text-sm">No Preview Available</p>
+                      </>
+                    )}
                  </div>
               </div>
 
@@ -388,8 +531,10 @@ export default function PurchaseRegisterPage() {
                  <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
                     <div>
                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                          {selectedInvoice.id} 
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedInvoice.status)}`}>{selectedInvoice.status}</span>
+                          {selectedInvoice.invoice_number || 'N/A'} 
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedInvoice.invoice_status)}`}>
+                            {getStatusLabel(selectedInvoice.invoice_status)}
+                          </span>
                        </h2>
                     </div>
                     <button onClick={() => setSelectedInvoice(null)} className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white">
@@ -426,11 +571,11 @@ export default function PurchaseRegisterPage() {
                           <div className="grid grid-cols-2 gap-6">
                              <div className="space-y-2">
                                 <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Number</label>
-                                <input type="text" defaultValue={selectedInvoice.id} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                <input type="text" defaultValue={selectedInvoice.invoice_number || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
                              </div>
                              <div className="space-y-2">
                                 <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Date</label>
-                                <input type="date" defaultValue="2025-11-18" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                <input type="date" defaultValue={selectedInvoice.invoice_date || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
                              </div>
                           </div>
 
@@ -439,11 +584,11 @@ export default function PurchaseRegisterPage() {
                              <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                    <label className="text-xs text-zinc-500 font-medium uppercase">Vendor Name</label>
-                                   <input type="text" defaultValue={selectedInvoice.vendor} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                   <input type="text" defaultValue={selectedInvoice.supplier_name || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
                                 </div>
                                 <div className="space-y-2">
                                    <label className="text-xs text-zinc-500 font-medium uppercase">GSTIN</label>
-                                   <input type="text" defaultValue={selectedInvoice.gstin} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                   <input type="text" defaultValue={selectedInvoice.supplier_gstin || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
                                 </div>
                              </div>
                           </div>
@@ -453,20 +598,42 @@ export default function PurchaseRegisterPage() {
                              <div className="grid grid-cols-3 gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5">
                                 <div className="space-y-1">
                                    <label className="text-xs text-zinc-500">Taxable Value</label>
-                                   <input type="text" defaultValue={selectedInvoice.taxable} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
+                                   <input type="text" defaultValue={selectedInvoice.taxable_value || 0} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">CGST (9%)</label>
-                                   <input type="text" defaultValue={selectedInvoice.gst / 2} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
+                                   <label className="text-xs text-zinc-500">CGST</label>
+                                   <input type="text" defaultValue={selectedInvoice.cgst_amount || 0} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">SGST (9%)</label>
-                                   <input type="text" defaultValue={selectedInvoice.gst / 2} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
+                                   <label className="text-xs text-zinc-500">SGST</label>
+                                   <input type="text" defaultValue={selectedInvoice.sgst_amount || 0} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
+                                </div>
+                                <div className="space-y-1">
+                                   <label className="text-xs text-zinc-500">IGST</label>
+                                   <input type="text" defaultValue={selectedInvoice.igst_amount || 0} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
+                                </div>
+                                <div className="space-y-1">
+                                   <label className="text-xs text-zinc-500">CESS</label>
+                                   <input type="text" defaultValue={selectedInvoice.cess_amount || 0} className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right" />
                                 </div>
                              </div>
                              <div className="flex justify-end items-center gap-4 pt-2">
                                 <span className="text-sm text-zinc-400">Total Amount</span>
-                                <span className="text-2xl font-bold text-white font-mono">₹ {selectedInvoice.total.toLocaleString()}</span>
+                                <span className="text-2xl font-bold text-white font-mono">₹ {(selectedInvoice.total_invoice_value || 0).toLocaleString()}</span>
+                             </div>
+                          </div>
+
+                          <div className="space-y-4 pt-4 border-t border-white/5">
+                             <h4 className="text-sm font-semibold text-white">Additional Details</h4>
+                             <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                   <label className="text-xs text-zinc-500 font-medium uppercase">HSN/SAC Code</label>
+                                   <input type="text" defaultValue={selectedInvoice.hsn_or_sac_code || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Type</label>
+                                   <input type="text" defaultValue={selectedInvoice.invoice_type || ''} className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" />
+                                </div>
                              </div>
                           </div>
                        </div>
