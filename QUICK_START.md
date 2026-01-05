@@ -34,14 +34,6 @@ If you need to verify or adjust settings:
 
 Your `.env.local` should have:
 
-```env
-# Already configured
-GEMINI_API_KEY=AIzaSyAOW4Ukj2T2OxJu7i02C_a3zK0xVzzEA5U
-NEXT_PUBLIC_SUPABASE_URL=https://dyokdgnrfdnpcnetftdk.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# Optional (for better OCR accuracy)
-GOOGLE_CLOUD_VISION_API_KEY=your-vision-api-key-here
 ```
 
 ✅ Already done! Your keys are configured.

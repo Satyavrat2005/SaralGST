@@ -59,23 +59,28 @@ export default function VendorListPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       {/* 1. PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Vendor Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">Track vendor compliance and invoice patterns</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Vendor Management</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">All Vendors</h1>
+          <p className="text-gray-600 text-sm mt-1">Track vendor compliance and invoice patterns</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
+           <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2 font-medium">
              <Download className="h-4 w-4" /> Export
            </button>
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
+           <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2 font-medium">
              <Upload className="h-4 w-4" /> Import
            </button>
            <button 
              onClick={() => setShowAddModal(true)}
-             className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+             className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
            >
              <Plus className="h-4 w-4" /> Add Vendor
            </button>
@@ -83,28 +88,28 @@ export default function VendorListPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between backdrop-blur-sm">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
          <div className="flex flex-wrap items-center gap-3 w-full">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
-              <input type="text" className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pl-10 p-2 placeholder-zinc-600" placeholder="Search by name, GSTIN..." />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <input type="text" className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-10 p-2.5 placeholder-gray-500 outline-none transition-all" placeholder="Search by name, GSTIN..." />
             </div>
             
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary p-2 cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 cursor-pointer hover:border-gray-300 outline-none transition-all">
               <option>All Compliance Levels</option>
               <option>Compliant</option>
               <option>At Risk</option>
               <option>Non-Compliant</option>
             </select>
 
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary p-2 cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 cursor-pointer hover:border-gray-300 outline-none transition-all">
               <option>All States</option>
               <option>Maharashtra</option>
               <option>Karnataka</option>
               <option>Delhi</option>
             </select>
 
-            <select className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary p-2 cursor-pointer hover:bg-black/40">
+            <select className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 cursor-pointer hover:border-gray-300 outline-none transition-all">
               <option>Sort By: Compliance</option>
               <option>Sort By: Total Amount</option>
               <option>Sort By: Name</option>
@@ -114,21 +119,21 @@ export default function VendorListPage() {
 
       {/* 2. SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <BentoCard className="p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
            <div className="flex justify-between items-start">
              <div>
-               <p className="text-sm text-muted-foreground">Total Vendors</p>
-               <h3 className="text-3xl font-bold text-white mt-2">60</h3>
-               <div className="flex gap-3 mt-1 text-xs text-zinc-500">
+               <p className="text-sm text-gray-600 font-medium">Total Vendors</p>
+               <h3 className="text-3xl font-bold text-gray-900 mt-2">60</h3>
+               <div className="flex gap-3 mt-1 text-xs text-gray-500">
                   <span>Active: 54</span>
                   <span>Inactive: 6</span>
                </div>
              </div>
-             <span className="bg-emerald-500/10 text-emerald-500 text-xs px-2 py-1 rounded border border-emerald-500/20">+3 this month</span>
+             <span className="bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">+3 this month</span>
            </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="p-4 flex items-center gap-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-4 flex items-center gap-6">
            <div className="h-20 w-20 relative shrink-0">
              <ResponsiveContainer width="100%" height="100%">
                <PieChart>
@@ -144,52 +149,52 @@ export default function VendorListPage() {
                      <Cell key={`cell-${index}`} fill={entry.color} />
                    ))}
                  </Pie>
-                 <Tooltip contentStyle={{ backgroundColor: '#09090b', borderRadius: '8px', border: '1px solid #333' }} itemStyle={{color: '#fff'}} />
+                 <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb' }} itemStyle={{color: '#111'}} />
                </PieChart>
              </ResponsiveContainer>
            </div>
            <div className="flex-1 space-y-1">
-             <p className="text-sm font-medium text-white mb-1">Compliance Overview</p>
+             <p className="text-sm font-semibold text-gray-900 mb-1">Compliance</p>
              <div className="flex items-center justify-between text-xs">
                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span className="text-zinc-400">Compliant</span>
+                  <span className="text-gray-600">Compliant</span>
                </div>
-               <span className="text-white">75%</span>
+               <span className="text-gray-900 font-semibold">75%</span>
              </div>
              <div className="flex items-center justify-between text-xs">
                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                  <span className="text-zinc-400">At Risk</span>
+                  <span className="text-gray-600">At Risk</span>
                </div>
-               <span className="text-white">20%</span>
+               <span className="text-gray-900 font-semibold">20%</span>
              </div>
            </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
            <div className="flex justify-between items-start">
              <div>
-               <p className="text-sm text-muted-foreground">Total Purchase Value</p>
-               <h3 className="text-3xl font-bold text-white mt-2">₹ 45.67 L</h3>
-               <p className="text-xs text-zinc-500 mt-1">Top: ABC Ent (₹ 8.45 L)</p>
+               <p className="text-sm text-gray-600 font-medium">Total Purchase Value</p>
+               <h3 className="text-3xl font-bold text-gray-900 mt-2">₹ 45.67 L</h3>
+               <p className="text-xs text-gray-500 mt-1">Top: ABC Ent (₹ 8.45 L)</p>
              </div>
            </div>
-        </BentoCard>
+        </div>
       </div>
 
       {/* 3. VIEW TOGGLE */}
       <div className="flex justify-end">
-         <div className="bg-zinc-900 p-1 rounded-lg border border-white/10 flex">
+         <div className="bg-white border border-gray-200 p-1 rounded-xl flex shadow-sm">
             <button 
               onClick={() => setViewMode('card')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'card' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'card' ? 'bg-emerald-50 text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
                <LayoutGrid className="h-4 w-4" />
             </button>
             <button 
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'table' ? 'bg-emerald-50 text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
                <List className="h-4 w-4" />
             </button>
@@ -200,85 +205,85 @@ export default function VendorListPage() {
       {viewMode === 'card' ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {vendors.map((vendor) => (
-               <GlassPanel key={vendor.id} className="p-0 group hover:border-primary/30 transition-all">
-                  <div className="p-6 border-b border-white/5 relative">
-                     <div className={`absolute top-4 right-4 px-2 py-1 rounded text-xs font-bold border ${getScoreColor(vendor.score)}`}>
+               <div key={vendor.id} className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden group hover:border-emerald-300 hover:shadow-xl transition-all">
+                  <div className="p-6 border-b border-gray-100 relative">
+                     <div className={`absolute top-4 right-4 px-2.5 py-1 rounded-full text-xs font-bold border ${getScoreColor(vendor.score).replace('bg-emerald-500/10 text-emerald-500 border-emerald-500/20', 'bg-emerald-50 text-emerald-700 border-emerald-200').replace('bg-amber-500/10 text-amber-500 border-amber-500/20', 'bg-amber-50 text-amber-700 border-amber-200').replace('bg-red-500/10 text-red-500 border-red-500/20', 'bg-red-50 text-red-700 border-red-200')}`}>
                         {vendor.score}%
                      </div>
-                     <h3 className="text-lg font-bold text-white group-hover:text-primary transition-colors truncate pr-12">{vendor.name}</h3>
+                     <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-600 transition-colors truncate pr-12">{vendor.name}</h3>
                      <div className="mt-4 space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-zinc-400">
-                           <Copy className="h-3 w-3 cursor-pointer hover:text-white" /> 
-                           <span className="font-mono bg-black/20 px-1.5 rounded">{vendor.gstin}</span>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                           <Copy className="h-3 w-3 cursor-pointer hover:text-gray-900" strokeWidth={2.5} /> 
+                           <span className="font-mono bg-gray-50 px-1.5 py-0.5 rounded text-xs">{vendor.gstin}</span>
                         </div>
-                        <p className="text-xs text-zinc-500">PAN: {vendor.pan} • {vendor.state}</p>
+                        <p className="text-xs text-gray-500">PAN: {vendor.pan} • {vendor.state}</p>
                         <div className="flex gap-3 pt-2">
-                           <button className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"><Phone className="h-3 w-3" /></button>
-                           <button className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"><Mail className="h-3 w-3" /></button>
+                           <button className="p-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 text-gray-600 hover:text-emerald-600 transition-colors"><Phone className="h-3 w-3" /></button>
+                           <button className="p-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 text-gray-600 hover:text-emerald-600 transition-colors"><Mail className="h-3 w-3" /></button>
                         </div>
                      </div>
                   </div>
-                  <div className="p-4 bg-zinc-900/30 grid grid-cols-3 gap-2 text-center">
+                  <div className="p-4 bg-gradient-to-r from-gray-50 to-white grid grid-cols-3 divide-x divide-gray-200 text-center">
                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase">Invoices</p>
-                        <p className="text-sm font-bold text-white">{vendor.invoices}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Invoices</p>
+                        <p className="text-sm font-bold text-gray-900">{vendor.invoices}</p>
                      </div>
                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase">Amount</p>
-                        <p className="text-sm font-bold text-white">₹{(vendor.amount/100000).toFixed(2)}L</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Amount</p>
+                        <p className="text-sm font-bold text-gray-900">₹{(vendor.amount/100000).toFixed(2)}L</p>
                      </div>
                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase">GSTR-1</p>
-                        <p className={`text-xs font-bold ${vendor.filingStatus === 'On Time' ? 'text-emerald-500' : vendor.filingStatus === 'Not Filed' ? 'text-red-500' : 'text-amber-500'}`}>{vendor.filingStatus}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">GSTR-1</p>
+                        <p className={`text-xs font-bold ${vendor.filingStatus === 'On Time' ? 'text-emerald-600' : vendor.filingStatus === 'Not Filed' ? 'text-red-600' : 'text-amber-600'}`}>{vendor.filingStatus}</p>
                      </div>
                   </div>
-                  <div className="p-3 border-t border-white/5 flex gap-2">
-                     <button onClick={() => router.push('/dashboard/sme/vendors/details')} className="flex-1 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-medium hover:bg-primary/20 transition-colors">View Details</button>
-                     <button onClick={() => router.push('/dashboard/sme/vendors/reminders')} className="flex-1 py-2 rounded-lg border border-white/10 text-zinc-300 text-xs font-medium hover:bg-white/5 transition-colors">Send Reminder</button>
+                  <div className="p-3 border-t border-gray-100 flex gap-2">
+                     <button onClick={() => router.push('/dashboard/sme/vendors/details')} className="flex-1 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors">View Details</button>
+                     <button onClick={() => router.push('/dashboard/sme/vendors/reminders')} className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors">Send Reminder</button>
                   </div>
-               </GlassPanel>
+               </div>
             ))}
          </div>
       ) : (
-         <GlassPanel className="p-0 overflow-hidden">
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
             <table className="w-full text-left text-sm">
-               <thead className="bg-white/5 text-zinc-500 font-medium">
+               <thead className="bg-gradient-to-r from-gray-50 to-white text-gray-700 font-semibold border-b border-gray-200">
                   <tr>
-                     <th className="px-6 py-3">Vendor Name</th>
-                     <th className="px-6 py-3">Compliance</th>
-                     <th className="px-6 py-3 text-right">Invoices</th>
-                     <th className="px-6 py-3 text-right">Amount</th>
-                     <th className="px-6 py-3">Filing Status</th>
-                     <th className="px-6 py-3">State</th>
-                     <th className="px-6 py-3 text-right">Actions</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Vendor Name</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Compliance</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Invoices</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Amount</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Filing Status</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">State</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-white/5">
+               <tbody className="divide-y divide-gray-100">
                   {vendors.map((vendor) => (
-                     <tr key={vendor.id} className="hover:bg-white/5 transition-colors group">
-                        <td className="px-6 py-4">
-                           <p className="font-medium text-white cursor-pointer hover:text-primary" onClick={() => router.push('/dashboard/sme/vendors/details')}>{vendor.name}</p>
-                           <p className="text-xs text-zinc-500 font-mono">{vendor.gstin}</p>
+                     <tr key={vendor.id} className="hover:bg-gray-50 transition-colors group">
+                        <td className="px-4 py-3">
+                           <p className="font-semibold text-gray-900 cursor-pointer hover:text-emerald-600 text-xs" onClick={() => router.push('/dashboard/sme/vendors/details')}>{vendor.name}</p>
+                           <p className="text-xs text-gray-500 font-mono">{vendor.gstin}</p>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                                  <div className={`h-full rounded-full ${vendor.score >= 90 ? 'bg-emerald-500' : vendor.score >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{width: `${vendor.score}%`}}></div>
                               </div>
-                              <span className="text-xs text-zinc-400">{vendor.score}%</span>
+                              <span className="text-xs text-gray-600 font-semibold">{vendor.score}%</span>
                            </div>
                         </td>
-                        <td className="px-6 py-4 text-right text-zinc-300">{vendor.invoices}</td>
-                        <td className="px-6 py-4 text-right font-mono text-white">₹{vendor.amount.toLocaleString()}</td>
-                        <td className="px-6 py-4">
-                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${vendor.filingStatus === 'On Time' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : vendor.filingStatus === 'Not Filed' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                        <td className="px-4 py-3 text-right text-gray-900 font-semibold text-xs">{vendor.invoices}</td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-900 font-semibold text-xs">₹{vendor.amount.toLocaleString()}</td>
+                        <td className="px-4 py-3">
+                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${vendor.filingStatus === 'On Time' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : vendor.filingStatus === 'Not Filed' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                               {vendor.filingStatus}
                            </span>
                         </td>
-                        <td className="px-6 py-4 text-zinc-400">{vendor.state}</td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-3 text-gray-600 text-xs">{vendor.state}</td>
+                        <td className="px-4 py-3 text-right">
                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white">
+                              <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all">
                                  <MoreVertical className="h-4 w-4" />
                               </button>
                            </div>
@@ -287,60 +292,61 @@ export default function VendorListPage() {
                   ))}
                </tbody>
             </table>
-         </GlassPanel>
+         </div>
       )}
 
       {/* Add Vendor Modal */}
       {showAddModal && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-zinc-950 border border-white/10 w-full max-w-2xl rounded-2xl flex flex-col overflow-hidden shadow-2xl">
-               <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-white">Add New Vendor</h2>
-                  <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white"><XCircle className="h-5 w-5" /></button>
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white border border-gray-200 w-full max-w-2xl rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+               <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-gray-50 to-white">
+                  <h2 className="text-xl font-bold text-gray-900">Add New Vendor</h2>
+                  <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors"><XCircle className="h-5 w-5" /></button>
                </div>
                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                   <div className="space-y-4">
-                     <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Basic Details</h3>
+                     <h3 className="text-sm font-semibold text-emerald-700 uppercase tracking-wider">Basic Details</h3>
                      <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                           <label className="text-xs text-zinc-500 mb-1 block">Vendor Name <span className="text-red-500">*</span></label>
-                           <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" placeholder="Enter vendor name" />
+                           <label className="text-xs text-gray-600 mb-1 block font-medium">Vendor Name <span className="text-red-500">*</span></label>
+                           <input type="text" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="Enter vendor name" />
                         </div>
                         <div>
-                           <label className="text-xs text-zinc-500 mb-1 block">GSTIN <span className="text-red-500">*</span></label>
+                           <label className="text-xs text-gray-600 mb-1 block font-medium">GSTIN <span className="text-red-500">*</span></label>
                            <div className="relative">
-                              <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none uppercase" placeholder="27ABCDE1234F1Z5" />
+                              <input type="text" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none uppercase transition-all" placeholder="27ABCDE1234F1Z5" />
                               <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
                            </div>
                         </div>
                         <div>
-                           <label className="text-xs text-zinc-500 mb-1 block">PAN</label>
-                           <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-400 focus:border-primary outline-none" placeholder="Auto-filled from GSTIN" disabled />
+                           <label className="text-xs text-gray-600 mb-1 block font-medium">PAN</label>
+                           <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="Auto-filled from GSTIN" disabled />
                         </div>
                      </div>
                   </div>
 
-                  <div className="space-y-4 pt-4 border-t border-white/5">
-                     <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Contact Information</h3>
+                  <div className="space-y-4 pt-4 border-t border-gray-200">
+                     <h3 className="text-sm font-semibold text-emerald-700 uppercase tracking-wider">Contact Information</h3>
                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                           <label className="text-xs text-zinc-500 mb-1 block">Email</label>
-                           <input type="email" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" placeholder="vendor@company.com" />
+                           <label className="text-xs text-gray-600 mb-1 block font-medium">Email</label>
+                           <input type="email" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="vendor@company.com" />
                         </div>
                         <div>
-                           <label className="text-xs text-zinc-500 mb-1 block">Phone</label>
-                           <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" placeholder="+91 98765 43210" />
+                           <label className="text-xs text-gray-600 mb-1 block font-medium">Phone</label>
+                           <input type="text" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="+91 98765 43210" />
                         </div>
                      </div>
                   </div>
                </div>
-               <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-zinc-900/50">
-                  <button onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg border border-white/10 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">Cancel</button>
-                  <button onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">Add Vendor</button>
+               <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-gradient-to-r from-gray-50 to-white">
+                  <button onClick={() => setShowAddModal(false)} className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:shadow-sm transition-all font-medium">Cancel</button>
+                  <button onClick={() => setShowAddModal(false)} className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all">Add Vendor</button>
                </div>
             </div>
          </div>
       )}
+    </div>
     </div>
   );
 }

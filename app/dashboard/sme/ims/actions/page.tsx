@@ -63,23 +63,28 @@ export default function IMSActionsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       {/* 1. PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">GSTR-2B Actions</h1>
-          <p className="text-muted-foreground text-sm mt-1">Accept, reject, or review 2B invoices for ITC eligibility</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+            <Gavel className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">IMS Actions</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">GSTR-2B Actions</h1>
+          <p className="text-gray-600 text-sm mt-1">Accept, reject, or review 2B invoices for ITC eligibility</p>
         </div>
         <div className="flex items-center gap-3">
            <div className="relative">
-             <select className="appearance-none bg-zinc-900 border border-white/10 text-sm rounded-lg pl-9 pr-8 py-2 focus:ring-1 focus:ring-primary outline-none text-zinc-300 cursor-pointer hover:bg-zinc-800">
+             <select className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-900 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
                <option>Nov 2025</option>
                <option>Oct 2025</option>
                <option>Sep 2025</option>
              </select>
-             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
+             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
            </div>
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
+           <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2 font-medium">
              <Filter className="h-4 w-4" /> Filters
            </button>
         </div>
@@ -87,70 +92,70 @@ export default function IMSActionsPage() {
 
       {/* 2. STATUS SUMMARY BAR */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <BentoCard className="border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:bg-emerald-500/10 transition-colors">
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-lg p-6 cursor-pointer hover:shadow-xl hover:border-emerald-300 transition-all">
            <div className="flex justify-between items-start">
              <div>
-               <p className="text-xs text-emerald-400 uppercase tracking-wider font-semibold">Accepted</p>
-               <h3 className="text-2xl font-bold text-white mt-2">654 <span className="text-sm font-normal text-zinc-400">/ 800</span></h3>
-               <p className="text-xs text-zinc-500 mt-1">ITC: ₹ 6,45,210</p>
+               <p className="text-xs text-emerald-600 uppercase tracking-wider font-semibold">Accepted</p>
+               <h3 className="text-2xl font-bold text-gray-900 mt-2">654 <span className="text-sm font-normal text-gray-600">/ 800</span></h3>
+               <p className="text-xs text-gray-600 mt-1">ITC: ₹ 6,45,210</p>
              </div>
-             <div className="p-2 rounded-full bg-emerald-500/10 text-emerald-500">
-               <CheckCircle2 className="h-5 w-5" />
+             <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30">
+               <CheckCircle2 className="h-5 w-5" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="border-red-500/30 bg-red-500/5 cursor-pointer hover:bg-red-500/10 transition-colors">
+        <div className="bg-white rounded-2xl border border-red-200 shadow-lg p-6 cursor-pointer hover:shadow-xl hover:border-red-300 transition-all">
            <div className="flex justify-between items-start">
              <div>
-               <p className="text-xs text-red-400 uppercase tracking-wider font-semibold">Rejected</p>
-               <h3 className="text-2xl font-bold text-white mt-2">37 <span className="text-sm font-normal text-zinc-400">/ 800</span></h3>
-               <p className="text-xs text-zinc-500 mt-1">Blocked: ₹ 78,420</p>
+               <p className="text-xs text-red-600 uppercase tracking-wider font-semibold">Rejected</p>
+               <h3 className="text-2xl font-bold text-gray-900 mt-2">37 <span className="text-sm font-normal text-gray-600">/ 800</span></h3>
+               <p className="text-xs text-gray-600 mt-1">Blocked: ₹ 78,420</p>
              </div>
-             <div className="p-2 rounded-full bg-red-500/10 text-red-500">
-               <XCircle className="h-5 w-5" />
+             <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30">
+               <XCircle className="h-5 w-5" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors">
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-lg p-6 cursor-pointer hover:shadow-xl hover:border-amber-300 transition-all">
            <div className="flex justify-between items-start">
              <div>
-               <p className="text-xs text-amber-400 uppercase tracking-wider font-semibold">Pending</p>
-               <h3 className="text-2xl font-bold text-white mt-2">102 <span className="text-sm font-normal text-zinc-400">/ 800</span></h3>
-               <p className="text-xs text-zinc-500 mt-1">At Risk: ₹ 1,24,800</p>
+               <p className="text-xs text-amber-600 uppercase tracking-wider font-semibold">Pending</p>
+               <h3 className="text-2xl font-bold text-gray-900 mt-2">102 <span className="text-sm font-normal text-gray-600">/ 800</span></h3>
+               <p className="text-xs text-gray-600 mt-1">At Risk: ₹ 1,24,800</p>
              </div>
-             <div className="p-2 rounded-full bg-amber-500/10 text-amber-500">
-               <AlertTriangle className="h-5 w-5" />
+             <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/30">
+               <AlertTriangle className="h-5 w-5" strokeWidth={2.5} />
              </div>
            </div>
-        </BentoCard>
+        </div>
       </div>
 
       {/* 3. ACTION TABLE */}
-      <GlassPanel className="p-0 overflow-hidden flex flex-col min-h-[500px]">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden flex flex-col min-h-[500px]">
          {/* Table Controls */}
-         <div className="px-6 py-4 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5">
+         <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-gray-50 to-white">
             <div className="flex items-center gap-4">
                <div className="flex items-center gap-2">
                   <input 
                     type="checkbox" 
-                    className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                    className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500"
                     checked={selectedRows.length === imsInvoices.length}
                     onChange={toggleSelectAll}
                   />
-                  <span className="text-sm text-zinc-400">Select All</span>
+                  <span className="text-sm text-gray-600">Select All</span>
                </div>
                {selectedRows.length > 0 && (
                   <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                     <div className="h-4 w-px bg-white/10 mx-2"></div>
-                     <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded flex items-center gap-1 transition-colors">
+                     <div className="h-4 w-px bg-gray-300 mx-2"></div>
+                     <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg flex items-center gap-1 transition-colors shadow-sm">
                         <Check className="h-3 w-3" /> Accept ({selectedRows.length})
                      </button>
-                     <button className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded flex items-center gap-1 transition-colors">
+                     <button className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-lg flex items-center gap-1 transition-colors shadow-sm">
                         <X className="h-3 w-3" /> Reject ({selectedRows.length})
                      </button>
-                     <button className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded border border-white/10 transition-colors">
+                     <button className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg border border-gray-300 transition-colors">
                         More Actions
                      </button>
                   </div>
@@ -158,111 +163,111 @@ export default function IMSActionsPage() {
             </div>
             
             <div className="relative">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                <input 
                  type="text" 
                  placeholder="Search invoices..." 
-                 className="pl-9 pr-4 py-1.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary outline-none w-64"
+                 className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-64"
                />
             </div>
          </div>
 
          <div className="flex-1 overflow-auto">
             <table className="w-full text-left text-sm">
-               <thead className="bg-white/5 text-zinc-500 font-medium sticky top-0 backdrop-blur-sm z-10">
+               <thead className="bg-gradient-to-r from-gray-50 to-white text-gray-700 font-semibold sticky top-0 backdrop-blur-sm z-10 border-b border-gray-200">
                   <tr>
-                     <th className="px-6 py-3 w-12"></th>
-                     <th className="px-6 py-3">Invoice No</th>
-                     <th className="px-6 py-3">Date</th>
-                     <th className="px-6 py-3">Vendor</th>
-                     <th className="px-6 py-3 text-right">Amount</th>
-                     <th className="px-6 py-3 text-right">GST</th>
-                     <th className="px-6 py-3 text-center">ITC Status</th>
-                     <th className="px-6 py-3 text-center">Issues</th>
-                     <th className="px-6 py-3 text-center">Decision</th>
-                     <th className="px-6 py-3 text-center">Remark</th>
-                     <th className="px-6 py-3 text-right">Actions</th>
+                     <th className="px-4 py-3 w-12"></th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Invoice No</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Date</th>
+                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Vendor</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Amount</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">GST</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">ITC Status</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Issues</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Decision</th>
+                     <th className="px-4 py-3 text-center text-xs uppercase tracking-wider">Remark</th>
+                     <th className="px-4 py-3 text-right text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-white/5">
+               <tbody className="divide-y divide-gray-100">
                   {imsInvoices.map((inv) => {
                      const currentDecision = decisions[inv.id] || inv.decision;
                      return (
-                        <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
-                           <td className="px-6 py-4">
+                        <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
+                           <td className="px-4 py-3">
                               <input 
                                 type="checkbox" 
-                                className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                                className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                 checked={selectedRows.includes(inv.id)}
                                 onChange={() => toggleRowSelection(inv.id)}
                               />
                            </td>
-                           <td className="px-6 py-4">
-                              <span className="font-medium text-white hover:text-primary hover:underline cursor-pointer">{inv.id}</span>
+                           <td className="px-4 py-3">
+                              <span className="font-semibold text-gray-900 hover:text-emerald-600 hover:underline cursor-pointer">{inv.id}</span>
                            </td>
-                           <td className="px-6 py-4 text-zinc-400">{inv.date}</td>
-                           <td className="px-6 py-4">
+                           <td className="px-4 py-3 text-gray-600 text-xs">{inv.date}</td>
+                           <td className="px-4 py-3">
                               <div className="flex flex-col">
-                                 <span className="text-zinc-200">{inv.vendor}</span>
-                                 <span className="text-[10px] text-zinc-500 font-mono">{inv.gstin}</span>
+                                 <span className="text-gray-900 text-xs font-medium">{inv.vendor}</span>
+                                 <span className="text-[10px] text-gray-500 font-mono">{inv.gstin}</span>
                               </div>
                            </td>
-                           <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.amount.toLocaleString()}</td>
-                           <td className="px-6 py-4 text-right text-zinc-300 font-mono">₹{inv.gst.toLocaleString()}</td>
-                           <td className="px-6 py-4 text-center">{getStatusBadge(inv.itcStatus)}</td>
-                           <td className="px-6 py-4 text-center">
+                           <td className="px-4 py-3 text-right text-gray-900 font-semibold text-xs">₹{inv.amount.toLocaleString()}</td>
+                           <td className="px-4 py-3 text-right text-gray-700 font-semibold text-xs">₹{inv.gst.toLocaleString()}</td>
+                           <td className="px-4 py-3 text-center">{getStatusBadge(inv.itcStatus)}</td>
+                           <td className="px-4 py-3 text-center">
                               {inv.issues === 0 ? (
-                                 <span className="text-emerald-500 text-xs flex items-center justify-center gap-1"><CheckCircle2 className="h-3 w-3" /> Valid</span>
+                                 <span className="text-emerald-600 text-xs flex items-center justify-center gap-1 font-semibold"><CheckCircle2 className="h-3 w-3" /> Valid</span>
                               ) : (
-                                 <span className="text-amber-500 text-xs flex items-center justify-center gap-1 cursor-pointer hover:underline"><AlertTriangle className="h-3 w-3" /> {inv.issues} Issue{inv.issues > 1 ? 's' : ''}</span>
+                                 <span className="text-amber-600 text-xs flex items-center justify-center gap-1 cursor-pointer hover:underline font-semibold"><AlertTriangle className="h-3 w-3" /> {inv.issues} Issue{inv.issues > 1 ? 's' : ''}</span>
                               )}
                            </td>
-                           <td className="px-6 py-4">
-                              <div className="flex bg-zinc-900 rounded-lg p-1 border border-white/10 w-fit mx-auto">
+                           <td className="px-4 py-3">
+                              <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200 w-fit mx-auto">
                                  <button 
                                     onClick={() => handleDecision(inv.id, 'Accept')}
-                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Accept' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Accept' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                     title="Accept"
                                  >
                                     <Check className="h-3.5 w-3.5" />
                                  </button>
                                  <button 
                                     onClick={() => handleDecision(inv.id, 'Pending')}
-                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Pending' ? 'bg-amber-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Pending' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                     title="Pending"
                                  >
                                     <Clock className="h-3.5 w-3.5" />
                                  </button>
                                  <button 
                                     onClick={() => handleDecision(inv.id, 'Reject')}
-                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Reject' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded transition-all ${currentDecision === 'Reject' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                     title="Reject"
                                  >
                                     <X className="h-3.5 w-3.5" />
                                  </button>
                               </div>
                            </td>
-                           <td className="px-6 py-4 text-center">
+                           <td className="px-4 py-3 text-center">
                               {inv.remark ? (
                                  <div className="group/remark relative inline-block">
-                                    <MessageSquare className="h-4 w-4 text-blue-400 cursor-pointer" />
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-zinc-900 border border-white/10 rounded-lg shadow-xl text-xs text-zinc-300 opacity-0 group-hover/remark:opacity-100 pointer-events-none transition-opacity z-20">
+                                    <MessageSquare className="h-4 w-4 text-blue-600 cursor-pointer" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-xs text-white opacity-0 group-hover/remark:opacity-100 pointer-events-none transition-opacity z-20">
                                        {inv.remark}
                                     </div>
                                  </div>
                               ) : (
-                                 <button className="text-zinc-600 hover:text-zinc-400"><MessageSquare className="h-4 w-4" /></button>
+                                 <button className="text-gray-400 hover:text-gray-600"><MessageSquare className="h-4 w-4" /></button>
                               )}
                            </td>
-                           <td className="px-6 py-4 text-right">
+                           <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="View Details">
+                                 <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all" title="View Details">
                                     <Eye className="h-4 w-4" />
                                  </button>
-                                 <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="Download PDF">
+                                 <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all" title="Download PDF">
                                     <Download className="h-4 w-4" />
                                  </button>
-                                 <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white">
+                                 <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-all">
                                     <MoreVertical className="h-4 w-4" />
                                  </button>
                               </div>
@@ -275,16 +280,26 @@ export default function IMSActionsPage() {
          </div>
 
          {/* Pagination */}
-         <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between bg-zinc-900/50">
-           <div className="text-xs text-zinc-500">Showing 1-6 of 102</div>
+         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+           <div className="text-xs text-gray-600">Showing 1-6 of 102</div>
            <div className="flex items-center gap-2">
-              <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700" disabled>Previous</button>
-              <button className="px-2 py-1 rounded bg-primary text-white text-xs">1</button>
-              <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700">2</button>
-              <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700">Next</button>
+              <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-600 text-xs hover:text-gray-900 hover:bg-gray-50" disabled>Previous</button>
+              <button className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold">1</button>
+              <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-600 text-xs hover:text-gray-900 hover:bg-gray-50">2</button>
+              <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-600 text-xs hover:text-gray-900 hover:bg-gray-50">Next</button>
            </div>
          </div>
-      </GlassPanel>
+      </div>
+    </div>
     </div>
   );
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'Eligible': return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Eligible</span>;
+    case 'Blocked': return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">Blocked</span>;
+    case 'At Risk': return <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">At Risk</span>;
+    default: return null;
+  }
 }

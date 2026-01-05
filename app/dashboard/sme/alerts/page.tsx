@@ -53,10 +53,10 @@ export default function AlertsPage() {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'critical': return <AlertOctagon className="h-5 w-5 text-red-500" />;
-      case 'warning': return <AlertTriangle className="h-5 w-5 text-amber-500" />;
-      case 'info': return <Info className="h-5 w-5 text-blue-500" />;
-      default: return <Bell className="h-5 w-5 text-zinc-500" />;
+      case 'critical': return <AlertOctagon className="h-4 w-4 text-white" strokeWidth={2.5} />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-white" strokeWidth={2.5} />;
+      case 'info': return <Info className="h-4 w-4 text-white" strokeWidth={2.5} />;
+      default: return <Bell className="h-4 w-4 text-white" strokeWidth={2.5} />;
     }
   };
 
@@ -70,114 +70,146 @@ export default function AlertsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Alerts & Notifications</h1>
-          <p className="text-muted-foreground text-sm mt-1">Stay updated with critical compliance events and system activities</p>
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-[11px] font-semibold text-emerald-700">Alert Center</span>
+              </div>
+              <h1 className="text-[28px] font-semibold text-gray-900 tracking-tight mb-1">Alerts & Notifications</h1>
+              <p className="text-sm text-gray-600">Stay updated with critical compliance events and system activities</p>
+            </div>
+            <div className="flex items-center gap-3">
+               <button 
+                 onClick={markAllAsRead}
+                 className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2"
+               >
+                 <CheckCircle2 className="h-4 w-4" /> Mark all as read
+               </button>
+               <button className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-2">
+                 <Filter className="h-4 w-4" /> Filter
+               </button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-           <button 
-             onClick={markAllAsRead}
-             className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2"
-           >
-             <CheckCircle2 className="h-4 w-4" /> Mark all as read
-           </button>
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2">
-             <Filter className="h-4 w-4" /> Filter
-           </button>
-        </div>
-      </div>
 
-      {/* Filter Tabs */}
-      <div className="flex border-b border-white/5">
-         {['all', 'critical', 'warning', 'info'].map((f) => (
-            <button 
-               key={f}
-               onClick={() => setFilter(f as any)}
-               className={`
-                  px-6 py-3 text-sm font-medium border-b-2 transition-colors capitalize
-                  ${filter === f 
-                     ? 'border-primary text-white' 
-                     : 'border-transparent text-zinc-500 hover:text-zinc-300'}
-               `}
-            >
-               {f}
-            </button>
-         ))}
-      </div>
+        {/* Filter Tabs */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 p-2 inline-flex gap-1">
+           {['all', 'critical', 'warning', 'info'].map((f) => (
+              <button 
+                 key={f}
+                 onClick={() => setFilter(f as any)}
+                 className={`
+                    px-6 py-2.5 text-sm font-medium rounded-xl transition-all capitalize
+                    ${filter === f 
+                       ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm border border-emerald-200' 
+                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
+                 `}
+              >
+                 {f}
+              </button>
+           ))}
+        </div>
 
       {/* Alerts Feed */}
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-8">
          {Object.entries(groupedAlerts).map(([group, items]) => (
             items.length > 0 && (
-               <div key={group} className="space-y-4">
-                  <h3 className="text-sm font-medium text-zinc-500 uppercase tracking-wider ml-2">{group}</h3>
+               <div key={group} className="space-y-3">
+                  <div className="flex items-center gap-2 ml-2">
+                     <div className="h-1 w-1 bg-emerald-500 rounded-full"></div>
+                     <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{group}</h3>
+                  </div>
                   {items.map((alert) => (
-                     <GlassPanel 
+                     <div 
                         key={alert.id} 
-                        className={`p-0 overflow-hidden transition-all duration-200 hover:translate-x-1 ${alert.read ? 'opacity-75' : 'opacity-100 border-l-4 border-l-primary'}`}
+                        className={`relative bg-white rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-300 ${
+                           alert.read ? 'opacity-60' : ''
+                        }`}
                      >
-                        <div className="p-5 flex items-start gap-4">
-                           <div className={`p-2 rounded-full shrink-0 bg-zinc-900 border border-white/5`}>
+                        {/* Status indicator */}
+                        {!alert.read && (
+                           <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full"></div>
+                        )}
+                        
+                        <div className="px-5 py-3.5 flex items-center gap-5">
+                           {/* Icon */}
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                              alert.type === 'critical' ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                              alert.type === 'warning' ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                              'bg-gradient-to-br from-blue-500 to-cyan-600'
+                           }`}>
                               {getIcon(alert.type)}
                            </div>
                            
+                           {/* Content - Title & Message */}
                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start">
-                                 <h4 className={`text-base font-semibold ${alert.read ? 'text-zinc-300' : 'text-white'}`}>
-                                    {alert.title}
-                                 </h4>
-                                 <span className="text-xs text-zinc-500 whitespace-nowrap ml-4 flex items-center gap-1">
-                                    <Clock className="h-3 w-3" /> {alert.time}
-                                 </span>
-                              </div>
-                              <p className="text-sm text-zinc-400 mt-1 leading-relaxed">
+                              <h4 className={`text-sm font-semibold ${alert.read ? 'text-gray-500' : 'text-gray-900'}`}>
+                                 {alert.title}
+                              </h4>
+                              <p className={`text-xs mt-0.5 line-clamp-1 ${alert.read ? 'text-gray-400' : 'text-gray-600'}`}>
                                  {alert.message}
                               </p>
-                              
+                           </div>
+
+                           {/* Time */}
+                           <div className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap min-w-[100px]">
+                              <Clock className="h-3.5 w-3.5" />
+                              {alert.time}
+                           </div>
+
+                           {/* Action Button - Fixed Width Container */}
+                           <div className="min-w-[130px]">
                               {alert.action && (
-                                 <div className="mt-3 flex items-center gap-3">
-                                    <button className="text-xs font-medium text-primary hover:text-emerald-400 flex items-center gap-1 transition-colors">
-                                       {alert.action} <ArrowRight className="h-3 w-3" />
-                                    </button>
-                                 </div>
+                                 <button className="btn-primary-custom text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all whitespace-nowrap">
+                                    {alert.action}
+                                    <ArrowRight className="h-3 w-3" />
+                                 </button>
                               )}
                            </div>
 
-                           <div className="flex flex-col gap-2 ml-4">
+                           {/* Actions - Fixed Width */}
+                           <div className="flex items-center gap-2 border-l border-gray-200 pl-4 min-w-[80px] justify-end">
                               {!alert.read && (
                                  <button 
                                     onClick={() => markAsRead(alert.id)}
-                                    className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-emerald-500 transition-colors" 
+                                    className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-all" 
                                     title="Mark as read"
                                  >
-                                    <Check className="h-4 w-4" />
+                                    <Check className="h-3.5 w-3.5" />
                                  </button>
                               )}
                               <button 
                                  onClick={() => deleteAlert(alert.id)}
-                                 className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-red-500 transition-colors"
+                                 className="p-2 rounded-lg bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
                                  title="Delete"
                               >
-                                 <Trash2 className="h-4 w-4" />
+                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                            </div>
                         </div>
-                     </GlassPanel>
+                     </div>
                   ))}
                </div>
             )
          ))}
 
          {filteredAlerts.length === 0 && (
-            <div className="text-center py-20 text-zinc-500">
-               <Bell className="h-16 w-16 mx-auto mb-4 opacity-20" />
-               <p>No alerts found in this category.</p>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-20">
+               <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                     <Bell className="h-7 w-7 text-gray-400" />
+                  </div>
+                  <p className="text-sm text-gray-500 font-medium">No alerts found in this category.</p>
+               </div>
             </div>
          )}
       </div>
+    </div>
     </div>
   );
 }
