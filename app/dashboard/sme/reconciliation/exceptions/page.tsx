@@ -26,8 +26,6 @@ import {
   Cell, 
   Legend 
 } from 'recharts';
-import GlassPanel from '../../../../../components/ui/GlassPanel';
-import BentoCard from '../../../../../components/ui/BentoCard';
 
 // Mock Data
 const vendorExceptionData = [
@@ -46,207 +44,262 @@ const categoryData = [
 
 export default function ExceptionDashboardPage() {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
       
-      {/* 1. PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Exception Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Visual analysis of reconciliation discrepancies</p>
+        {/* 1. PAGE HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-block bg-purple-50 border border-purple-200 rounded-full px-6 py-2 mb-4">
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Exception Dashboard</h1>
+            </div>
+            <p className="text-gray-600 text-sm ml-1">Visual analysis of reconciliation discrepancies</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select className="bg-white border border-gray-300 text-sm rounded-lg px-4 py-2 text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm">
+              <option>This Month</option>
+              <option>Last Month</option>
+              <option>Last 3 Months</option>
+            </select>
+            <button className="p-2 rounded-lg bg-white border border-gray-300 text-gray-600 hover:text-gray-900 hover:bg-gray-50 shadow-sm transition-colors">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-sm font-medium hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center gap-2 shadow-lg">
+              <Download className="h-4 w-4" /> Download Analysis
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-           <select className="bg-zinc-900 border border-white/10 text-sm rounded-lg p-2 text-zinc-300 focus:ring-1 focus:ring-primary outline-none">
-             <option>This Month</option>
-             <option>Last Month</option>
-             <option>Last 3 Months</option>
-           </select>
-           <button className="p-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-800">
-             <RefreshCw className="h-4 w-4" />
-           </button>
-           <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20">
-             <Download className="h-4 w-4" /> Download Analysis
-           </button>
+
+        {/* 2. KPI CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Exceptions */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Total Exceptions</p>
+                <div className="p-2 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200">
+                  <AlertOctagon className="h-5 w-5 text-gray-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-gray-900">67</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-emerald-600 text-sm flex items-center font-medium">
+                    <ArrowDownRight className="h-4 w-4 mr-1" /> 5% down
+                  </span>
+                  <span className="text-xs text-gray-500">8% of total invoices</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ITC at Risk */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">ITC at Risk</p>
+                <div className="p-2 rounded-lg bg-gradient-to-br from-red-100 to-red-200">
+                  <AlertOctagon className="h-5 w-5 text-red-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-red-600">₹ 3.68 L</h3>
+                <p className="text-xs text-gray-500 mt-2">15% of eligible ITC</p>
+              </div>
+            </div>
+          </div>
+
+          {/* High Priority */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">High Priority</p>
+                <div className="relative">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-100 to-amber-200">
+                    <AlertOctagon className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-gray-900">12</h3>
+                <p className="text-xs text-gray-500 mt-2">Amount {'>'} ₹50k or {'>'} 30 days</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Avg Resolution Time */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Avg Resolution</p>
+                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-gray-900">4.5 days</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-emerald-600 text-sm flex items-center font-medium">
+                    <ArrowDownRight className="h-4 w-4 mr-1" /> 1.2 days
+                  </span>
+                  <span className="text-xs text-gray-500">Median time</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* 2. KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-         <BentoCard>
-            <div className="flex flex-col h-full justify-between">
-               <div className="flex justify-between items-start">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Exceptions</p>
-                  <span className="text-emerald-500 text-xs flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded"><ArrowDownRight className="h-3 w-3 mr-1" /> 5</span>
-               </div>
-               <div>
-                  <h3 className="text-3xl font-bold text-white mt-2">67</h3>
-                  <p className="text-xs text-zinc-500 mt-1">8% of total invoices</p>
-               </div>
+        {/* 3. CHARTS SECTION */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Vendor-wise Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Vendor-wise Breakdown</h3>
+            <div className="w-full h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={vendorExceptionData} layout="vertical" margin={{ left: 20, right: 10, top: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={true} vertical={false} />
+                  <XAxis type="number" stroke="#9ca3af" tick={{fill: '#6b7280', fontSize: 12}} />
+                  <YAxis dataKey="name" type="category" stroke="#9ca3af" tick={{fill: '#111827', fontSize: 12}} width={80} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#ffffff', 
+                      borderColor: '#e5e7eb', 
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                    itemStyle={{ fontSize: '12px', color: '#111827' }}
+                    cursor={{fill: 'rgba(16, 185, 129, 0.05)'}}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                  <Bar dataKey="gstr2b" name="Missing GSTR-2B" stackId="a" fill="#EF4444" barSize={20} />
+                  <Bar dataKey="books" name="Missing Books" stackId="a" fill="#F97316" barSize={20} />
+                  <Bar dataKey="value" name="Value Mismatch" stackId="a" fill="#EAB308" barSize={20} radius={[0,4,4,0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-         </BentoCard>
+          </div>
 
-         <BentoCard>
-            <div className="flex flex-col h-full justify-between">
-               <div className="flex justify-between items-start">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">ITC at Risk</p>
-                  <AlertOctagon className="h-4 w-4 text-red-500" />
-               </div>
-               <div>
-                  <h3 className="text-3xl font-bold text-red-500 mt-2">₹ 3.68 L</h3>
-                  <p className="text-xs text-zinc-500 mt-1">15% of eligible ITC</p>
-               </div>
+          {/* Category Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Category Breakdown</h3>
+            <div className="w-full h-[320px] flex items-center">
+              <div className="w-1/2 h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#ffffff', 
+                        borderRadius: '8px', 
+                        border: '1px solid #e5e7eb',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                      }} 
+                      itemStyle={{color: '#111827'}} 
+                    />
+                    <Legend 
+                      verticalAlign="middle" 
+                      align="right"
+                      layout="vertical"
+                      wrapperStyle={{ 
+                        fontSize: '12px',
+                        backgroundColor: '#ffffff',
+                        padding: '8px',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-1/2 space-y-4 pl-4">
+                {categoryData.map((item) => (
+                  <div key={item.name} className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                        <p className="text-xs text-gray-500">{item.value} invoices</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-         </BentoCard>
+          </div>
+        </div>
 
-         <BentoCard className="cursor-pointer hover:border-white/20 transition-colors">
-            <div className="flex flex-col h-full justify-between">
-               <div className="flex justify-between items-start">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">High Priority</p>
-                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-               </div>
-               <div>
-                  <h3 className="text-3xl font-bold text-white mt-2">12</h3>
-                  <p className="text-xs text-zinc-500 mt-1">Amount {'>'} ₹50k or {'>'} 30 days</p>
-               </div>
+        {/* 4. AI INSIGHTS PANEL */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-100 to-emerald-100">
+              <Zap className="h-5 w-5 text-purple-600 fill-current" />
             </div>
-         </BentoCard>
+            <h3 className="text-lg font-semibold text-gray-900">Automated Insights & Recommendations</h3>
+          </div>
 
-         <BentoCard>
-            <div className="flex flex-col h-full justify-between">
-               <div className="flex justify-between items-start">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Avg Resolution</p>
-                  <span className="text-emerald-500 text-xs flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded"><ArrowDownRight className="h-3 w-3 mr-1" /> 1.2 days</span>
-               </div>
-               <div>
-                  <h3 className="text-3xl font-bold text-white mt-2">4.5 days</h3>
-                  <p className="text-xs text-zinc-500 mt-1">Median time to resolve</p>
-               </div>
-            </div>
-         </BentoCard>
-      </div>
-
-      {/* 3. CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[400px]">
-         <GlassPanel className="p-6 flex flex-col">
-            <h3 className="text-lg font-semibold text-white mb-6">Vendor-wise Breakdown</h3>
-            <div className="flex-1 w-full min-h-0">
-               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={vendorExceptionData} layout="vertical" margin={{ left: 20 }}>
-                     <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={true} vertical={false} />
-                     <XAxis type="number" stroke="#666" tick={{fill: '#9ca3af', fontSize: 12}} />
-                     <YAxis dataKey="name" type="category" stroke="#666" tick={{fill: '#fff', fontSize: 12}} width={80} />
-                     <Tooltip 
-                       contentStyle={{ backgroundColor: '#09090b', borderColor: '#333', borderRadius: '8px' }}
-                       itemStyle={{ fontSize: '12px' }}
-                       cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                     />
-                     <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                     <Bar dataKey="gstr2b" name="Missing GSTR-2B" stackId="a" fill="#EF4444" barSize={20} radius={[0,0,0,0]} />
-                     <Bar dataKey="books" name="Missing Books" stackId="a" fill="#F97316" barSize={20} radius={[0,0,0,0]} />
-                     <Bar dataKey="value" name="Value Mismatch" stackId="a" fill="#EAB308" barSize={20} radius={[0,4,4,0]} />
-                  </BarChart>
-               </ResponsiveContainer>
-            </div>
-         </GlassPanel>
-
-         <GlassPanel className="p-6 flex flex-col">
-            <h3 className="text-lg font-semibold text-white mb-6">Category Breakdown</h3>
-            <div className="flex-1 w-full min-h-0 flex items-center">
-               <div className="w-1/2 h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                        <Pie
-                           data={categoryData}
-                           innerRadius={60}
-                           outerRadius={80}
-                           paddingAngle={5}
-                           dataKey="value"
-                           stroke="none"
-                        >
-                           {categoryData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                           ))}
-                        </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: '#09090b', borderRadius: '8px', border: '1px solid #333' }} itemStyle={{color: '#fff'}} />
-                     </PieChart>
-                  </ResponsiveContainer>
-               </div>
-               <div className="w-1/2 space-y-4">
-                  {categoryData.map((item) => (
-                     <div key={item.name} className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                           <div className="w-3 h-3 rounded-full" style={{backgroundColor: item.color}}></div>
-                           <div>
-                              <p className="text-sm font-medium text-white">{item.name}</p>
-                              <p className="text-xs text-zinc-500">{item.value} invoices</p>
-                           </div>
-                        </div>
-                     </div>
-                  ))}
-               </div>
-            </div>
-         </GlassPanel>
-      </div>
-
-      {/* 4. AI INSIGHTS PANEL */}
-      <GlassPanel className="p-6">
-         <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-               <Zap className="h-5 w-5 fill-current" />
-            </div>
-            <h3 className="text-lg font-semibold text-white">Automated Insights & Recommendations</h3>
-         </div>
-
-         <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {/* Insight 1: Priority */}
-            <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-primary/30 transition-colors flex items-start gap-4">
-               <div className="p-2 rounded-full bg-red-500/10 text-red-500 mt-1">
-                  <AlertOctagon className="h-5 w-5" />
-               </div>
-               <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">Priority Action Needed</h4>
-                  <p className="text-sm text-zinc-400 mt-1">
-                     12 high-value invoices ({'>'}₹50K) have been pending {'>'}15 days. Focus on these first to secure <span className="text-white font-medium">₹1,85,600 ITC</span>.
-                  </p>
-               </div>
-               <button className="px-4 py-2 rounded-lg bg-red-600/10 text-red-500 text-xs font-bold hover:bg-red-600 hover:text-white transition-colors">
-                  View List
-               </button>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 hover:border-red-300 transition-all hover:shadow-md flex items-start gap-4">
+              <div className="p-2.5 rounded-full bg-white shadow-sm mt-1">
+                <AlertOctagon className="h-5 w-5 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900">Priority Action Needed</h4>
+                <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                  12 high-value invoices ({'>'}₹50K) have been pending {'>'}15 days. Focus on these first to secure <span className="text-red-700 font-semibold">₹1,85,600 ITC</span>.
+                </p>
+              </div>
+              <button className="px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm">
+                View List
+              </button>
             </div>
 
             {/* Insight 2: Trend */}
-            <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-primary/30 transition-colors flex items-start gap-4">
-               <div className="p-2 rounded-full bg-blue-500/10 text-blue-500 mt-1">
-                  <TrendingUp className="h-5 w-5" />
-               </div>
-               <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">Negative Trend Alert</h4>
-                  <p className="text-sm text-zinc-400 mt-1">
-                     Exceptions increased by 15% this month. Top contributor: <span className="text-white font-medium">ABC Enterprises (18 issues)</span>.
-                  </p>
-               </div>
-               <button className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-white/10 transition-colors">
-                  Analyze
-               </button>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 hover:border-blue-300 transition-all hover:shadow-md flex items-start gap-4">
+              <div className="p-2.5 rounded-full bg-white shadow-sm mt-1">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900">Negative Trend Alert</h4>
+                <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                  Exceptions increased by 15% this month. Top contributor: <span className="text-blue-700 font-semibold">ABC Enterprises (18 issues)</span>.
+                </p>
+              </div>
+              <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+                Analyze
+              </button>
             </div>
 
             {/* Insight 3: Quick Win */}
-            <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-primary/30 transition-colors flex items-start gap-4">
-               <div className="p-2 rounded-full bg-emerald-500/10 text-emerald-500 mt-1">
-                  <CheckSquare className="h-5 w-5" />
-               </div>
-               <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">Quick Win Identified</h4>
-                  <p className="text-sm text-zinc-400 mt-1">
-                     6 invoices have rounding differences {'<'}₹10. Accept GSTR-2B values to instantly resolve these exceptions.
-                  </p>
-               </div>
-               <button className="px-4 py-2 rounded-lg bg-emerald-600/10 text-emerald-500 text-xs font-bold hover:bg-emerald-600 hover:text-white transition-colors">
-                  Auto-Resolve
-               </button>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 transition-all hover:shadow-md flex items-start gap-4">
+              <div className="p-2.5 rounded-full bg-white shadow-sm mt-1">
+                <CheckSquare className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900">Quick Win Identified</h4>
+                <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                  6 invoices have rounding differences {'<'}₹10. Accept GSTR-2B values to instantly resolve these exceptions.
+                </p>
+              </div>
+              <button className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
+                Auto-Resolve
+              </button>
             </div>
-         </div>
-      </GlassPanel>
+          </div>
+        </div>
 
+      </div>
     </div>
   );
 }
