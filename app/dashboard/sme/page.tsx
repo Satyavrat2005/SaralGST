@@ -27,6 +27,8 @@ import {
 import { 
   LineChart, 
   Line, 
+  AreaChart,
+  Area,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -101,8 +103,7 @@ export default function SMEDashboard() {
             <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></div>
             LIVE
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Saral GST Demo Account</p>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         </div>
         <div className="flex items-center gap-3">
            <div className="relative">
@@ -136,129 +137,172 @@ export default function SMEDashboard() {
       {/* 2. KEY METRICS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* Card 1: Total Invoices */}
+        {/* Card 1: Total Invoices - Blue Gradient */}
         <div 
-          className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group"
+          className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-5 cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden relative"
           onClick={() => router.push('/dashboard/sme/invoices/purchase')}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 font-medium mb-1">Total Invoices</p>
-              <h3 className="text-2xl font-bold text-gray-900">1,247</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-              <FileText className="h-5 w-5" />
-            </div>
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full -ml-16 -mb-16"></div>
           </div>
           
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Purchase</span>
-              <span className="text-gray-900 font-semibold">823</span>
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <p className="text-blue-100 text-xs font-medium mb-1">TOTAL INVOICES</p>
+                <h3 className="text-3xl font-bold text-white mb-2">1,247</h3>
+              </div>
+              <FileText className="h-6 w-6 text-white opacity-90" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Sales</span>
-              <span className="text-gray-900 font-semibold">424</span>
+            
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-white/90">Purchase</span>
+                <span className="text-sm font-bold text-white">823</span>
+              </div>
+              <div className="h-1 bg-white/30 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-white rounded-full" style={{width: '66%'}}></div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/90">Sales</span>
+                <span className="text-sm font-bold text-white">424</span>
+              </div>
             </div>
-            <div className="pt-2 mt-2 border-t border-gray-100 flex items-center text-xs text-emerald-600 font-medium">
-              <ArrowUpRight className="h-3 w-3 mr-1" /> +12% vs last month
+            
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-blue-100">This Month</span>
+              <span className="flex items-center gap-1 text-white font-semibold">
+                <ArrowUpRight className="h-3 w-3" /> 12%
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Card 2: ITC Available */}
+        {/* Card 2: ITC Available - Emerald Gradient */}
         <div 
-          className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all group"
+          className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-lg p-5 cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden relative"
           onClick={() => router.push('/dashboard/sme/itc')}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 font-medium mb-1">ITC Available</p>
-              <h3 className="text-2xl font-bold text-emerald-600">₹ 2.45 L</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-              <TrendingUp className="h-5 w-5" />
-            </div>
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full -ml-16 -mb-16"></div>
           </div>
           
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Claimed</span>
-              <span className="text-gray-900 font-semibold">₹ 1.80 L</span>
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <p className="text-emerald-100 text-xs font-medium mb-1">ITC AVAILABLE</p>
+                <h3 className="text-3xl font-bold text-white mb-2">₹2.45L</h3>
+              </div>
+              <TrendingUp className="h-6 w-6 text-white opacity-90" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Pending</span>
-              <span className="text-gray-900 font-semibold">₹ 0.65 L</span>
+            
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-white/90">Claimed</span>
+                <span className="text-sm font-bold text-white">₹1.80L</span>
+              </div>
+              <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                <div className="h-full bg-white rounded-full" style={{width: '73%'}}></div>
+              </div>
             </div>
-            <div className="pt-2 mt-2 border-t border-gray-100 flex items-center text-xs text-emerald-600 font-medium">
-              <ArrowUpRight className="h-3 w-3 mr-1" /> +5% vs last month
+            
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-emerald-100">Pending: ₹0.65L</span>
+              <span className="flex items-center gap-1 text-white font-semibold">
+                <ArrowUpRight className="h-3 w-3" /> 5%
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Tax Payable */}
+        {/* Card 3: Tax Payable - Amber Gradient */}
         <div 
-          className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:border-amber-300 hover:shadow-md transition-all group"
+          className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl shadow-lg p-5 cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden relative"
           onClick={() => router.push('/dashboard/sme/returns/gstr3b')}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 font-medium mb-1">Tax Payable</p>
-              <h3 className="text-2xl font-bold text-gray-900">₹ 1.12 L</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
-              <AlertCircle className="h-5 w-5" />
-            </div>
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full -ml-16 -mb-16"></div>
           </div>
           
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Output Tax</span>
-              <span className="text-gray-900 font-semibold">₹ 2.92 L</span>
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <p className="text-amber-100 text-xs font-medium mb-1">TAX PAYABLE</p>
+                <h3 className="text-3xl font-bold text-white mb-2">₹1.12L</h3>
+              </div>
+              <AlertCircle className="h-6 w-6 text-white opacity-90" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Input Credit</span>
-              <span className="text-emerald-600 font-semibold">-₹ 1.80 L</span>
+            
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-white/90">Output Tax</span>
+                <span className="text-sm font-bold text-white">₹2.92L</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/90">Input Credit</span>
+                <span className="text-sm font-bold text-white">-₹1.80L</span>
+              </div>
             </div>
-            <div className="pt-2 mt-2 border-t border-gray-100">
-              <span className="inline-flex items-center text-xs font-semibold text-amber-600">
-                Due: 20th Nov
+            
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-amber-100 flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Due: 20th Nov
               </span>
+              <span className="text-white font-semibold">14 days</span>
             </div>
           </div>
         </div>
 
-        {/* Card 4: Pending Actions */}
+        {/* Card 4: Pending Actions - Rose/Red Gradient */}
         <div 
-          className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:border-red-300 hover:shadow-md transition-all group"
+          className="bg-gradient-to-br from-rose-500 to-red-500 rounded-2xl shadow-lg p-5 cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden relative"
           onClick={() => router.push('/dashboard/sme/alerts')}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 font-medium mb-1">Pending Actions</p>
-              <h3 className="text-2xl font-bold text-gray-900">23</h3>
-            </div>
-            <div className="relative p-2 rounded-lg bg-red-50 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-            </div>
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full -ml-16 -mb-16"></div>
           </div>
           
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Failed Validations</span>
-              <span className="text-red-600 font-semibold">12</span>
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <p className="text-rose-100 text-xs font-medium mb-1">PENDING ACTIONS</p>
+                <h3 className="text-3xl font-bold text-white mb-2">23</h3>
+              </div>
+              <div className="relative">
+                <AlertTriangle className="h-6 w-6 text-white opacity-90" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">IMS Decisions</span>
-              <span className="text-gray-900 font-semibold">8</span>
+            
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/90">Failed Validations</span>
+                <span className="text-sm font-bold text-white">12</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/90">IMS Decisions</span>
+                <span className="text-sm font-bold text-white">8</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/90">Reminders</span>
+                <span className="text-sm font-bold text-white">3</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Vendor Reminders</span>
-              <span className="text-gray-900 font-semibold">3</span>
+            
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-rose-100">Requires Attention</span>
+              <span className="text-white font-semibold">View All</span>
             </div>
           </div>
         </div>
@@ -359,7 +403,21 @@ export default function SMEDashboard() {
             </div>
             <div className="flex-1 w-full min-h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={ITCTrendData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <AreaChart data={ITCTrendData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="colorAvailable" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorClaimed" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorLost" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="month" stroke="#6b7280" tick={{fill: '#6b7280', fontSize: 12}} axisLine={false} tickLine={false} dy={10} />
                   <YAxis stroke="#6b7280" tick={{fill: '#6b7280', fontSize: 12}} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value/1000}k`} />
@@ -369,10 +427,10 @@ export default function SMEDashboard() {
                     labelStyle={{ color: '#111827', marginBottom: '8px', fontWeight: 'bold' }}
                     formatter={(value: number) => [`₹ ${value.toLocaleString()}`, '']}
                   />
-                  <Line type="monotone" dataKey="available" stroke="#3b82f6" strokeWidth={2} dot={{r:3, fill:'#3b82f6'}} activeDot={{r:6, strokeWidth:0}} name="Available" />
-                  <Line type="monotone" dataKey="claimed" stroke="#10B981" strokeWidth={2} dot={{r:3, fill:'#10B981'}} activeDot={{r:6, strokeWidth:0}} name="Claimed" />
-                  <Line type="monotone" dataKey="lost" stroke="#ef4444" strokeWidth={2} dot={{r:3, fill:'#ef4444'}} activeDot={{r:6, strokeWidth:0}} name="Lost" />
-                </LineChart>
+                  <Area type="monotone" dataKey="available" stroke="#3b82f6" strokeWidth={2} fill="url(#colorAvailable)" dot={{r:3, fill:'#3b82f6'}} activeDot={{r:6, strokeWidth:0}} name="Available" />
+                  <Area type="monotone" dataKey="claimed" stroke="#10B981" strokeWidth={2} fill="url(#colorClaimed)" dot={{r:3, fill:'#10B981'}} activeDot={{r:6, strokeWidth:0}} name="Claimed" />
+                  <Area type="monotone" dataKey="lost" stroke="#ef4444" strokeWidth={2} fill="url(#colorLost)" dot={{r:3, fill:'#ef4444'}} activeDot={{r:6, strokeWidth:0}} name="Lost" />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>

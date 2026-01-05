@@ -40,22 +40,22 @@
   }
   
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 240 10% 4%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
     --primary: 158 64% 52%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 3.7% 15.9%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 158 64% 52%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
     --ring: 158 64% 52%;
   }
 
@@ -64,30 +64,32 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-white text-foreground antialiased;
   }
 }
 
 @layer utilities {
   .glass-panel {
-    background-color: rgba(var(--background), 0.4);
+    background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    border: 1px solid rgba(229, 231, 235, 0.5);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(16, 185, 129, 0.02) inset;
   }
   
   .bento-card {
-    background-image: linear-gradient(to bottom right, hsl(var(--card)), hsla(var(--card), 0.5));
-    border: 1px solid hsla(var(--border), 0.5);
-    border-radius: 0.75rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(249, 250, 251, 0.8) 100%);
+    border: 1px solid rgba(229, 231, 235, 0.5);
+    border-radius: 1rem;
     padding: 1.5rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
   }
   
   .bento-card:hover {
-    border-color: hsla(var(--primary), 0.5);
-    box-shadow: 0 10px 15px -3px hsla(var(--primary), 0.05), 0 4px 6px -2px hsla(var(--primary), 0.05);
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.15), 0 0 0 1px rgba(16, 185, 129, 0.1) inset;
+    transform: translateY(-2px);
   }
 
   /* Text Gradient - Emerald theme for SaralGST */
@@ -235,21 +237,61 @@
 
   /* Custom Scrollbar Styles */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(243, 244, 246, 0.5);
+    border-radius: 4px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #D1D5DB;
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.5) 100%);
+    border-radius: 4px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #9CA3AF;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.5) 0%, rgba(16, 185, 129, 0.7) 100%);
+  }
+
+  /* Glow effect utilities */
+  .glow-emerald {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .glow-emerald-strong {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5), 0 0 60px rgba(16, 185, 129, 0.2);
+  }
+
+  /* Card shine effect */
+  .card-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-shine::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(16, 185, 129, 0.1) 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    transform: rotate(45deg);
+    transition: all 0.6s ease;
+  }
+
+  .card-shine:hover::before {
+    left: 100%;
   }
 }
 

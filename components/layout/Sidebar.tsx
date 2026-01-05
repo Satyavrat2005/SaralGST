@@ -201,26 +201,26 @@ export default function Sidebar() {
   return (
     <aside 
       className={`
-        h-screen bg-zinc-950/95 backdrop-blur-xl border-r border-white/5 flex flex-col shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] z-20 shadow-2xl
-        ${isCollapsed ? 'w-[70px]' : 'w-[240px]'}
+        h-screen bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] z-20 shadow-sm
+        ${isCollapsed ? 'w-[70px]' : 'w-[260px]'}
       `}
     >
       {/* Top Section: Logo & Toggle */}
-      <div className={`h-16 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-4'} border-b border-white/5 shrink-0 transition-all duration-300`}>
+      <div className={`h-16 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-4'} border-b border-gray-200 shrink-0 transition-all duration-300`}>
         
         {!isCollapsed ? (
           <>
-            <div className="flex items-center gap-2.5 overflow-hidden">
-               <div className={`h-8 w-8 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-gradient-to-br ${currentRole === 'ca' ? 'from-emerald-700 to-emerald-900' : 'from-primary to-emerald-700'} shrink-0`}>
-                  <Triangle className="h-4 w-4 text-white fill-white rotate-180" />
+            <div className="flex items-center gap-3 overflow-hidden">
+               <div className={`h-9 w-9 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 bg-gradient-to-br ${currentRole === 'ca' ? 'from-emerald-600 to-emerald-700' : 'from-emerald-500 to-emerald-600'} shrink-0`}>
+                  <Triangle className="h-5 w-5 text-white fill-white rotate-180" />
                </div>
                <div className="flex flex-col">
-                 <span className="text-lg font-bold tracking-tight text-white leading-none font-sans">Saral<span className="text-primary">GST</span></span>
+                 <span className="text-lg font-bold tracking-tight text-gray-900 leading-none font-sans">Saral<span className="text-emerald-600">GST</span></span>
                </div>
             </div>
             <button 
               onClick={() => setIsCollapsed(true)}
-              className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
               title="Collapse Sidebar"
             >
               <PanelLeftClose className="h-4 w-4" />
@@ -229,7 +229,7 @@ export default function Sidebar() {
         ) : (
           <button 
             onClick={() => setIsCollapsed(false)}
-            className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-white/5 text-zinc-400 hover:text-primary transition-all group"
+            className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-all group"
             title="Expand Sidebar"
           >
             <PanelLeftOpen className="h-6 w-6 group-hover:scale-110 transition-transform" />
@@ -240,18 +240,18 @@ export default function Sidebar() {
       {/* GSTIN Indicator (Only visible when open) */}
       {!isCollapsed && (
         <div className="px-3 py-4 shrink-0">
-          <div className="bg-gradient-to-r from-zinc-900 to-black rounded-xl p-3 border border-white/5 shadow-inner">
-             <div className="flex justify-between items-center mb-1">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Active GSTIN</p>
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)] animate-pulse"></div>
+          <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl p-3.5 border border-emerald-200 shadow-sm hover:border-emerald-300 transition-all group">
+             <div className="flex justify-between items-center mb-1.5">
+                <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-bold">Active GSTIN</p>
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"></div>
              </div>
-             <p className="text-xs text-white font-mono font-medium tracking-wide truncate">27AAACW1234F1Z5</p>
+             <p className="text-xs text-gray-900 font-mono font-semibold tracking-wide truncate group-hover:text-emerald-900 transition-colors">27AAACW1234F1Z5</p>
           </div>
         </div>
       )}
 
       {/* Navigation Items (Hidden Scrollbar) */}
-      <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1 
+      <div className="flex-1 overflow-y-auto py-2 px-2.5 space-y-1 
           [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {menuItems.map((item, idx) => {
           const isExpanded = expandedMenus.includes(item.label);
@@ -266,40 +266,40 @@ export default function Sidebar() {
                 onMouseEnter={() => isCollapsed && setHoveredItem(item.label)}
                 onMouseLeave={() => isCollapsed && setHoveredItem(null)}
                 className={`
-                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative overflow-hidden
+                  w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden
                   ${isItemActive 
-                    ? 'text-white bg-gradient-to-r from-primary/20 to-transparent border-l-2 border-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]' 
-                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border-l-2 border-transparent'}
+                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200'}
                   ${isCollapsed ? 'justify-center px-0' : ''}
                 `}
               >
                 <div className={`flex items-center gap-3 z-10 ${isCollapsed ? 'justify-center w-full' : ''}`}>
-                  <item.icon className={`h-4 w-4 shrink-0 transition-colors duration-300 ${isItemActive ? 'text-primary drop-shadow-[0_0_3px_rgba(16,185,129,0.5)]' : 'group-hover:text-white'}`} />
-                  {!isCollapsed && <span className="truncate tracking-wide text-xs">{item.label}</span>}
+                  <item.icon className={`h-4.5 w-4.5 shrink-0 transition-all duration-300 ${isItemActive ? 'text-emerald-600' : 'group-hover:text-gray-900 group-hover:scale-110'}`} />
+                  {!isCollapsed && <span className="truncate tracking-wide text-[13px] font-medium">{item.label}</span>}
                 </div>
 
                 {/* Badges & Arrows */}
                 {!isCollapsed && (
                   <div className="flex items-center gap-2 z-10">
                     {item.badge && (
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white shadow-sm ${item.badgeColor || 'bg-primary'}`}>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm ${item.badgeColor || 'bg-emerald-500'}`}>
                         {item.badge}
                       </span>
                     )}
                     {item.subItems && (
-                      <ChevronRight className={`h-3.5 w-3.5 text-zinc-600 transition-transform duration-300 ${isExpanded ? 'rotate-90 text-zinc-300' : ''}`} />
+                      <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-90 text-emerald-600' : ''}`} />
                     )}
                   </div>
                 )}
                 
                 {/* Collapsed Mode Badge Indicator (Dot) */}
                 {isCollapsed && item.badge && (
-                   <div className={`absolute top-2 right-3.5 h-1.5 w-1.5 rounded-full border border-black ${item.badgeColor || 'bg-primary'}`}></div>
+                   <div className={`absolute top-2 right-3.5 h-2 w-2 rounded-full ${item.badgeColor || 'bg-emerald-500'} shadow-sm`}></div>
                 )}
 
                 {/* Tooltip for Collapsed State */}
                 {isCollapsed && hoveredItem === item.label && (
-                  <div className="absolute left-[60px] bg-zinc-900 border border-white/10 text-white text-xs px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap z-50 animate-in fade-in slide-in-from-left-2 duration-200">
+                  <div className="absolute left-[68px] bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl whitespace-nowrap z-50 animate-in fade-in slide-in-from-left-2 duration-200">
                     {item.label}
                   </div>
                 )}
@@ -307,7 +307,7 @@ export default function Sidebar() {
 
               {/* Sub Items */}
               {!isCollapsed && item.subItems && isExpanded && (
-                <div className="mt-0.5 space-y-0.5 overflow-hidden animate-in slide-in-from-top-2 fade-in duration-300">
+                <div className="mt-1 space-y-0.5 overflow-hidden animate-in slide-in-from-top-2 fade-in duration-300">
                   {item.subItems.map((sub, subIdx) => {
                      const isSubActive = isActive(sub.path);
                      return (
@@ -315,15 +315,18 @@ export default function Sidebar() {
                           key={subIdx}
                           onClick={() => handleNavigation(sub.path)}
                           className={`
-                            w-full flex items-center justify-between pl-9 pr-3 py-1.5 rounded-r-lg text-xs transition-all duration-200 border-l-2 border-transparent relative
+                            w-full flex items-center justify-between pl-11 pr-3 py-2 rounded-lg text-xs transition-all duration-200 border border-transparent relative group/sub
                             ${isSubActive 
-                              ? 'text-white bg-white/5 border-l-primary' 
-                              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}
+                              ? 'text-emerald-700 bg-emerald-50/50 border-emerald-200 font-medium' 
+                              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-200'}
                           `}
                         >
-                          <span className="truncate">{sub.label}</span>
+                          <span className="truncate flex items-center gap-2">
+                            <div className={`h-1 w-1 rounded-full ${isSubActive ? 'bg-emerald-600' : 'bg-gray-400 group-hover/sub:bg-gray-600'}`}></div>
+                            {sub.label}
+                          </span>
                           {sub.badge && (
-                            <span className={`h-1.5 w-1.5 rounded-full ${sub.badgeColor || 'bg-red-500'}`}></span>
+                            <span className={`h-5 w-5 rounded-md ${sub.badgeColor || 'bg-red-500'} flex items-center justify-center text-[9px] font-bold text-white shadow-sm`}>{sub.badge}</span>
                           )}
                         </button>
                      );
@@ -336,19 +339,19 @@ export default function Sidebar() {
       </div>
 
       {/* Bottom Section: Settings, Profile */}
-      <div className="border-t border-white/5 bg-black/20 p-2 space-y-1 shrink-0 backdrop-blur-md">
+      <div className="border-t border-gray-200 bg-gray-50/50 p-2.5 space-y-1.5 shrink-0">
         
         {/* Settings */}
         <button 
            onClick={() => router.push('/dashboard/sme/settings')}
            onMouseEnter={() => isCollapsed && setHoveredItem('Settings')}
            onMouseLeave={() => isCollapsed && setHoveredItem(null)}
-           className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-all relative ${isCollapsed ? 'justify-center' : ''}`}
+           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-white transition-all relative border border-transparent hover:border-gray-200 group ${isCollapsed ? 'justify-center' : ''}`}
         >
-           <Settings className="h-4 w-4" />
+           <Settings className="h-4.5 w-4.5 group-hover:rotate-90 transition-transform duration-300" />
            {!isCollapsed && <span className="text-xs">Settings</span>}
            {isCollapsed && hoveredItem === 'Settings' && (
-              <div className="absolute left-[60px] bg-zinc-900 border border-white/10 text-white text-xs px-3 py-1.5 rounded-md shadow-xl z-50">Settings</div>
+              <div className="absolute left-[68px] bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl z-50">Settings</div>
            )}
         </button>
 
@@ -356,32 +359,32 @@ export default function Sidebar() {
         <div className="relative">
           <button 
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/5 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl hover:bg-white border border-gray-200 hover:border-emerald-200 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
           >
-             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shrink-0 shadow-lg group-hover:shadow-indigo-500/20 transition-shadow text-xs">
+             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold shrink-0 shadow-lg group-hover:shadow-emerald-500/30 transition-shadow text-xs">
                MK
              </div>
              {!isCollapsed && (
                <div className="flex-1 text-left overflow-hidden">
-                 <p className="text-xs font-semibold text-white truncate">Manish Kumar</p>
-                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider truncate">Admin</p>
+                 <p className="text-xs font-bold text-gray-900 truncate">Deep Jain</p>
+                 <p className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider truncate">Admin</p>
                </div>
              )}
-             {!isCollapsed && <ChevronDown className="h-3 w-3 text-zinc-500 group-hover:text-white transition-colors" />}
+             {!isCollapsed && <ChevronDown className={`h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} />}
           </button>
           
           {/* Profile Dropdown */}
           {userMenuOpen && (
-            <div className="absolute bottom-[calc(100%+8px)] left-0 w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] p-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                <User className="h-3.5 w-3.5" /> View Profile
+            <div className="absolute bottom-[calc(100%+8px)] left-0 w-full bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <button className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-200">
+                <User className="h-4 w-4" /> View Profile
               </button>
-              <div className="h-px bg-white/10 my-1 mx-2"></div>
+              <div className="h-px bg-gray-200 my-1 mx-2"></div>
               <button 
                 onClick={() => router.push('/')}
-                className="w-full flex items-center gap-3 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-200"
               >
-                <LogOut className="h-3.5 w-3.5" /> Logout
+                <LogOut className="h-4 w-4" /> Logout
               </button>
             </div>
           )}

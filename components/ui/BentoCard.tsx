@@ -10,12 +10,12 @@ interface BentoCardProps extends React.HTMLAttributes<HTMLDivElement> {
 const BentoCard: React.FC<BentoCardProps> = ({ children, className = '', title, action, ...props }) => {
   return (
     <div 
-      className={`bento-card flex flex-col h-full ${className}`} 
+      className={`bento-card card-shine flex flex-col h-full ${className}`} 
       {...props}
     >
       {(title || action) && (
         <div className="flex items-center justify-between mb-4">
-          {title && <h3 className="font-semibold text-lg tracking-tight text-foreground">{title}</h3>}
+          {title && <h3 className="font-bold text-lg tracking-tight text-white">{title}</h3>}
           {action && <div>{action}</div>}
         </div>
       )}
