@@ -1,8 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-family: 'Google Sans', system-ui, sans-serif;
+  }
+  
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -22,14 +28,23 @@
     --input: 240 5.9% 90%;
     --ring: 158 64% 52%;
     --radius: 0.75rem;
+    --brand-50: 142 76% 95%;
+    --brand-100: 142 76% 90%;
+    --brand-200: 142 76% 80%;
+    --brand-300: 142 76% 70%;
+    --brand-400: 142 76% 60%;
+    --brand-500: 158 64% 52%;
+    --brand-600: 158 64% 52%;
+    --brand-700: 158 64% 42%;
+    --brand-800: 158 64% 32%;
   }
   
   .dark {
-    --background: 240 10% 3.9%; /* Zinc 950 */
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --primary: 158 64% 52%; /* Emerald 600 */
+    --primary: 158 64% 52%;
     --primary-foreground: 355.7 100% 97.3%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -74,4 +89,167 @@
     border-color: hsla(var(--primary), 0.5);
     box-shadow: 0 10px 15px -3px hsla(var(--primary), 0.05), 0 4px 6px -2px hsla(var(--primary), 0.05);
   }
+
+  /* Text Gradient - Emerald theme for SaralGST */
+  .text-gradient {
+    background: linear-gradient(155deg, #059669 0%, #10B981 45%, #047857 70%, #34D399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Custom Button Styles - Emerald theme */
+  .btn-primary-custom {
+    border-radius: 0.625rem;
+    background: radial-gradient(156.98% 105% at 50% 25%, #10B981 0%, #047857 100%);
+    box-shadow: 0px -1px 8px 0px rgba(0, 0, 0, 0.15) inset;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-secondary-custom {
+    border-radius: 0.625rem;
+    border: 0.5px solid rgba(0, 0, 0, 0.20);
+    background: radial-gradient(131.41% 73% at 50.45% 9%, #FFF 0%, #FBFAFA 99.98%);
+    box-shadow: 0px -0.5px 8px 0px rgba(0, 0, 0, 0.05) inset;
+    color: #374151;
+    cursor: pointer;
+  }
+
+  /* Enhanced Hero Background - Emerald gradient */
+  .hero-bg-custom {
+    background: radial-gradient(125% 125% at 50% 10%, #FFFFFF 35%, #D1FAE5 75%, #10B981 100%);
+  }
+
+  /* Dashboard Preview Style - Emerald theme */
+  .dashboard-preview-bg {
+    border-radius: 2.1875rem;
+    background: linear-gradient(114deg, #E7F7EF 4.53%, #9DFFBD 31.43%, #91FFB6 54.74%, #B4D5C4 77.06%, #FFF 101.24%);
+    box-shadow: 4px 4px 10px 0px #7E9E8C;
+    filter: blur(1px);
+  }
+
+  /* Industry Card Styles - Emerald theme */
+  .industry-card-1 {
+    background: linear-gradient(132deg, #F3FEF4 14.34%, #CEFFDE 98.07%);
+  }
+  
+  .industry-card-2 {
+    background: linear-gradient(50deg, #B7FFD2 -1.52%, #EFFCF5 65.13%, #E0FFF2 105.48%);
+  }
+
+  /* Deep Emerald Background for sections */
+  .demo-emerald-bg {
+    background: linear-gradient(180deg, #064E3B 0%, #022c22 100%);
+  }
+
+  /* Benefit Cards Styles - Emerald theme */
+  .benefit-card-primary {
+    border-radius: 1.25rem;
+    background: linear-gradient(141deg, #B8FFD4 10.07%, #447054 98.58%);
+  }
+  
+  /* Secondary Card: Outer container with white fill and border */
+  .benefit-card-secondary {
+    background-color: #FFFFFF;
+    border: 1px solid #E7F1EA;
+    border-radius: 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Secondary Card: Inner blurred gradient layer */
+  .benefit-card-secondary::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    right: 2px;
+    border-radius: 1rem;
+    background: linear-gradient(128deg, #F5FCF8 16.47%, #EAFAF4 60.05%, #E8F5EE 72.08%);
+    filter: blur(5px);
+    z-index: 0;
+  }
+
+  /* Animations */
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translate3d(0, -30px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 30px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  @keyframes zoomIn {
+    from {
+      opacity: 0;
+      transform: scale3d(0.95, 0.95, 0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale3d(1, 1, 1);
+    }
+  }
+
+  .animate-fade-in-down {
+    animation: fadeInDown 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  .animate-zoom-in {
+    animation: zoomIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+
+  .animation-delay-200 { animation-delay: 0.2s; }
+  .animation-delay-400 { animation-delay: 0.4s; }
+  .animation-delay-600 { animation-delay: 0.6s; }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom Scrollbar Styles */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+  }
 }
+
