@@ -46,23 +46,74 @@ export default function UploadInvoicesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('manual');
   const [dragActive, setDragActive] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadedFile[]>([]);
+  const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
   
-  // Tab Stats (Mock)
-  const stats = {
-    whatsapp: 3,
-    email: 5
-  };
+  // Tab Stats
+  const [stats, setStats] = useState({
+    whatsapp: 0,
+    email: 0
+  });
 
-  // Mock Recent Invoices
-  const recentInvoices = [
-    { id: 'INV-001234', file: 'invoice_nov_2025.pdf', party: 'TechSol Pvt Ltd', date: '18 Nov 2025', amount: 45600, gst: 8208, type: 'Purchase', status: 'Validated' },
-    { id: 'INV-001235', file: 'bill_materials.jpg', party: 'Alpha Traders', date: '18 Nov 2025', amount: 12500, gst: 2250, type: 'Sales', status: 'Processing' },
-    { id: 'INV-001236', file: 'scan_001.pdf', party: 'Gamma Logistics', date: '17 Nov 2025', amount: 89000, gst: 16020, type: 'Purchase', status: 'Failed' },
-    { id: 'INV-001237', file: 'invoice_draft.pdf', party: 'Beta Retail', date: '17 Nov 2025', amount: 3400, gst: 612, type: 'Purchase', status: 'Validated' },
-  ];
+  // Fetch recent invoices on mount
+  useEffect(() => {
+    fetchRecentInvoices();
+  }, []);
+
+  const fetchRecentInvoices = async () => {
+    try {
+      setLoadingRecent(true);
+      const response = await fetch('/api/invoice/purchase');
+      const data = await response.json();
+
+      if (data.success && data.invoices) {
+        // Get last 10 invoices sorted by created_at
+        const recent = data.invoices
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 10);
+        setRecentInvoices(recent);
+
+        // Calculate stats
+        const whatsappCount = data.invoices.filter((inv: any) => inv.source === 'whatsapp').length;
+        const emailCount = data.invoices.filter((inv: any) => inv.source === 'email').length;
+        setStats({ whatsapp: whatsappCount, email: emailCount });
+      }
+    } catch (error) {
+      console.error('Error fetching recent invoices:', error);
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
 
   // Helper to simulate upload progress
   // Removed - using real API calls now
+
+  const handleDelete = async (invoiceId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this invoice?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/invoice/purchase/${invoiceId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Remove from local state
+        setRecentInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+        alert('Invoice deleted successfully');
+      } else {
+        throw new Error(data.error || 'Failed to delete invoice');
+      }
+    } catch (error: any) {
+      console.error('Error deleting invoice:', error);
+      alert(`Failed to delete invoice: ${error.message}`);
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -587,57 +638,107 @@ export default function UploadInvoicesPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3">
-               {recentInvoices.map((invoice) => (
-                  <div key={invoice.id} className="group p-4 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/10 hover:bg-zinc-900/80 transition-all">
-                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        
-                        {/* Left: File Info */}
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                           <div className="h-10 w-10 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
-                              {invoice.file.endsWith('.pdf') ? <FileText className="h-5 w-5 text-red-400" /> : <FileText className="h-5 w-5 text-blue-400" />}
+               {loadingRecent ? (
+                 <div className="flex items-center justify-center py-12">
+                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                   <span className="ml-2 text-zinc-500">Loading recent invoices...</span>
+                 </div>
+               ) : recentInvoices.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-12">
+                   <FileText className="h-12 w-12 text-zinc-700 mb-2" />
+                   <p className="text-zinc-500 text-sm">No invoices uploaded yet</p>
+                 </div>
+               ) : (
+                 recentInvoices.map((invoice) => {
+                   const fileName = invoice.invoice_bucket_url 
+                     ? invoice.invoice_bucket_url.split('/').pop() 
+                     : 'invoice.pdf';
+                   const totalGst = (invoice.cgst_amount || 0) + (invoice.sgst_amount || 0) + (invoice.igst_amount || 0);
+                   const invoiceDate = invoice.invoice_date 
+                     ? new Date(invoice.invoice_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                     : 'N/A';
+                   
+                   const statusLabel = invoice.invoice_status === 'extracted' || invoice.invoice_status === 'verified' 
+                     ? 'Validated' 
+                     : invoice.invoice_status === 'needs_review' 
+                     ? 'Needs Review' 
+                     : invoice.invoice_status === 'error' 
+                     ? 'Failed' 
+                     : 'Processing';
+
+                   return (
+                     <div key={invoice.id} className="group p-4 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/10 hover:bg-zinc-900/80 transition-all">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                           
+                           {/* Left: File Info */}
+                           <div className="flex items-center gap-4 min-w-0 flex-1">
+                              <div className="h-10 w-10 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+                                 {fileName?.endsWith('.pdf') ? <FileText className="h-5 w-5 text-red-400" /> : <FileText className="h-5 w-5 text-blue-400" />}
+                              </div>
+                              <div className="min-w-0">
+                                 <p className="text-sm font-semibold text-white truncate">
+                                   {invoice.invoice_number || 'N/A'} 
+                                   <span className="text-zinc-500 font-normal mx-1">•</span> 
+                                   {invoice.supplier_name || 'Unknown'}
+                                 </p>
+                                 <div className="flex items-center gap-2 mt-0.5">
+                                    <p className="text-xs text-zinc-500">{invoiceDate}</p>
+                                    <span className="h-1 w-1 rounded-full bg-zinc-700"></span>
+                                    <p className="text-xs text-zinc-500">{fileName}</p>
+                                 </div>
+                              </div>
                            </div>
-                           <div className="min-w-0">
-                              <p className="text-sm font-semibold text-white truncate">{invoice.id} <span className="text-zinc-500 font-normal mx-1">•</span> {invoice.party}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                 <p className="text-xs text-zinc-500">{invoice.date}</p>
-                                 <span className="h-1 w-1 rounded-full bg-zinc-700"></span>
-                                 <p className="text-xs text-zinc-500">{invoice.file}</p>
+
+                           {/* Middle: Amount */}
+                           <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0 pl-14 sm:pl-0">
+                              <p className="text-sm font-bold text-white">₹{(invoice.total_invoice_value || 0).toLocaleString()}</p>
+                              <p className="text-xs text-zinc-500">GST: ₹{totalGst.toLocaleString()}</p>
+                           </div>
+
+                           {/* Right: Status & Actions */}
+                           <div className="flex items-center gap-4 pl-14 sm:pl-0 w-full sm:w-auto justify-between sm:justify-end">
+                              <div className="flex flex-col items-end gap-1">
+                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(statusLabel)}`}>
+                                    {statusLabel}
+                                 </span>
+                                 <span className="text-[10px] text-blue-400">
+                                    Purchase
+                                 </span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <button 
+                                   onClick={() => router.push('/dashboard/sme/invoices/purchase')}
+                                   className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                                   title="View Data"
+                                 >
+                                    <Eye className="h-4 w-4" />
+                                 </button>
+                                 {invoice.invoice_bucket_url && (
+                                   <a 
+                                     href={invoice.invoice_bucket_url}
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                                     title="View PDF"
+                                   >
+                                      <FileText className="h-4 w-4" />
+                                   </a>
+                                 )}
+                                 <button 
+                                   onClick={(e) => handleDelete(invoice.id, e)}
+                                   className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-red-400" 
+                                   title="Delete"
+                                 >
+                                    <Trash2 className="h-4 w-4" />
+                                 </button>
                               </div>
                            </div>
                         </div>
-
-                        {/* Middle: Amount */}
-                        <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0 pl-14 sm:pl-0">
-                           <p className="text-sm font-bold text-white">₹{invoice.amount.toLocaleString()}</p>
-                           <p className="text-xs text-zinc-500">GST: ₹{invoice.gst.toLocaleString()}</p>
-                        </div>
-
-                        {/* Right: Status & Actions */}
-                        <div className="flex items-center gap-4 pl-14 sm:pl-0 w-full sm:w-auto justify-between sm:justify-end">
-                           <div className="flex flex-col items-end gap-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(invoice.status)}`}>
-                                 {invoice.status}
-                              </span>
-                              <span className={`text-[10px] ${invoice.type === 'Purchase' ? 'text-blue-400' : 'text-emerald-400'}`}>
-                                 {invoice.type}
-                              </span>
-                           </div>
-                           
-                           <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="View Data">
-                                 <Eye className="h-4 w-4" />
-                              </button>
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="Edit">
-                                 <Edit3 className="h-4 w-4" />
-                              </button>
-                              <button className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-red-400" title="Delete">
-                                 <Trash2 className="h-4 w-4" />
-                              </button>
-                           </div>
-                        </div>
                      </div>
-                  </div>
-               ))}
+                   );
+                 })
+               )}
             </div>
          </GlassPanel>
       </div>

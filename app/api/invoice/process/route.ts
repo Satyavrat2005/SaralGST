@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       invoice_status: 'pending',
     };
 
-    const { data: createdInvoice, error: createError } = await createPurchaseInvoice(initialRecord);
+    const { data: createdInvoice, error: createError } = await createPurchaseInvoice(initialRecord, true);
 
     if (createError || !createdInvoice) {
       return NextResponse.json(
@@ -78,12 +78,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Upload file to Supabase Storage
-    const { url: fileUrl, error: uploadError } = await uploadInvoiceToStorage(file, invoiceId);
+    const { url: fileUrl, error: uploadError } = await uploadInvoiceToStorage(file, invoiceId, true);
 
     if (uploadError || !fileUrl) {
       await updatePurchaseInvoice(invoiceId, {
         invoice_status: 'error',
-      });
+      }, true);
 
       return NextResponse.json(
         { error: `Failed to upload file: ${uploadError}` },
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Update record with file URL
     await updatePurchaseInvoice(invoiceId, {
       invoice_bucket_url: fileUrl,
-    });
+    }, true);
 
     // Step 3: Convert file to buffer for OCR
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       if (!ocrResult.success || !ocrResult.rawText) {
         await updatePurchaseInvoice(invoiceId, {
           invoice_status: 'error',
-        });
+        }, true);
 
         await createPurchaseRemark({
           purchase_id: invoiceId,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
           detected_value: null,
           comment: ocrResult.error || 'Failed to extract text from invoice',
           status: 'open',
-        });
+        }, true);
 
         return NextResponse.json(
           { error: 'Failed to extract text from invoice', details: ocrResult.error },
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
           invoice_status: 'error',
           ocr_raw_json: { rawText: ocrResult.rawText },
           ocr_confidence_score: ocrConfidence,
-        });
+        }, true);
 
         await createPurchaseRemark({
           purchase_id: invoiceId,
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           detected_value: ocrResult.rawText.substring(0, 200),
           comment: llmError || 'Failed to extract structured data from OCR text',
           status: 'open',
-        });
+        }, true);
 
         return NextResponse.json(
           { error: 'Failed to extract structured data', details: llmError },
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       sgst_amount: extractedData.sgst || 0,
       igst_amount: extractedData.igst || 0,
       cess_amount: extractedData.cess || 0,
-      total_invoice_value: extractedData.total_invoice_value || 0,
+      // total_invoice_value is a generated column, calculated automatically by DB
       hsn_or_sac_code: extractedData.hsn_or_sac || null,
       description_of_goods_services: extractedData.description || null,
       quantity: parseFloat(extractedData.quantity) || null,
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       is_itc_eligible: extractedData.is_itc_eligible !== false, // Default true
       ocr_raw_json: extractedData,
       ocr_confidence_score: ocrConfidence,
-      invoice_status: validationResult.isValid ? 'extracted' : 'needs_review',
+      invoice_status: validationResult.isValid ? 'extracted' : 'pending', // 'pending' for invoices needing review
     };
 
     // Calculate ITC amounts (assuming eligible)
@@ -215,7 +215,8 @@ export async function POST(request: NextRequest) {
     // Step 8: Update invoice record with extracted data
     const { data: updatedInvoice, error: updateError } = await updatePurchaseInvoice(
       invoiceId,
-      invoiceData
+      invoiceData,
+      true
     );
 
     if (updateError) {
@@ -237,7 +238,7 @@ export async function POST(request: NextRequest) {
           confidence_score: error.confidence_score || null,
           comment: error.message,
           status: 'open',
-        });
+        }, true);
       }
     }
 

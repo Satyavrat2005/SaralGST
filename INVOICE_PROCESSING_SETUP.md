@@ -128,10 +128,14 @@ CREATE TABLE purchase_remarks (
 
 ### Storage Bucket Setup
 
-Create a Supabase storage bucket named `invoices` with the following settings:
+Your Supabase storage bucket is configured as:
+- Bucket name: `SARALGST`
+- Folder structure: `Purchase Invoice/`
 - Public: Yes (or configure appropriate RLS policies)
 - File size limit: 10MB
 - Allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`
+
+Files are stored as: `SARALGST/Purchase Invoice/{uuid}.{ext}`
 
 ## API Endpoints
 

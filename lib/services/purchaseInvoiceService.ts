@@ -2,8 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Client-side Supabase client (respects RLS)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Server-side Supabase client (bypasses RLS) - use only in API routes
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 // Types matching the database schema
 export interface PurchaseRegister {
@@ -60,15 +70,17 @@ export interface PurchaseRemark {
  */
 export async function uploadInvoiceToStorage(
   file: File,
-  invoiceId: string
+  invoiceId: string,
+  useAdmin = false
 ): Promise<{ url: string | null; error: string | null }> {
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${invoiceId}.${fileExt}`;
-    const filePath = `SARALGST/Purchase Invoice/${fileName}`;
+    const filePath = `Purchase Invoice/${fileName}`;
 
-    const { data, error } = await supabase.storage
-      .from('invoices') // Make sure this bucket exists in your Supabase project
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client.storage
+      .from('SARALGST')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false
@@ -80,8 +92,8 @@ export async function uploadInvoiceToStorage(
     }
 
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('invoices')
+    const { data: { publicUrl } } = client.storage
+      .from('SARALGST')
       .getPublicUrl(filePath);
 
     return { url: publicUrl, error: null };
@@ -95,10 +107,12 @@ export async function uploadInvoiceToStorage(
  * Create a new purchase invoice record
  */
 export async function createPurchaseInvoice(
-  invoice: PurchaseRegister
+  invoice: PurchaseRegister,
+  useAdmin = false
 ): Promise<{ data: PurchaseRegister | null; error: string | null }> {
   try {
-    const { data, error } = await supabase
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
       .from('purchase_register')
       .insert([invoice])
       .select()
@@ -121,10 +135,12 @@ export async function createPurchaseInvoice(
  */
 export async function updatePurchaseInvoice(
   id: string,
-  updates: Partial<PurchaseRegister>
+  updates: Partial<PurchaseRegister>,
+  useAdmin = false
 ): Promise<{ data: PurchaseRegister | null; error: string | null }> {
   try {
-    const { data, error } = await supabase
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
       .from('purchase_register')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -222,10 +238,12 @@ export async function getPurchaseInvoiceById(
  * Create a remark/issue for a purchase invoice
  */
 export async function createPurchaseRemark(
-  remark: PurchaseRemark
+  remark: PurchaseRemark,
+  useAdmin = false
 ): Promise<{ data: PurchaseRemark | null; error: string | null }> {
   try {
-    const { data, error } = await supabase
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
       .from('purchase_remarks')
       .insert([remark])
       .select()
@@ -272,17 +290,20 @@ export async function getPurchaseRemarks(
  * Delete a purchase invoice and its remarks
  */
 export async function deletePurchaseInvoice(
-  id: string
+  id: string,
+  useAdmin = false
 ): Promise<{ success: boolean; error: string | null }> {
   try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    
     // First delete remarks
-    await supabase
+    await client
       .from('purchase_remarks')
       .delete()
       .eq('purchase_id', id);
 
     // Then delete the invoice
-    const { error } = await supabase
+    const { error } = await client
       .from('purchase_register')
       .delete()
       .eq('id', id);

@@ -15,13 +15,20 @@ This will create:
 - ✅ Helpful views
 - ✅ Triggers
 
-### 1.3 Create Storage Bucket
+### 1.3 Create Storage Bucket (If Not Already Created)
+
+**Your bucket is already set up!** You have:
+- ✅ Bucket name: `SARALGST`
+- ✅ Folder: `Purchase Invoice`
+
+If you need to verify or adjust settings:
 1. Go to Storage in Supabase dashboard
-2. Click "New Bucket"
-3. Name: `invoices`
-4. Set as Public: Yes
-5. File size limit: 10MB
-6. Allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`
+2. Check bucket `SARALGST` exists
+3. Verify folder `Purchase Invoice` exists
+4. Settings should be:
+   - Public: Yes (or configure RLS policies)
+   - File size limit: 10MB
+   - Allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`
 
 ## Step 2: Environment Configuration (2 minutes)
 

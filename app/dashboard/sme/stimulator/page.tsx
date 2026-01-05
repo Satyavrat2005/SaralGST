@@ -108,9 +108,14 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
   useEffect(() => {
     const fetchInvoices = async () => {
       setLoading(true);
-      const data = await getPDFInvoices();
-      if (data) {
-        setInvoices(data);
+      try {
+        const response = await fetch('/api/invoice/purchase');
+        const data = await response.json();
+        if (data.success && data.invoices) {
+          setInvoices(data.invoices);
+        }
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
       }
       setLoading(false);
     };
@@ -205,26 +210,26 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
                              <FileText className="h-5 w-5" />
                           </div>
                           <div>
-                             <p className="text-sm font-medium text-white">{invoice.invoice_number}</p>
-                             <p className="text-xs text-zinc-500">{invoice.company_name}</p>
-                             {invoice.reason && (
-                                <p className="text-xs text-red-400 mt-0.5" title={invoice.reason}>
-                                   {invoice.reason.length > 50 ? invoice.reason.substring(0, 50) + '...' : invoice.reason}
-                                </p>
-                             )}
+                             <p className="text-sm font-medium text-white">{invoice.invoice_number || 'No Invoice #'}</p>
+                             <p className="text-xs text-zinc-500">{invoice.supplier_name || 'Unknown Supplier'}</p>
+                             <p className="text-xs text-zinc-400 mt-0.5">₹{invoice.total_invoice_value?.toLocaleString() || '0'}</p>
                           </div>
                        </div>
                        <div className="flex items-center gap-4">
                           <span className={`text-xs px-2 py-1 rounded border ${
-                             invoice.status.toLowerCase() === 'error' || invoice.status.toLowerCase() === 'failed' 
-                                ? 'bg-red-500/10 text-red-500 border-red-500/20' 
-                                : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                             invoice.invoice_status === 'extracted' || invoice.invoice_status === 'verified'
+                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                                : invoice.invoice_status === 'pending' || invoice.invoice_status === 'needs_review'
+                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                : 'bg-red-500/10 text-red-500 border-red-500/20'
                           }`}>
-                             {invoice.status}
+                             {invoice.invoice_status === 'extracted' ? 'Validated' :
+                              invoice.invoice_status === 'pending' || invoice.invoice_status === 'needs_review' ? 'Partial' :
+                              invoice.invoice_status === 'verified' ? 'Verified' : 'Error'}
                           </span>
-                          {invoice.links && (
+                          {invoice.invoice_bucket_url && (
                              <a 
-                                href={invoice.links} 
+                                href={invoice.invoice_bucket_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100"

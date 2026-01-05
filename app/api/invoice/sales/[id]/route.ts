@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getPurchaseInvoiceById,
-  getPurchaseRemarks,
-  updatePurchaseInvoice,
-  deletePurchaseInvoice,
-} from '@/lib/services/purchaseInvoiceService';
+  getSalesInvoiceById,
+  getSalesRemarks,
+  updateSalesInvoice,
+  deleteSalesInvoice,
+} from '@/lib/services/salesInvoiceService';
 
 /**
- * GET /api/invoice/purchase/[id]
- * Fetch a single purchase invoice with its remarks
+ * GET /api/invoice/sales/[id]
+ * Fetch a single sales invoice with its remarks
  */
 export async function GET(
   request: NextRequest,
@@ -17,7 +17,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const { data: invoice, error: invoiceError } = await getPurchaseInvoiceById(id);
+    const { data: invoice, error: invoiceError } = await getSalesInvoiceById(id);
 
     if (invoiceError) {
       return NextResponse.json(
@@ -34,7 +34,7 @@ export async function GET(
     }
 
     // Fetch remarks for this invoice
-    const { data: remarks, error: remarksError } = await getPurchaseRemarks(id);
+    const { data: remarks, error: remarksError } = await getSalesRemarks(id);
 
     return NextResponse.json({
       success: true,
@@ -52,8 +52,8 @@ export async function GET(
 }
 
 /**
- * PATCH /api/invoice/purchase/[id]
- * Update a purchase invoice
+ * PATCH /api/invoice/sales/[id]
+ * Update a sales invoice
  */
 export async function PATCH(
   request: NextRequest,
@@ -63,7 +63,10 @@ export async function PATCH(
     const { id } = await params;
     const updates = await request.json();
 
-    const { data, error } = await updatePurchaseInvoice(id, updates);
+    // Remove generated column if present
+    const { total_invoice_value, ...dataToSave } = updates;
+
+    const { data, error } = await updateSalesInvoice(id, dataToSave, true);
 
     if (error) {
       return NextResponse.json(
@@ -87,8 +90,8 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/invoice/purchase/[id]
- * Delete a purchase invoice
+ * DELETE /api/invoice/sales/[id]
+ * Delete a sales invoice
  */
 export async function DELETE(
   request: NextRequest,
@@ -97,7 +100,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const { success, error } = await deletePurchaseInvoice(id, true);
+    const { success, error } = await deleteSalesInvoice(id, true);
 
     if (error || !success) {
       return NextResponse.json(

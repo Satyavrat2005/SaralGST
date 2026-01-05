@@ -69,7 +69,7 @@ async function extractFromPDF(base64File: string): Promise<OCRResult> {
     
     if (!visionApiKey) {
       // Fallback: Use Gemini API for basic text extraction
-      return await fallbackTextExtraction(base64File);
+      return await fallbackTextExtraction(base64File, 'application/pdf');
     }
 
     const response = await fetch(
@@ -125,7 +125,7 @@ async function extractFromPDF(base64File: string): Promise<OCRResult> {
   } catch (error: any) {
     console.error('Error extracting from PDF:', error);
     // Fallback to basic extraction
-    return await fallbackTextExtraction(base64File);
+    return await fallbackTextExtraction(base64File, 'application/pdf');
   }
 }
 
@@ -137,7 +137,7 @@ async function extractFromImage(base64File: string): Promise<OCRResult> {
     const visionApiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
     
     if (!visionApiKey) {
-      return await fallbackTextExtraction(base64File);
+      return await fallbackTextExtraction(base64File, 'image/jpeg');
     }
 
     const response = await fetch(
@@ -198,7 +198,7 @@ async function extractFromImage(base64File: string): Promise<OCRResult> {
 /**
  * Fallback text extraction using Gemini Vision API
  */
-async function fallbackTextExtraction(base64File: string): Promise<OCRResult> {
+async function fallbackTextExtraction(base64File: string, mimeType: string = 'image/jpeg'): Promise<OCRResult> {
   try {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     
@@ -212,7 +212,7 @@ async function fallbackTextExtraction(base64File: string): Promise<OCRResult> {
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -227,7 +227,7 @@ async function fallbackTextExtraction(base64File: string): Promise<OCRResult> {
                 },
                 {
                   inline_data: {
-                    mime_type: 'application/pdf',
+                    mime_type: mimeType,
                     data: base64File,
                   },
                 },

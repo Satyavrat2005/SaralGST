@@ -179,25 +179,33 @@ function validateGSTIN(
 }
 
 /**
- * Validate mandatory GST fields
+ * Validate mandatory GST fields for GSTR-2B/Purchase Register compliance
  */
 function validateMandatoryFields(data: ExtractedInvoiceData, errors: ValidationError[]): void {
+  // Critical fields for GSTR-2B filing
   const mandatoryFields = [
-    { field: 'supplier_name', value: data.supplier_name },
-    { field: 'invoice_number', value: data.invoice_number, confidence: data.confidence.invoice_number },
-    { field: 'invoice_date', value: data.invoice_date },
-    { field: 'place_of_supply', value: data.place_of_supply },
-    { field: 'taxable_value', value: data.taxable_value },
-    { field: 'total_invoice_value', value: data.total_invoice_value },
+    { field: 'supplier_name', value: data.supplier_name, label: 'Supplier Name', critical: true },
+    { field: 'supplier_gstin', value: data.supplier_gstin, label: 'Supplier GSTIN', critical: true },
+    { field: 'invoice_number', value: data.invoice_number, label: 'Invoice Number', confidence: data.confidence.invoice_number, critical: true },
+    { field: 'invoice_date', value: data.invoice_date, label: 'Invoice Date', critical: true },
+    { field: 'invoice_type', value: data.invoice_type, label: 'Invoice Type (B2B/Import/RCM/SEZ)', critical: true },
+    { field: 'place_of_supply', value: data.place_of_supply, label: 'Place of Supply', critical: true },
+    { field: 'taxable_value', value: data.taxable_value, label: 'Taxable Value', critical: true },
+    { field: 'hsn_or_sac', value: data.hsn_or_sac, label: 'HSN/SAC Code', critical: true }, // Required for B2B invoices
+    { field: 'description', value: data.description, label: 'Description of Goods/Services', critical: false },
+    { field: 'quantity', value: data.quantity, label: 'Quantity', critical: false },
+    { field: 'unit', value: data.unit, label: 'Unit of Measure', critical: false },
   ];
 
-  mandatoryFields.forEach(({ field, value, confidence }) => {
-    if (value === null || value === undefined || value === '' || value === 0) {
+  mandatoryFields.forEach(({ field, value, confidence, label, critical }) => {
+    if (value === null || value === undefined || value === '' || (typeof value === 'number' && value === 0 && field === 'taxable_value')) {
       errors.push({
         field,
         issue_type: 'missing',
         detected_value: value?.toString() || null,
-        message: `${field} is required`,
+        message: critical 
+          ? `${label} is required for GST filing (GSTR-2B compliance)` 
+          : `${label} is recommended for complete invoice records`,
         confidence_score: confidence,
       });
     }
