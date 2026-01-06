@@ -634,13 +634,13 @@ export default function PurchaseRegisterPage() {
     switch (status) {
       case 'extracted':
       case 'verified':
-        return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'pending':
-        return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+        return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'error':
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
+        return 'bg-red-50 text-red-700 border-red-200';
       default:
-        return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+        return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
 
@@ -665,25 +665,29 @@ export default function PurchaseRegisterPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6 pb-20">
       
       {/* 1. PAGE HEADER */}
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Purchase Register</h1>
-            <p className="text-muted-foreground text-sm mt-1">All inward invoices from vendors</p>
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-2">
+              <span className="text-emerald-700 text-xs font-semibold">PURCHASE REGISTER</span>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Purchase Register</h1>
+            <p className="text-gray-600 text-sm mt-1">All inward invoices from vendors</p>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={exportToExcel}
-              className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm"
             >
               <Download className="h-4 w-4" /> Export
             </button>
             <button 
               onClick={() => router.push('/dashboard/sme/invoices/upload')}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-sm font-medium shadow-lg transition-all flex items-center gap-2"
             >
               <Plus className="h-4 w-4" /> Upload Invoice
             </button>
@@ -691,16 +695,16 @@ export default function PurchaseRegisterPage() {
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between backdrop-blur-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between shadow-sm">
            <div className="flex flex-wrap items-center gap-3 w-full">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Calendar className="h-4 w-4 text-zinc-500" />
+                  <Calendar className="h-4 w-4 text-gray-400" />
                 </div>
                 <select 
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pl-10 p-2 appearance-none cursor-pointer hover:bg-black/40"
+                  className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-10 p-2 appearance-none cursor-pointer hover:bg-gray-50"
                 >
                   <option>This Month</option>
                   <option>Last Month</option>
@@ -709,12 +713,12 @@ export default function PurchaseRegisterPage() {
                 </select>
               </div>
 
-              <div className="w-px h-8 bg-white/5 hidden md:block"></div>
+              <div className="w-px h-8 bg-gray-200 hidden md:block"></div>
 
               <select 
                 value={vendorFilter}
                 onChange={(e) => setVendorFilter(e.target.value)}
-                className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary p-2 cursor-pointer hover:bg-black/40"
+                className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 p-2 cursor-pointer hover:bg-gray-50"
               >
                 <option>All Vendors</option>
                 {getUniqueVendors().map(vendor => (
@@ -725,7 +729,7 @@ export default function PurchaseRegisterPage() {
               <select 
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary p-2 cursor-pointer hover:bg-black/40"
+                className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 p-2 cursor-pointer hover:bg-gray-50"
               >
                 <option>All Status</option>
                 <option>Validated</option>
@@ -736,75 +740,75 @@ export default function PurchaseRegisterPage() {
 
               <div className="relative flex-1 min-w-[200px]">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-zinc-500" />
+                  <Search className="h-4 w-4 text-gray-400" />
                 </div>
                 <input 
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-black/20 border border-white/10 text-zinc-300 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pl-10 p-2 placeholder-zinc-600" 
+                  className="bg-white border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-10 p-2 placeholder-gray-400" 
                   placeholder="Search invoices..." 
                 />
               </div>
            </div>
-           <button onClick={clearFilters} className="text-xs text-zinc-500 hover:text-white whitespace-nowrap">Clear Filters</button>
+           <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-900 whitespace-nowrap font-medium">Clear Filters</button>
         </div>
       </div>
 
       {/* 2. SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <BentoCard className="p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm text-muted-foreground">Total Purchases</p>
-              <h3 className="text-3xl font-bold text-white mt-2">
+              <p className="text-sm text-gray-600">Total Purchases</p>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">
                 {loading ? (
-                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
                 ) : (
                   `₹ ${Math.round(stats.totalPurchases).toLocaleString()}`
                 )}
               </h3>
-              <p className="text-xs text-zinc-500 mt-1">{stats.count} Invoices • This Month</p>
+              <p className="text-xs text-gray-500 mt-1">{stats.count} Invoices • This Month</p>
             </div>
-            <div className="px-2 py-1 bg-emerald-500/10 rounded text-emerald-500 text-xs font-medium flex items-center">
+            <div className="px-2 py-1 bg-emerald-50 rounded text-emerald-700 text-xs font-medium flex items-center border border-emerald-200">
               <ArrowUpRight className="h-3 w-3 mr-1" /> New
             </div>
           </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="p-6">
+        <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6">
           <div className="flex justify-between items-start mb-4">
              <div>
-               <p className="text-sm text-muted-foreground">Total Input Tax (ITC)</p>
-               <h3 className="text-3xl font-bold text-emerald-500 mt-2">
+               <p className="text-sm text-emerald-700">Total Input Tax (ITC)</p>
+               <h3 className="text-3xl font-bold text-emerald-600 mt-2">
                  {loading ? (
-                   <Loader2 className="h-8 w-8 animate-spin" />
+                   <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
                  ) : (
                    `₹ ${Math.round(stats.totalTax).toLocaleString()}`
                  )}
                </h3>
              </div>
-             <div className="p-2 bg-emerald-500/10 rounded-lg">
-               <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+             <div className="p-2 bg-emerald-100 rounded-lg">
+               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
              </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center border-t border-white/5 pt-3">
+          <div className="grid grid-cols-3 gap-2 text-center border-t border-emerald-200 pt-3">
              <div>
-               <p className="text-[10px] text-zinc-500">CGST</p>
-               <p className="text-xs font-mono text-white">₹{(stats.cgst / 1000).toFixed(1)}K</p>
+               <p className="text-[10px] text-gray-600">CGST</p>
+               <p className="text-xs font-mono text-gray-900">₹{(stats.cgst / 1000).toFixed(1)}K</p>
              </div>
              <div>
-               <p className="text-[10px] text-zinc-500">SGST</p>
-               <p className="text-xs font-mono text-white">₹{(stats.sgst / 1000).toFixed(1)}K</p>
+               <p className="text-[10px] text-gray-600">SGST</p>
+               <p className="text-xs font-mono text-gray-900">₹{(stats.sgst / 1000).toFixed(1)}K</p>
              </div>
              <div>
-               <p className="text-[10px] text-zinc-500">IGST</p>
-               <p className="text-xs font-mono text-white">₹{(stats.igst / 1000).toFixed(1)}K</p>
+               <p className="text-[10px] text-gray-600">IGST</p>
+               <p className="text-xs font-mono text-gray-900">₹{(stats.igst / 1000).toFixed(1)}K</p>
              </div>
           </div>
-        </BentoCard>
+        </div>
 
-        <BentoCard className="p-4 flex items-center gap-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-4 flex items-center gap-4">
            <div className="h-24 w-24 relative shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -825,45 +829,45 @@ export default function PurchaseRegisterPage() {
               </ResponsiveContainer>
            </div>
            <div className="flex-1 space-y-2">
-              <p className="text-sm font-medium text-white mb-2">Validation Status</p>
+              <p className="text-sm font-medium text-gray-900 mb-2">Validation Status</p>
               {validationStatusData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between text-xs">
                    <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}}></div>
-                      <span className="text-zinc-400">{item.name}</span>
+                      <span className="text-gray-600">{item.name}</span>
                    </div>
-                   <span className="text-white font-mono">{item.value}</span>
+                   <span className="text-gray-900 font-mono font-semibold">{item.value}</span>
                 </div>
               ))}
            </div>
-        </BentoCard>
+        </div>
       </div>
 
       {/* 3. DATA TABLE */}
-      <GlassPanel className="p-0 overflow-hidden flex flex-col h-[600px]">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-0 overflow-hidden flex flex-col h-[600px]">
         {/* Table Actions Bar */}
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                  <input 
                    type="checkbox" 
-                   className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                   className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500"
                    checked={selectedRows.length === filteredInvoices.length && filteredInvoices.length > 0}
                    onChange={toggleSelectAll}
                  />
-                 <span className="text-sm text-zinc-400">Select All</span>
+                 <span className="text-sm text-gray-600">Select All</span>
               </div>
-              <div className="h-4 w-px bg-white/10"></div>
-              <span className="text-sm text-white font-medium">{filteredInvoices.length} Invoices Found</span>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <span className="text-sm text-gray-900 font-medium">{filteredInvoices.length} Invoices Found</span>
            </div>
 
            {selectedRows.length > 0 && (
               <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                 <span className="text-sm text-zinc-300">{selectedRows.length} selected</span>
-                 <div className="flex items-center rounded-lg bg-zinc-800 border border-white/10 overflow-hidden">
-                    <button className="px-3 py-1.5 text-xs hover:bg-white/5 text-zinc-300 border-r border-white/10">Mark Reviewed</button>
-                    <button className="px-3 py-1.5 text-xs hover:bg-white/5 text-zinc-300 border-r border-white/10">Re-validate</button>
-                    <button className="px-3 py-1.5 text-xs hover:bg-white/5 text-red-400 hover:text-red-300">Delete</button>
+                 <span className="text-sm text-gray-700">{selectedRows.length} selected</span>
+                 <div className="flex items-center rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
+                    <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200">Mark Reviewed</button>
+                    <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200">Re-validate</button>
+                    <button className="px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 hover:text-red-700">Delete</button>
                  </div>
               </div>
            )}
@@ -872,37 +876,37 @@ export default function PurchaseRegisterPage() {
         {/* Table Content */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-left text-sm relative">
-            <thead className="text-zinc-500 font-medium bg-zinc-950/50 sticky top-0 z-10 backdrop-blur-sm">
+            <thead className="text-gray-500 font-medium bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
                <tr>
                  <th className="px-6 py-3 w-12"></th>
-                 <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors">Invoice No</th>
-                 <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors">Date</th>
-                 <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors">Vendor</th>
-                 <th className="px-6 py-3 text-right cursor-pointer hover:text-white transition-colors">Taxable</th>
-                 <th className="px-6 py-3 text-right cursor-pointer hover:text-white transition-colors">GST</th>
-                 <th className="px-6 py-3 text-right cursor-pointer hover:text-white transition-colors">Total</th>
+                 <th className="px-6 py-3 cursor-pointer hover:text-gray-900 transition-colors">Invoice No</th>
+                 <th className="px-6 py-3 cursor-pointer hover:text-gray-900 transition-colors">Date</th>
+                 <th className="px-6 py-3 cursor-pointer hover:text-gray-900 transition-colors">Vendor</th>
+                 <th className="px-6 py-3 text-right cursor-pointer hover:text-gray-900 transition-colors">Taxable</th>
+                 <th className="px-6 py-3 text-right cursor-pointer hover:text-gray-900 transition-colors">GST</th>
+                 <th className="px-6 py-3 text-right cursor-pointer hover:text-gray-900 transition-colors">Total</th>
                  <th className="px-6 py-3 text-center">HSN</th>
                  <th className="px-6 py-3 text-center">Status</th>
                  <th className="px-6 py-3 text-center">Source</th>
                  <th className="px-6 py-3 text-right">Actions</th>
                </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-gray-100">
                {loading ? (
                  <tr>
                    <td colSpan={11} className="px-6 py-12 text-center">
-                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                     <p className="text-sm text-zinc-500 mt-2">Loading invoices...</p>
+                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
+                     <p className="text-sm text-gray-500 mt-2">Loading invoices...</p>
                    </td>
                  </tr>
                ) : filteredInvoices.length === 0 ? (
                  <tr>
                    <td colSpan={11} className="px-6 py-12 text-center">
-                     <FileText className="h-12 w-12 mx-auto text-zinc-700 mb-2" />
-                     <p className="text-sm text-zinc-500">No invoices found</p>
+                     <FileText className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                     <p className="text-sm text-gray-500">No invoices found</p>
                      <button 
                        onClick={() => router.push('/dashboard/sme/invoices/upload')}
-                       className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90"
+                       className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700"
                      >
                        Upload First Invoice
                      </button>
@@ -910,39 +914,39 @@ export default function PurchaseRegisterPage() {
                  </tr>
                ) : (
                  filteredInvoices.map((inv) => (
-                   <tr key={inv.id} className="group hover:bg-white/5 transition-colors">
+                   <tr key={inv.id} className="group hover:bg-gray-50 transition-colors">
                      <td className="px-6 py-4">
                        <input 
                          type="checkbox" 
-                         className="rounded bg-zinc-800 border-zinc-600 text-primary focus:ring-primary"
+                         className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500"
                          checked={selectedRows.includes(inv.id || '')}
                          onChange={() => toggleRowSelection(inv.id || '')}
                        />
                      </td>
                      <td className="px-6 py-4">
-                        <button onClick={() => setSelectedInvoice(inv)} className="font-medium text-white hover:text-primary hover:underline text-left">
+                        <button onClick={() => setSelectedInvoice(inv)} className="font-medium text-gray-900 hover:text-emerald-600 hover:underline text-left">
                           {inv.invoice_number || 'N/A'}
                         </button>
                      </td>
-                     <td className="px-6 py-4 text-zinc-400">
+                     <td className="px-6 py-4 text-gray-600">
                        {inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'N/A'}
                      </td>
                      <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="text-zinc-200">{inv.supplier_name || 'Unknown'}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono">{inv.supplier_gstin || 'N/A'}</span>
+                          <span className="text-gray-900">{inv.supplier_name || 'Unknown'}</span>
+                          <span className="text-[10px] text-gray-500 font-mono">{inv.supplier_gstin || 'N/A'}</span>
                         </div>
                      </td>
-                     <td className="px-6 py-4 text-right text-zinc-300 font-mono">
+                     <td className="px-6 py-4 text-right text-gray-700 font-mono">
                        ₹{(inv.taxable_value || 0).toLocaleString()}
                      </td>
-                     <td className="px-6 py-4 text-right text-zinc-300 font-mono group-hover:text-emerald-400 transition-colors cursor-help" title="CGST + SGST + IGST">
+                     <td className="px-6 py-4 text-right text-gray-700 font-mono group-hover:text-emerald-600 transition-colors cursor-help" title="CGST + SGST + IGST">
                        ₹{((inv.cgst_amount || 0) + (inv.sgst_amount || 0) + (inv.igst_amount || 0)).toLocaleString()}
                      </td>
-                     <td className="px-6 py-4 text-right font-bold text-white font-mono">
+                     <td className="px-6 py-4 text-right font-bold text-gray-900 font-mono">
                        ₹{(inv.total_invoice_value || 0).toLocaleString()}
                      </td>
-                     <td className="px-6 py-4 text-center text-zinc-500 font-mono text-xs">
+                     <td className="px-6 py-4 text-center text-gray-500 font-mono text-xs">
                        {inv.hsn_or_sac_code || 'N/A'}
                      </td>
                      <td className="px-6 py-4 text-center">
@@ -951,13 +955,13 @@ export default function PurchaseRegisterPage() {
                         </span>
                      </td>
                      <td className="px-6 py-4 text-center">
-                        <span className="text-xs text-zinc-300 capitalize">
+                        <span className="text-xs text-gray-700 capitalize">
                           {inv.source || 'manual'}
                         </span>
                      </td>
                      <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => setSelectedInvoice(inv)} className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" title="View Details">
+                           <button onClick={() => setSelectedInvoice(inv)} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900" title="View Details">
                               <Eye className="h-4 w-4" />
                            </button>
                            {inv.invoice_bucket_url && (
@@ -965,7 +969,7 @@ export default function PurchaseRegisterPage() {
                                href={inv.invoice_bucket_url} 
                                target="_blank" 
                                rel="noopener noreferrer"
-                               className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                               className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900" 
                                title="Download"
                              >
                                <Download className="h-4 w-4" />
@@ -977,12 +981,12 @@ export default function PurchaseRegisterPage() {
                                  e.stopPropagation();
                                  setActiveDropdown(activeDropdown === inv.id ? null : inv.id || null);
                                }}
-                               className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white"
+                               className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900"
                              >
                                <MoreVertical className="h-4 w-4" />
                              </button>
                              {activeDropdown === inv.id && (
-                               <div className="absolute right-0 top-full mt-1 w-40 bg-zinc-900 border border-white/10 rounded-lg shadow-xl z-50 py-1">
+                               <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
                                  <button
                                    onClick={(e) => {
                                      e.stopPropagation();
@@ -1026,48 +1030,48 @@ export default function PurchaseRegisterPage() {
         </div>
 
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between bg-zinc-900/50">
-           <div className="text-xs text-zinc-500">Showing 1-50 of 823</div>
+        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+           <div className="text-xs text-gray-500">Showing 1-50 of 823</div>
            <div className="flex items-center gap-2">
-              <select className="bg-zinc-900 border border-white/10 text-xs rounded p-1 text-zinc-400 outline-none">
+              <select className="bg-white border border-gray-200 text-xs rounded p-1 text-gray-700 outline-none">
                 <option>25 / page</option>
                 <option>50 / page</option>
                 <option>100 / page</option>
               </select>
               <div className="flex gap-1">
-                 <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700" disabled>Previous</button>
-                 <button className="px-2 py-1 rounded bg-primary text-white text-xs">1</button>
-                 <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700">2</button>
-                 <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700">3</button>
-                 <span className="px-2 py-1 text-zinc-600 text-xs">...</span>
-                 <button className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs hover:text-white hover:bg-zinc-700">Next</button>
+                 <button className="px-2 py-1 rounded bg-gray-200 text-gray-400 text-xs" disabled>Previous</button>
+                 <button className="px-2 py-1 rounded bg-emerald-600 text-white text-xs">1</button>
+                 <button className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs hover:text-gray-900 hover:bg-gray-200">2</button>
+                 <button className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs hover:text-gray-900 hover:bg-gray-200">3</button>
+                 <span className="px-2 py-1 text-gray-400 text-xs">...</span>
+                 <button className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs hover:text-gray-900 hover:bg-gray-200">Next</button>
               </div>
            </div>
         </div>
-      </GlassPanel>
+      </div>
 
       {/* DETAIL MODAL */}
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-zinc-950 border border-white/10 w-full max-w-6xl h-[90vh] rounded-2xl flex overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white border border-gray-200 w-full max-w-6xl h-[90vh] rounded-2xl flex overflow-hidden shadow-2xl">
               {/* Left: Preview */}
-              <div className="w-[40%] bg-zinc-900 border-r border-white/5 p-6 flex flex-col">
+              <div className="w-[40%] bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-semibold">Original Invoice</h3>
+                    <h3 className="text-gray-900 font-semibold">Original Invoice</h3>
                     <div className="flex gap-2">
                        {selectedInvoice.invoice_bucket_url && (
                          <a 
                            href={selectedInvoice.invoice_bucket_url} 
                            target="_blank"
                            rel="noopener noreferrer"
-                           className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white"
+                           className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-gray-900 transition-colors"
                          >
                            <Download className="h-4 w-4" />
                          </a>
                        )}
                     </div>
                  </div>
-                 <div className="flex-1 bg-zinc-950 rounded-xl border border-white/5 relative overflow-hidden">
+                 <div className="flex-1 bg-white rounded-xl border border-gray-200 relative overflow-hidden shadow-sm">
                     {selectedInvoice.invoice_bucket_url ? (
                       <object 
                         data={selectedInvoice.invoice_bucket_url} 
@@ -1082,19 +1086,19 @@ export default function PurchaseRegisterPage() {
                       </object>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full">
-                        <FileText className="h-16 w-16 text-zinc-700" />
-                        <p className="mt-4 text-zinc-600 text-sm">No Preview Available</p>
+                        <FileText className="h-16 w-16 text-gray-300" />
+                        <p className="mt-4 text-gray-500 text-sm">No Preview Available</p>
                       </div>
                     )}
                  </div>
               </div>
 
               {/* Right: Details */}
-              <div className="w-[60%] flex flex-col bg-background">
+              <div className="w-[60%] flex flex-col bg-white">
                  {/* Modal Header */}
-                 <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
+                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <div>
-                       <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                       <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           {selectedInvoice.invoice_number || 'N/A'} 
                           <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedInvoice.invoice_status)}`}>
                             {getStatusLabel(selectedInvoice.invoice_status)}
@@ -1105,34 +1109,34 @@ export default function PurchaseRegisterPage() {
                        {!isEditing && (
                          <button 
                            onClick={handleEdit}
-                           className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white"
+                           className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-gray-900 transition-colors"
                          >
                            <Edit3 className="h-4 w-4" />
                          </button>
                        )}
-                       <button onClick={() => { setSelectedInvoice(null); setIsEditing(false); }} className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white">
+                       <button onClick={() => { setSelectedInvoice(null); setIsEditing(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-gray-900 transition-colors">
                           <X className="h-5 w-5" />
                        </button>
                     </div>
                  </div>
 
                  {/* Tabs */}
-                 <div className="flex border-b border-white/5 px-6">
+                 <div className="flex border-b border-gray-200 px-6 bg-white">
                     <button 
                       onClick={() => setModalTab('details')}
-                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'details' ? 'border-primary text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'details' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                       Invoice Details
                     </button>
                     <button 
                       onClick={() => setModalTab('validation')}
-                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'validation' ? 'border-primary text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'validation' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                       Validation Results
                     </button>
                     <button 
                       onClick={() => setModalTab('history')}
-                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'history' ? 'border-primary text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${modalTab === 'history' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                       History
                     </button>
@@ -1144,134 +1148,134 @@ export default function PurchaseRegisterPage() {
                        <div className="space-y-6">
                           <div className="grid grid-cols-2 gap-6">
                              <div className="space-y-2">
-                                <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Number</label>
+                                <label className="text-xs text-gray-600 font-medium uppercase">Invoice Number</label>
                                 <input 
                                   type="text" 
                                   value={isEditing ? (editedData.invoice_number ?? selectedInvoice.invoice_number ?? '') : (selectedInvoice.invoice_number || '')} 
                                   onChange={(e) => handleFieldChange('invoice_number', e.target.value)}
                                   disabled={!isEditing}
-                                  className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                 />
                              </div>
                              <div className="space-y-2">
-                                <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Date</label>
+                                <label className="text-xs text-gray-600 font-medium uppercase">Invoice Date</label>
                                 <input 
                                   type="date" 
                                   value={isEditing ? (editedData.invoice_date ?? selectedInvoice.invoice_date ?? '') : (selectedInvoice.invoice_date || '')} 
                                   onChange={(e) => handleFieldChange('invoice_date', e.target.value)}
                                   disabled={!isEditing}
-                                  className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                 />
                              </div>
                           </div>
 
-                          <div className="space-y-4 pt-4 border-t border-white/5">
-                             <h4 className="text-sm font-semibold text-white">Vendor Details</h4>
+                          <div className="space-y-4 pt-4 border-t border-gray-200">
+                             <h4 className="text-sm font-semibold text-gray-900">Vendor Details</h4>
                              <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                   <label className="text-xs text-zinc-500 font-medium uppercase">Vendor Name</label>
+                                   <label className="text-xs text-gray-600 font-medium uppercase">Vendor Name</label>
                                    <input 
                                      type="text" 
                                      value={isEditing ? (editedData.supplier_name ?? selectedInvoice.supplier_name ?? '') : (selectedInvoice.supplier_name || '')} 
                                      onChange={(e) => handleFieldChange('supplier_name', e.target.value)}
                                      disabled={!isEditing}
-                                     className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-2">
-                                   <label className="text-xs text-zinc-500 font-medium uppercase">GSTIN</label>
+                                   <label className="text-xs text-gray-600 font-medium uppercase">GSTIN</label>
                                    <input 
                                      type="text" 
                                      value={isEditing ? (editedData.supplier_gstin ?? selectedInvoice.supplier_gstin ?? '') : (selectedInvoice.supplier_gstin || '')} 
                                      onChange={(e) => handleFieldChange('supplier_gstin', e.target.value)}
                                      disabled={!isEditing}
-                                     className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                    />
                                 </div>
                              </div>
                           </div>
 
-                          <div className="space-y-4 pt-4 border-t border-white/5">
-                             <h4 className="text-sm font-semibold text-white">Tax Breakdown</h4>
-                             <div className="grid grid-cols-3 gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5">
+                          <div className="space-y-4 pt-4 border-t border-gray-200">
+                             <h4 className="text-sm font-semibold text-gray-900">Tax Breakdown</h4>
+                             <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">Taxable Value</label>
+                                   <label className="text-xs text-gray-600">Taxable Value</label>
                                    <input 
                                      type="number" 
                                      value={isEditing ? (editedData.taxable_value ?? selectedInvoice.taxable_value ?? 0) : (selectedInvoice.taxable_value || 0)} 
                                      onChange={(e) => handleFieldChange('taxable_value', parseFloat(e.target.value))}
                                      disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
+                                     className="w-full bg-transparent border-b border-gray-300 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">CGST</label>
+                                   <label className="text-xs text-gray-600">CGST</label>
                                    <input 
                                      type="number" 
                                      value={isEditing ? (editedData.cgst_amount ?? selectedInvoice.cgst_amount ?? 0) : (selectedInvoice.cgst_amount || 0)} 
                                      onChange={(e) => handleFieldChange('cgst_amount', parseFloat(e.target.value))}
                                      disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
+                                     className="w-full bg-transparent border-b border-gray-300 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">SGST</label>
+                                   <label className="text-xs text-gray-600">SGST</label>
                                    <input 
                                      type="number" 
                                      value={isEditing ? (editedData.sgst_amount ?? selectedInvoice.sgst_amount ?? 0) : (selectedInvoice.sgst_amount || 0)} 
                                      onChange={(e) => handleFieldChange('sgst_amount', parseFloat(e.target.value))}
                                      disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
+                                     className="w-full bg-transparent border-b border-gray-300 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">IGST</label>
+                                   <label className="text-xs text-gray-600">IGST</label>
                                    <input 
                                      type="number" 
                                      value={isEditing ? (editedData.igst_amount ?? selectedInvoice.igst_amount ?? 0) : (selectedInvoice.igst_amount || 0)} 
                                      onChange={(e) => handleFieldChange('igst_amount', parseFloat(e.target.value))}
                                      disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
+                                     className="w-full bg-transparent border-b border-gray-300 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-zinc-500">CESS</label>
+                                   <label className="text-xs text-gray-600">CESS</label>
                                    <input 
                                      type="number" 
                                      value={isEditing ? (editedData.cess_amount ?? selectedInvoice.cess_amount ?? 0) : (selectedInvoice.cess_amount || 0)} 
                                      onChange={(e) => handleFieldChange('cess_amount', parseFloat(e.target.value))}
                                      disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-white/10 py-1 text-sm text-white font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
+                                     className="w-full bg-transparent border-b border-gray-300 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:text-gray-500" 
                                    />
                                 </div>
                              </div>
                              <div className="flex justify-end items-center gap-4 pt-2">
-                                <span className="text-sm text-zinc-400">Total Amount</span>
-                                <span className="text-2xl font-bold text-white font-mono">₹ {(selectedInvoice.total_invoice_value || 0).toLocaleString()}</span>
+                                <span className="text-sm text-gray-600">Total Amount</span>
+                                <span className="text-2xl font-bold text-gray-900 font-mono">₹ {(selectedInvoice.total_invoice_value || 0).toLocaleString()}</span>
                              </div>
                           </div>
 
-                          <div className="space-y-4 pt-4 border-t border-white/5">
-                             <h4 className="text-sm font-semibold text-white">Additional Details</h4>
+                          <div className="space-y-4 pt-4 border-t border-gray-200">
+                             <h4 className="text-sm font-semibold text-gray-900">Additional Details</h4>
                              <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                   <label className="text-xs text-zinc-500 font-medium uppercase">HSN/SAC Code</label>
+                                   <label className="text-xs text-gray-600 font-medium uppercase">HSN/SAC Code</label>
                                    <input 
                                      type="text" 
                                      value={isEditing ? (editedData.hsn_or_sac_code ?? selectedInvoice.hsn_or_sac_code ?? '') : (selectedInvoice.hsn_or_sac_code || '')} 
                                      onChange={(e) => handleFieldChange('hsn_or_sac_code', e.target.value)}
                                      disabled={!isEditing}
-                                     className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                    />
                                 </div>
                                 <div className="space-y-2">
-                                   <label className="text-xs text-zinc-500 font-medium uppercase">Invoice Type</label>
+                                   <label className="text-xs text-gray-600 font-medium uppercase">Invoice Type</label>
                                    <input 
                                      type="text" 
                                      value={isEditing ? (editedData.invoice_type ?? selectedInvoice.invoice_type ?? '') : (selectedInvoice.invoice_type || '')} 
                                      onChange={(e) => handleFieldChange('invoice_type', e.target.value)}
                                      disabled={!isEditing}
-                                     className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none disabled:opacity-50" 
+                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:bg-gray-50 disabled:text-gray-500" 
                                    />
                                 </div>
                              </div>
@@ -1283,7 +1287,7 @@ export default function PurchaseRegisterPage() {
                        <div className="space-y-4">
                           {loadingRemarks ? (
                             <div className="flex items-center justify-center py-8">
-                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                              <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
                             </div>
                           ) : (
                             <>
@@ -1292,18 +1296,18 @@ export default function PurchaseRegisterPage() {
                                 const missingFields = getMissingFields(selectedInvoice);
                                 return missingFields.length > 0 && (
                                   <div>
-                                    <h4 className="text-sm font-semibold text-white mb-3">Missing Information</h4>
+                                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Missing Information</h4>
                                     {missingFields.map((field, idx) => (
                                       <div 
                                         key={idx}
-                                        className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-start gap-3 mb-3"
+                                        className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 mb-3"
                                       >
-                                        <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                                         <div className="flex-1">
-                                          <h4 className="text-sm font-semibold text-orange-500">{field}</h4>
-                                          <p className="text-xs text-zinc-400 mt-1">This field is missing or empty in the invoice.</p>
+                                          <h4 className="text-sm font-semibold text-amber-900">{field}</h4>
+                                          <p className="text-xs text-amber-700 mt-1">This field is missing or empty in the invoice.</p>
                                         </div>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
                                           missing
                                         </span>
                                       </div>
@@ -1315,33 +1319,33 @@ export default function PurchaseRegisterPage() {
                               {/* Remarks/Issues Section */}
                               {remarks.length > 0 && (
                                 <div>
-                                  <h4 className="text-sm font-semibold text-white mb-3">Validation Issues</h4>
+                                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Validation Issues</h4>
                                   {remarks.map((remark) => (
                                     <div 
                                       key={remark.id} 
-                                      className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 mb-3"
+                                      className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 mb-3"
                                     >
-                                      <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                      <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                                       <div className="flex-1">
-                                        <h4 className="text-sm font-semibold text-amber-500 capitalize">
+                                        <h4 className="text-sm font-semibold text-amber-900 capitalize">
                                           {remark.field_name.replace(/_/g, ' ')} - {remark.issue_type}
                                         </h4>
-                                        <p className="text-xs text-zinc-400 mt-1">{remark.comment || 'No details provided'}</p>
+                                        <p className="text-xs text-amber-700 mt-1">{remark.comment || 'No details provided'}</p>
                                         {remark.detected_value && (
-                                          <p className="text-xs text-zinc-500 mt-1">
+                                          <p className="text-xs text-gray-600 mt-1">
                                             Detected: <span className="font-mono">{remark.detected_value}</span>
                                           </p>
                                         )}
                                         {remark.expected_value && (
-                                          <p className="text-xs text-zinc-500">
+                                          <p className="text-xs text-gray-600">
                                             Expected: <span className="font-mono">{remark.expected_value}</span>
                                           </p>
                                         )}
                                       </div>
                                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                                         remark.status === 'resolved' 
-                                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                                          : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' 
+                                          : 'bg-amber-100 text-amber-700 border border-amber-300'
                                       }`}>
                                         {remark.status}
                                       </span>
@@ -1352,11 +1356,11 @@ export default function PurchaseRegisterPage() {
 
                               {/* All Clear Message */}
                               {remarks.length === 0 && getMissingFields(selectedInvoice).length === 0 && (
-                                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
-                                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+                                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                                   <div>
-                                    <h4 className="text-sm font-semibold text-emerald-500">All Fields Validated</h4>
-                                    <p className="text-xs text-zinc-400 mt-1">No issues found with this invoice. All required information is present.</p>
+                                    <h4 className="text-sm font-semibold text-emerald-900">All Fields Validated</h4>
+                                    <p className="text-xs text-emerald-700 mt-1">No issues found with this invoice. All required information is present.</p>
                                   </div>
                                 </div>
                               )}
@@ -1366,20 +1370,20 @@ export default function PurchaseRegisterPage() {
                     )}
                     
                     {modalTab === 'history' && (
-                       <div className="relative pl-6 border-l border-zinc-800 space-y-8">
+                       <div className="relative pl-6 border-l border-gray-200 space-y-8">
                           {[
-                             { time: 'Today, 2:30 PM', action: 'Validated Successfully', user: 'System', icon: CheckCircle2, color: 'text-emerald-500' },
-                             { time: 'Today, 2:29 PM', action: 'Edited by User', user: 'Rahul Sharma', icon: Edit3, color: 'text-blue-500' },
-                             { time: 'Today, 2:25 PM', action: 'Validation Failed (Total Mismatch)', user: 'System', icon: AlertTriangle, color: 'text-red-500' },
-                             { time: 'Today, 2:24 PM', action: 'Uploaded via WhatsApp', user: 'System', icon: UploadCloud, color: 'text-zinc-400' },
+                             { time: 'Today, 2:30 PM', action: 'Validated Successfully', user: 'System', icon: CheckCircle2, color: 'text-emerald-600' },
+                             { time: 'Today, 2:29 PM', action: 'Edited by User', user: 'Rahul Sharma', icon: Edit3, color: 'text-blue-600' },
+                             { time: 'Today, 2:25 PM', action: 'Validation Failed (Total Mismatch)', user: 'System', icon: AlertTriangle, color: 'text-red-600' },
+                             { time: 'Today, 2:24 PM', action: 'Uploaded via WhatsApp', user: 'System', icon: UploadCloud, color: 'text-gray-500' },
                           ].map((item, i) => (
                              <div key={i} className="relative">
-                                <div className={`absolute -left-[33px] top-0 h-4 w-4 rounded-full bg-zinc-900 border-2 border-zinc-700 flex items-center justify-center`}>
+                                <div className={`absolute -left-[33px] top-0 h-4 w-4 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center`}>
                                    <div className={`h-1.5 w-1.5 rounded-full ${item.color.replace('text-', 'bg-')}`}></div>
                                 </div>
-                                <p className="text-xs text-zinc-500 mb-1">{item.time}</p>
-                                <p className="text-sm text-white font-medium">{item.action}</p>
-                                <p className="text-xs text-zinc-400 mt-0.5">by {item.user}</p>
+                                <p className="text-xs text-gray-500 mb-1">{item.time}</p>
+                                <p className="text-sm text-gray-900 font-medium">{item.action}</p>
+                                <p className="text-xs text-gray-600 mt-0.5">by {item.user}</p>
                              </div>
                           ))}
                        </div>
@@ -1387,18 +1391,18 @@ export default function PurchaseRegisterPage() {
                  </div>
 
                  {/* Modal Footer */}
-                 <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-zinc-900/50">
+                 <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
                     {isEditing ? (
                       <>
                         <button 
                           onClick={handleCancelEdit} 
-                          className="px-4 py-2 rounded-lg border border-white/10 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+                          className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                         >
                           Cancel
                         </button>
                         <button 
                           onClick={handleSaveChanges}
-                          className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2"
+                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-colors shadow-lg flex items-center gap-2"
                         >
                           <Save className="h-4 w-4" /> Save Changes
                         </button>
@@ -1406,7 +1410,7 @@ export default function PurchaseRegisterPage() {
                     ) : (
                       <button 
                         onClick={() => { setSelectedInvoice(null); setIsEditing(false); }} 
-                        className="px-4 py-2 rounded-lg border border-white/10 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                       >
                         Close
                       </button>
@@ -1416,6 +1420,7 @@ export default function PurchaseRegisterPage() {
            </div>
         </div>
       )}
+      </div>
 
     </div>
   );

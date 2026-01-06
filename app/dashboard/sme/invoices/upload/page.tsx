@@ -24,8 +24,6 @@ import {
   Phone,
   Settings
 } from 'lucide-react';
-import GlassPanel from '../../../../../components/ui/GlassPanel';
-import BentoCard from '../../../../../components/ui/BentoCard';
 
 // Types
 type TabType = 'whatsapp' | 'email' | 'manual' | 'bulk';
@@ -214,45 +212,49 @@ export default function UploadInvoicesPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Validated': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case 'Processing': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case 'Failed': return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'Partial Match': return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-      default: return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+      case 'Validated': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'Processing': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Failed': return 'bg-red-50 text-red-700 border-red-200';
+      case 'Partial Match': return 'bg-orange-50 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
 
   const renderUploadStatus = (file: UploadedFile) => {
     switch(file.status) {
-      case 'uploading': return <span className="text-blue-400 text-xs flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Uploading...</span>;
-      case 'extracting': return <span className="text-amber-400 text-xs flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Extracting Data...</span>;
-      case 'validating': return <span className="text-purple-400 text-xs flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Validating...</span>;
-      case 'completed': return <span className="text-emerald-500 text-xs flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Completed</span>;
-      case 'failed': return <span className="text-red-500 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Failed</span>;
+      case 'uploading': return <span className="text-blue-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Uploading...</span>;
+      case 'extracting': return <span className="text-amber-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Extracting Data...</span>;
+      case 'validating': return <span className="text-purple-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Validating...</span>;
+      case 'completed': return <span className="text-emerald-600 text-xs flex items-center gap-1 font-medium"><CheckCircle2 className="h-3 w-3" /> Completed</span>;
+      case 'failed': return <span className="text-red-600 text-xs flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3" /> Failed</span>;
     }
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
+      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6 pb-20">
       
       {/* 1. PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Upload Invoices</h1>
-          <p className="text-muted-foreground text-sm mt-1">Automatically extract and validate GST details from your invoices.</p>
+          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-2">
+            <span className="text-emerald-700 text-xs font-semibold">INVOICE MANAGEMENT</span>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Upload Invoices</h1>
+          <p className="text-gray-600 text-sm mt-1">Automatically extract and validate GST details from your invoices.</p>
         </div>
         <div className="flex items-center gap-3">
            <button 
              onClick={() => router.push('/dashboard/sme/invoices/purchase')}
-             className="px-4 py-2 bg-secondary/50 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white hover:bg-secondary transition-all"
+             className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm"
            >
              View All Invoices
            </button>
            <div className="relative group">
-             <button className="p-2 rounded-lg bg-secondary/50 border border-white/10 text-zinc-400 hover:text-white hover:bg-secondary transition-all">
+             <button className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
                <HelpCircle className="h-5 w-5" />
              </button>
-             <div className="absolute right-0 top-12 w-64 p-3 rounded-xl bg-zinc-900 border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-xs text-zinc-400">
+             <div className="absolute right-0 top-12 w-64 p-3 rounded-xl bg-white border border-gray-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-xs text-gray-600">
                Supported formats: PDF, JPG, PNG, Excel, CSV. Max size 10MB per file.
              </div>
            </div>
@@ -260,7 +262,7 @@ export default function UploadInvoicesPage() {
       </div>
 
       {/* 2. TAB NAVIGATION */}
-      <div className="flex flex-wrap gap-2 border-b border-white/5 pb-1">
+      <div className="flex border-b border-gray-200 bg-white rounded-t-2xl">
          {[
            { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: stats.whatsapp },
          //   { id: 'email', label: 'Gmail', icon: Mail, badge: stats.email },
@@ -270,18 +272,17 @@ export default function UploadInvoicesPage() {
            <button
              key={tab.id}
              onClick={() => setActiveTab(tab.id as TabType)}
-             className={`
-               relative flex items-center gap-2 px-5 py-3 rounded-t-lg text-sm font-medium transition-all
-               ${activeTab === tab.id 
-                 ? 'bg-zinc-800/80 text-white border-b-2 border-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]' 
-                 : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}
-             `}
+             className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+               activeTab === tab.id 
+                 ? 'border-emerald-600 text-emerald-600' 
+                 : 'border-transparent text-gray-500 hover:text-gray-700'
+             }`}
            >
-             <tab.icon className={`h-4 w-4 ${activeTab === tab.id ? 'text-primary' : ''}`} />
+             <tab.icon className="h-4 w-4" />
              {tab.label}
-             {tab.badge && (
-               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
-                 {tab.badge} New
+             {tab.badge !== undefined && tab.badge > 0 && (
+               <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                 {tab.badge}
                </span>
              )}
            </button>
@@ -289,54 +290,55 @@ export default function UploadInvoicesPage() {
       </div>
 
       {/* 3. UPLOAD AREA (Changes per Tab) */}
-      <div className="min-h-[300px]">
+      <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg p-6 min-h-[300px]">
         
         {/* TAB 1: WHATSAPP */}
         {activeTab === 'whatsapp' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                {/* Connected Status */}
-               <GlassPanel className="p-6 flex flex-col items-center justify-center text-center space-y-4 border-l-4 border-l-emerald-500">
-                  <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center relative">
-                    <MessageSquare className="h-8 w-8 text-emerald-500" />
-                    <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-zinc-900 flex items-center justify-center">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+               <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center relative">
+                    <MessageSquare className="h-8 w-8 text-emerald-600" />
+                    <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">WhatsApp Connected</h3>
-                    <p className="text-sm text-zinc-400 mt-1">+91 98765 43210</p>
-                    <p className="text-xs text-zinc-500 mt-2">Last synced: 2 mins ago</p>
+                    <h3 className="text-lg font-semibold text-gray-900">WhatsApp Connected</h3>
+                    <p className="text-sm text-gray-600 mt-1">+91 98765 43210</p>
+                    <p className="text-xs text-emerald-600 mt-2 font-medium">Last synced: 2 mins ago</p>
                   </div>
-                  <button className="px-4 py-2 rounded-lg border border-white/10 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">
+                  <button className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">
                     Configure Settings
                   </button>
-               </GlassPanel>
+               </div>
                
                {/* Instructions */}
-               <BentoCard className="lg:col-span-2" title="How it works">
+               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">How it works</h3>
                   <div className="space-y-4">
-                     <ol className="list-decimal list-inside space-y-2 text-sm text-zinc-400">
+                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                         <li>Share invoices (PDF/Image) to your registered WhatsApp Business number.</li>
                         <li>Our system automatically extracts attachments and processes them.</li>
                         <li>You receive a notification once the GST validation is complete.</li>
                      </ol>
-                     <div className="p-3 rounded bg-zinc-900 border border-white/5 text-xs text-zinc-500 flex items-center gap-2">
-                       <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
+                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                        Auto-extraction active for +91 98765 43210
                      </div>
                   </div>
-               </BentoCard>
+               </div>
             </div>
 
             {/* Pending Queue */}
-            <GlassPanel className="p-0 overflow-hidden">
-               <div className="px-6 py-4 border-b border-white/5 bg-white/5">
-                 <h3 className="font-semibold text-white">Pending Processing Queue (WhatsApp)</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                 <h3 className="font-semibold text-gray-900">Pending Processing Queue (WhatsApp)</h3>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left text-sm">
-                    <thead className="text-zinc-500 font-medium border-b border-white/5">
+                    <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
                        <tr>
                          <th className="px-6 py-3">Vendor Phone</th>
                          <th className="px-6 py-3">File Name</th>
@@ -345,28 +347,28 @@ export default function UploadInvoicesPage() {
                          <th className="px-6 py-3 text-right">Action</th>
                        </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y divide-gray-100">
                        {[1,2,3].map((i) => (
-                         <tr key={i} className="group hover:bg-white/5 transition-colors">
-                           <td className="px-6 py-3 text-white">+91 99887 76655</td>
-                           <td className="px-6 py-3 text-zinc-300 flex items-center gap-2">
-                             <FileText className="h-4 w-4 text-zinc-500" /> img_invoice_00{i}.jpg
+                         <tr key={i} className="group hover:bg-gray-50 transition-colors">
+                           <td className="px-6 py-3 text-gray-900 font-medium">+91 99887 76655</td>
+                           <td className="px-6 py-3 text-gray-700 flex items-center gap-2">
+                             <FileText className="h-4 w-4 text-gray-400" /> img_invoice_00{i}.jpg
                            </td>
-                           <td className="px-6 py-3 text-zinc-500">10 mins ago</td>
+                           <td className="px-6 py-3 text-gray-600">10 mins ago</td>
                            <td className="px-6 py-3">
-                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                <Loader2 className="h-3 w-3 animate-spin" /> Processing
                              </span>
                            </td>
                            <td className="px-6 py-3 text-right">
-                              <button className="text-primary hover:underline text-xs">View</button>
+                              <button className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">View</button>
                            </td>
                          </tr>
                        ))}
                     </tbody>
                  </table>
                </div>
-            </GlassPanel>
+            </div>
           </div>
         )}
 
@@ -475,7 +477,7 @@ export default function UploadInvoicesPage() {
 
         {/* TAB 3: MANUAL UPLOAD (Default) */}
         {activeTab === 'manual' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
              
              {/* Upload Area */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -485,8 +487,8 @@ export default function UploadInvoicesPage() {
                   className={`
                     border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer h-64 relative overflow-hidden
                     ${dragActive 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/50 hover:bg-zinc-900'}
+                      ? 'border-emerald-500 bg-emerald-50' 
+                      : 'border-gray-300 hover:border-emerald-400 bg-white hover:bg-emerald-50/30'}
                   `}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -496,33 +498,33 @@ export default function UploadInvoicesPage() {
                 >
                    <input type="file" id="file-upload" className="hidden" multiple onChange={handleFileInput} />
                    
-                   <div className="h-14 w-14 rounded-full bg-zinc-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                     <UploadCloud className="h-7 w-7 text-zinc-400" />
+                   <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                     <UploadCloud className="h-7 w-7 text-emerald-600" />
                    </div>
-                   <h3 className="text-lg font-semibold text-white">Drag & drop invoices here</h3>
-                   <p className="text-sm text-zinc-500 mt-2">or click to browse from your computer</p>
-                   <p className="text-xs text-zinc-600 mt-4 bg-zinc-900/50 px-3 py-1 rounded-full border border-white/5">
+                   <h3 className="text-lg font-semibold text-gray-900">Drag & drop invoices here</h3>
+                   <p className="text-sm text-gray-600 mt-2">or click to browse from your computer</p>
+                   <p className="text-xs text-gray-500 mt-4 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
                      Supports: PDF, JPG, PNG (Max 10MB)
                    </p>
                 </div>
 
                 {/* Camera / Instructions */}
                 <div className="flex flex-col gap-4 h-64">
-                   {/* <div className="flex-1 rounded-xl bg-zinc-900/50 border border-zinc-800 p-6 flex flex-col items-center justify-center text-center hover:border-zinc-600 transition-colors cursor-pointer group">
-                      <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center mb-3 group-hover:text-primary transition-colors">
-                        <Camera className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
+                   {/* <div className="flex-1 rounded-xl bg-white border border-gray-200 p-6 flex flex-col items-center justify-center text-center hover:border-emerald-300 transition-colors cursor-pointer group shadow-sm">
+                      <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3 group-hover:bg-emerald-100 transition-colors">
+                        <Camera className="h-6 w-6 text-gray-600 group-hover:text-emerald-600" />
                       </div>
-                      <h3 className="font-semibold text-white">Capture from Camera</h3>
-                      <p className="text-xs text-zinc-500 mt-1">Take a photo of physical invoice</p>
+                      <h3 className="font-semibold text-gray-900">Capture from Camera</h3>
+                      <p className="text-xs text-gray-600 mt-1">Take a photo of physical invoice</p>
                    </div> */}
-                   <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
+                   <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 shadow-sm">
                       <div className="flex items-start gap-3">
-                         <div className="p-1.5 bg-primary/20 rounded-full mt-0.5">
-                           <CheckCircle2 className="h-4 w-4 text-primary" />
+                         <div className="p-1.5 bg-emerald-100 rounded-full mt-0.5">
+                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                          </div>
                          <div>
-                            <h4 className="text-sm font-semibold text-primary">Smart OCR Enabled</h4>
-                            <p className="text-xs text-zinc-400 mt-1">
+                            <h4 className="text-sm font-semibold text-emerald-700">Smart OCR Enabled</h4>
+                            <p className="text-xs text-gray-600 mt-1">
                               Our AI automatically detects vendor GSTIN, Invoice #, Date, and tax amounts. No manual entry needed.
                             </p>
                          </div>
@@ -534,33 +536,33 @@ export default function UploadInvoicesPage() {
              {/* Upload Progress List */}
              {uploadQueue.length > 0 && (
                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Upload Progress</h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Upload Progress</h3>
                   {uploadQueue.map((file) => (
-                    <GlassPanel key={file.id} className="p-3 flex items-center gap-4">
-                       <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center shrink-0">
-                          <FileText className="h-5 w-5 text-zinc-400" />
+                    <div key={file.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
+                       <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5 text-gray-600" />
                        </div>
                        <div className="flex-1 min-w-0">
                           <div className="flex justify-between mb-1">
-                             <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                             <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                              <span className="text-xs">{renderUploadStatus(file)}</span>
                           </div>
-                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                              <div 
-                               className={`h-full rounded-full transition-all duration-300 ${file.status === 'failed' ? 'bg-red-500' : 'bg-primary'}`} 
+                               className={`h-full rounded-full transition-all duration-300 ${file.status === 'failed' ? 'bg-red-500' : 'bg-emerald-600'}`} 
                                style={{ width: `${file.progress}%` }}
                              ></div>
                           </div>
                        </div>
                        <div className="flex items-center gap-2 shrink-0">
                           {file.status === 'completed' && (
-                             <button className="p-1.5 rounded hover:bg-white/10 text-primary font-medium text-xs border border-primary/30 hover:border-primary">View Details</button>
+                             <button className="px-3 py-1.5 rounded-lg hover:bg-gray-50 text-emerald-600 font-medium text-xs border border-emerald-200 hover:border-emerald-300 transition-colors">View Details</button>
                           )}
-                          <button className="p-1.5 rounded hover:bg-white/10 text-zinc-500 hover:text-red-400">
+                          <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-colors">
                              <X className="h-4 w-4" />
                           </button>
                        </div>
-                    </GlassPanel>
+                    </div>
                   ))}
                </div>
              )}
@@ -569,47 +571,49 @@ export default function UploadInvoicesPage() {
 
         {/* TAB 4: BULK IMPORT */}
         {activeTab === 'bulk' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Step 1: Download */}
-                <BentoCard title="Step 1: Download Template">
-                   <p className="text-sm text-zinc-400 mb-6">Use our standardized template to ensure all fields are mapped correctly for bulk processing.</p>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 1: Download Template</h3>
+                   <p className="text-sm text-gray-600 mb-6">Use our standardized template to ensure all fields are mapped correctly for bulk processing.</p>
                    <div className="space-y-3">
-                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-700 hover:border-emerald-500 hover:bg-zinc-800 transition-all group">
+                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all group shadow-sm">
                          <div className="flex items-center gap-3">
                             <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
                             <div className="text-left">
-                               <p className="text-sm font-medium text-white">Excel Template (.xlsx)</p>
-                               <p className="text-[10px] text-zinc-500">Recommended for most users</p>
+                               <p className="text-sm font-medium text-gray-900">Excel Template (.xlsx)</p>
+                               <p className="text-[10px] text-gray-600">Recommended for most users</p>
                             </div>
                          </div>
-                         <Download className="h-4 w-4 text-zinc-500 group-hover:text-white" />
+                         <Download className="h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
                       </button>
-                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-700 hover:border-blue-500 hover:bg-zinc-800 transition-all group">
+                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all group shadow-sm">
                          <div className="flex items-center gap-3">
                             <FileText className="h-5 w-5 text-blue-500" />
                             <div className="text-left">
-                               <p className="text-sm font-medium text-white">CSV Template (.csv)</p>
-                               <p className="text-[10px] text-zinc-500">For programmatic exports</p>
+                               <p className="text-sm font-medium text-gray-900">CSV Template (.csv)</p>
+                               <p className="text-[10px] text-gray-600">For programmatic exports</p>
                             </div>
                          </div>
-                         <Download className="h-4 w-4 text-zinc-500 group-hover:text-white" />
+                         <Download className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                       </button>
                    </div>
-                </BentoCard>
+                </div>
 
                 {/* Step 2: Upload */}
-                <BentoCard title="Step 2: Upload Filled File">
-                   <div className="border-2 border-dashed border-zinc-700 rounded-lg h-40 flex flex-col items-center justify-center hover:border-zinc-500 hover:bg-white/5 transition-all cursor-pointer">
-                      <UploadCloud className="h-8 w-8 text-zinc-500 mb-2" />
-                      <p className="text-sm text-zinc-300">Drag & drop your Excel/CSV here</p>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 2: Upload Filled File</h3>
+                   <div className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-50/30 transition-all cursor-pointer">
+                      <UploadCloud className="h-8 w-8 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Drag & drop your Excel/CSV here</p>
                    </div>
-                   <div className="mt-4 p-3 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 flex items-start gap-2">
+                   <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                       Ensure dates are in DD-MM-YYYY format and GSTINs are valid to avoid errors.
                    </div>
-                </BentoCard>
+                </div>
              </div>
           </div>
         )}
@@ -617,22 +621,22 @@ export default function UploadInvoicesPage() {
 
       {/* 4. RECENTLY UPLOADED INVOICES */}
       <div className="mt-8">
-         <GlassPanel className="p-6">
+         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                <div className="flex items-center gap-2">
-                 <h3 className="text-lg font-semibold text-white">Recently Uploaded</h3>
-                 <span className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-full">Last 24h</span>
+                 <h3 className="text-lg font-semibold text-gray-900">Recently Uploaded</h3>
+                 <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">Last 24h</span>
                </div>
                
                <div className="flex gap-2">
                   <div className="relative">
-                     <select className="appearance-none bg-zinc-900 border border-white/10 text-xs rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-primary outline-none text-zinc-300 cursor-pointer hover:bg-zinc-800">
+                     <select className="appearance-none bg-white border border-gray-200 text-xs rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-emerald-500 outline-none text-gray-700 cursor-pointer hover:bg-gray-50">
                         <option>All Status</option>
                         <option>Validated</option>
                         <option>Failed</option>
                         <option>Processing</option>
                      </select>
-                     <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
+                     <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
                   </div>
                </div>
             </div>
@@ -640,13 +644,13 @@ export default function UploadInvoicesPage() {
             <div className="grid grid-cols-1 gap-3">
                {loadingRecent ? (
                  <div className="flex items-center justify-center py-12">
-                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                   <span className="ml-2 text-zinc-500">Loading recent invoices...</span>
+                   <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                   <span className="ml-2 text-gray-500">Loading recent invoices...</span>
                  </div>
                ) : recentInvoices.length === 0 ? (
                  <div className="flex flex-col items-center justify-center py-12">
-                   <FileText className="h-12 w-12 text-zinc-700 mb-2" />
-                   <p className="text-zinc-500 text-sm">No invoices uploaded yet</p>
+                   <FileText className="h-12 w-12 text-gray-300 mb-2" />
+                   <p className="text-gray-500 text-sm">No invoices uploaded yet</p>
                  </div>
                ) : (
                  recentInvoices.map((invoice) => {
@@ -667,32 +671,32 @@ export default function UploadInvoicesPage() {
                      : 'Processing';
 
                    return (
-                     <div key={invoice.id} className="group p-4 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/10 hover:bg-zinc-900/80 transition-all">
+                     <div key={invoice.id} className="group p-4 rounded-xl bg-gray-50 border border-gray-200 hover:border-emerald-300 hover:bg-white transition-all cursor-pointer">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                            
                            {/* Left: File Info */}
                            <div className="flex items-center gap-4 min-w-0 flex-1">
-                              <div className="h-10 w-10 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
-                                 {fileName?.endsWith('.pdf') ? <FileText className="h-5 w-5 text-red-400" /> : <FileText className="h-5 w-5 text-blue-400" />}
+                              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                                 {fileName?.endsWith('.pdf') ? <FileText className="h-5 w-5 text-red-500" /> : <FileText className="h-5 w-5 text-blue-500" />}
                               </div>
                               <div className="min-w-0">
-                                 <p className="text-sm font-semibold text-white truncate">
+                                 <p className="text-sm font-semibold text-gray-900 truncate">
                                    {invoice.invoice_number || 'N/A'} 
-                                   <span className="text-zinc-500 font-normal mx-1">•</span> 
+                                   <span className="text-gray-400 font-normal mx-1">•</span> 
                                    {invoice.supplier_name || 'Unknown'}
                                  </p>
                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <p className="text-xs text-zinc-500">{invoiceDate}</p>
-                                    <span className="h-1 w-1 rounded-full bg-zinc-700"></span>
-                                    <p className="text-xs text-zinc-500">{fileName}</p>
+                                    <p className="text-xs text-gray-600">{invoiceDate}</p>
+                                    <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                                    <p className="text-xs text-gray-600">{fileName}</p>
                                  </div>
                               </div>
                            </div>
 
                            {/* Middle: Amount */}
                            <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0 pl-14 sm:pl-0">
-                              <p className="text-sm font-bold text-white">₹{(invoice.total_invoice_value || 0).toLocaleString()}</p>
-                              <p className="text-xs text-zinc-500">GST: ₹{totalGst.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-gray-900">₹{(invoice.total_invoice_value || 0).toLocaleString()}</p>
+                              <p className="text-xs text-gray-600">GST: ₹{totalGst.toLocaleString()}</p>
                            </div>
 
                            {/* Right: Status & Actions */}
@@ -701,7 +705,7 @@ export default function UploadInvoicesPage() {
                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(statusLabel)}`}>
                                     {statusLabel}
                                  </span>
-                                 <span className="text-[10px] text-blue-400">
+                                 <span className="text-[10px] text-blue-600 font-medium">
                                     Purchase
                                  </span>
                               </div>
@@ -709,7 +713,7 @@ export default function UploadInvoicesPage() {
                               <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                                  <button 
                                    onClick={() => router.push('/dashboard/sme/invoices/purchase')}
-                                   className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                                   className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" 
                                    title="View Data"
                                  >
                                     <Eye className="h-4 w-4" />
@@ -719,7 +723,7 @@ export default function UploadInvoicesPage() {
                                      href={invoice.invoice_bucket_url}
                                      target="_blank"
                                      rel="noopener noreferrer"
-                                     className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white" 
+                                     className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" 
                                      title="View PDF"
                                    >
                                       <FileText className="h-4 w-4" />
@@ -727,7 +731,7 @@ export default function UploadInvoicesPage() {
                                  )}
                                  <button 
                                    onClick={(e) => handleDelete(invoice.id, e)}
-                                   className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-red-400" 
+                                   className="p-1.5 hover:bg-red-50 rounded text-gray-600 hover:text-red-600 transition-colors" 
                                    title="Delete"
                                  >
                                     <Trash2 className="h-4 w-4" />
@@ -740,9 +744,10 @@ export default function UploadInvoicesPage() {
                  })
                )}
             </div>
-         </GlassPanel>
+         </div>
       </div>
 
+      </div>
     </div>
   );
 }

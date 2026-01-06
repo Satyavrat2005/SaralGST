@@ -144,7 +144,7 @@ function SaralHero({ businessName, handleInputChange, handleSubmit, router }: an
             Get Started
           </button>
           <button
-            onClick={() => router.push('/demo')}
+            onClick={() => router.push('/dashboard/sme/stimulator')}
             className="btn-secondary-custom px-6 py-3 md:px-8 md:py-3 font-medium hover:opacity-90 text-sm md:text-base whitespace-nowrap"
           >
             Try Simulator

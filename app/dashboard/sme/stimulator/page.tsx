@@ -54,8 +54,6 @@ import {
   YAxis,
   CartesianGrid
 } from 'recharts';
-import GlassPanel from '../../../../components/ui/GlassPanel';
-import BentoCard from '../../../../components/ui/BentoCard';
 
 // --- TYPES ---
 type SimulatorStep = 1 | 2 | 3 | 4 | 5 | 6;
@@ -66,9 +64,9 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
   return (
     <div className="w-full mb-8">
       <div className="flex items-center justify-between relative">
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-zinc-800 rounded-full -z-10"></div>
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 rounded-full -z-10"></div>
         <div 
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary transition-all duration-500 -z-10"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-emerald-600 to-teal-600 transition-all duration-500 -z-10"
           style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
         ></div>
         {steps.map((label, idx) => {
@@ -79,14 +77,14 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
           return (
             <div key={idx} className="flex flex-col items-center gap-2">
               <div 
-                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-background
-                  ${isActive ? 'border-primary text-primary shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-110' : 
-                    isCompleted ? 'border-primary bg-primary text-white' : 'border-zinc-700 text-zinc-500'}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-white
+                  ${isActive ? 'border-emerald-600 text-emerald-600 shadow-lg shadow-emerald-200 scale-110' : 
+                    isCompleted ? 'border-emerald-600 bg-gradient-to-r from-emerald-600 to-teal-600 text-white' : 'border-gray-300 text-gray-500'}
                 `}
               >
                 {isCompleted ? <Check className="h-5 w-5" /> : <span className="text-sm font-bold">{stepNum}</span>}
               </div>
-              <span className={`text-xs font-medium transition-colors ${isActive ? 'text-white' : isCompleted ? 'text-zinc-300' : 'text-zinc-600'}`}>
+              <span className={`text-xs font-medium transition-colors ${isActive ? 'text-gray-900' : isCompleted ? 'text-gray-700' : 'text-gray-500'}`}>
                 {label}
               </span>
             </div>
@@ -140,12 +138,12 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Captured Invoices</h2>
-          <p className="text-zinc-400 text-sm">View and validate invoices automatically captured from multiple sources</p>
+          <h2 className="text-2xl font-bold text-gray-900">Captured Invoices</h2>
+          <p className="text-gray-600 text-sm">View and validate invoices automatically captured from multiple sources</p>
         </div>
         <div className="flex gap-2">
-           <button className="px-3 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white">View All Invoices</button>
-           <button className="p-2 bg-zinc-900 border border-white/10 rounded-lg text-zinc-300 hover:text-white"><Settings className="h-5 w-5" /></button>
+           <button className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 shadow-sm">View All Invoices</button>
+           <button className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 shadow-sm"><Settings className="h-5 w-5" /></button>
         </div>
       </div>
 
@@ -160,68 +158,68 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
              <button
                key={tab.id}
                onClick={() => setActiveTab(tab.id as any)}
-               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all
-                 ${activeTab === tab.id ? 'bg-primary/10 border-primary text-white' : 'bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900 hover:text-white'}
+               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all shadow-sm
+                 ${activeTab === tab.id ? 'bg-emerald-50 border-emerald-200 text-gray-900' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900'}
                `}
              >
                <div className="flex items-center gap-3">
                  <tab.icon className="h-4 w-4" />
                  {tab.label}
                </div>
-               <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded-full">{tab.count}</span>
+               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-700">{tab.count}</span>
              </button>
            ))}
         </div>
 
         {/* Main Content */}
-        <GlassPanel className="lg:col-span-3 p-0 overflow-hidden flex flex-col min-h-[400px]">
-           <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                 {activeTab === 'whatsapp' && <MessageSquare className="h-4 w-4 text-emerald-500" />}
-                 {activeTab === 'email' && <Mail className="h-4 w-4 text-blue-500" />}
-                 {activeTab === 'manual' && <UploadCloud className="h-4 w-4 text-amber-500" />}
+        <div className="lg:col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+           <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                 {activeTab === 'whatsapp' && <MessageSquare className="h-4 w-4 text-emerald-600" />}
+                 {activeTab === 'email' && <Mail className="h-4 w-4 text-blue-600" />}
+                 {activeTab === 'manual' && <UploadCloud className="h-4 w-4 text-amber-600" />}
                  Incoming Stream
               </h3>
               {processing ? (
-                 <div className="flex items-center gap-2 text-xs text-primary">
+                 <div className="flex items-center gap-2 text-xs text-emerald-600">
                     <Loader2 className="h-3 w-3 animate-spin" /> Processing... {processedCount}%
                  </div>
               ) : (
-                 <button onClick={handleSimulateProcess} className="text-xs text-primary hover:underline">Re-run Validation</button>
+                 <button onClick={handleSimulateProcess} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Re-run Validation</button>
               )}
            </div>
            
-           <div className="flex-1 overflow-y-auto p-4 space-y-3">
+           <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[500px]">
               {loading ? (
                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2 text-sm text-zinc-400">Loading invoices...</span>
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                    <span className="ml-2 text-sm text-gray-600">Loading invoices...</span>
                  </div>
               ) : invoices.length === 0 ? (
                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FileText className="h-12 w-12 text-zinc-600 mb-2" />
-                    <p className="text-sm text-zinc-400">No invoices found</p>
+                    <FileText className="h-12 w-12 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600">No invoices found</p>
                  </div>
               ) : (
                  invoices.map((invoice, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-white/5 hover:border-white/10 transition-all group">
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200 hover:border-gray-300 transition-all group">
                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-zinc-500">
+                          <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500">
                              <FileText className="h-5 w-5" />
                           </div>
                           <div>
-                             <p className="text-sm font-medium text-white">{invoice.invoice_number || 'No Invoice #'}</p>
-                             <p className="text-xs text-zinc-500">{invoice.supplier_name || 'Unknown Supplier'}</p>
-                             <p className="text-xs text-zinc-400 mt-0.5">₹{invoice.total_invoice_value?.toLocaleString() || '0'}</p>
+                             <p className="text-sm font-medium text-gray-900">{invoice.invoice_number || 'No Invoice #'}</p>
+                             <p className="text-xs text-gray-600">{invoice.supplier_name || 'Unknown Supplier'}</p>
+                             <p className="text-xs text-gray-500 mt-0.5">₹{invoice.total_invoice_value?.toLocaleString() || '0'}</p>
                           </div>
                        </div>
                        <div className="flex items-center gap-4">
                           <span className={`text-xs px-2 py-1 rounded border ${
                              invoice.invoice_status === 'extracted' || invoice.invoice_status === 'verified'
-                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
                                 : invoice.invoice_status === 'pending' || invoice.invoice_status === 'needs_review'
-                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                                : 'bg-red-500/10 text-red-500 border-red-500/20'
+                                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                : 'bg-red-100 text-red-700 border-red-200'
                           }`}>
                              {invoice.invoice_status === 'extracted' ? 'Validated' :
                               invoice.invoice_status === 'pending' || invoice.invoice_status === 'needs_review' ? 'Partial' :
@@ -232,7 +230,7 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
                                 href={invoice.invoice_bucket_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="p-1.5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-1.5 hover:bg-gray-200 rounded text-gray-600 hover:text-gray-900 transition-colors opacity-0 group-hover:opacity-100"
                                 title="View PDF"
                              >
                                 <Eye className="h-4 w-4" />
@@ -243,7 +241,7 @@ const CapturedInvoices = ({ onNext }: { onNext: () => void }) => {
                  ))
               )}
            </div>
-        </GlassPanel>
+        </div>
       </div>
     </div>
   );
@@ -366,41 +364,41 @@ const RegistersAndDraft = ({ onNext }: { onNext: () => void }) => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 relative">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Registers & GSTR-1B</h2>
-          <p className="text-zinc-400 text-sm">Review your registers and generate the return draft</p>
+          <h2 className="text-2xl font-bold text-gray-900">Registers & GSTR-1B</h2>
+          <p className="text-gray-600 text-sm">Review your registers and generate the return draft</p>
         </div>
-        <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white flex items-center gap-2">
+        <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 shadow-sm">
            <Plus className="h-4 w-4" /> Add Invoice Manual
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Registers View */}
-         <GlassPanel className="lg:col-span-2 p-0 overflow-hidden h-[550px] flex flex-col">
-            <div className="p-4 border-b border-white/5 flex gap-4">
+         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-[550px] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex gap-4">
                <button 
                   onClick={() => setActiveRegister('purchase')}
-                  className={`text-sm font-medium pb-4 -mb-4 px-2 transition-colors border-b-2 ${activeRegister === 'purchase' ? 'text-white border-primary' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                  className={`text-sm font-medium pb-4 -mb-4 px-2 transition-colors border-b-2 ${activeRegister === 'purchase' ? 'text-gray-900 border-emerald-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}
                >
                   Purchase Register
                </button>
                <button 
                   onClick={() => setActiveRegister('sales')}
-                  className={`text-sm font-medium pb-4 -mb-4 px-2 transition-colors border-b-2 ${activeRegister === 'sales' ? 'text-white border-primary' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                  className={`text-sm font-medium pb-4 -mb-4 px-2 transition-colors border-b-2 ${activeRegister === 'sales' ? 'text-gray-900 border-emerald-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}
                >
                   Sales Register
                </button>
             </div>
-            <div className="p-3 border-b border-white/5 flex gap-2">
+            <div className="p-3 border-b border-gray-200 flex gap-2 bg-gray-50">
                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                  <input type="text" placeholder={`Search ${activeRegister}...`} className="w-full bg-zinc-900 rounded-lg pl-9 py-1.5 text-sm border border-white/10 focus:border-primary outline-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input type="text" placeholder={`Search ${activeRegister}...`} className="w-full bg-white rounded-lg pl-9 py-1.5 text-sm border border-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
                </div>
-               <button className="p-1.5 border border-white/10 rounded-lg hover:bg-white/5"><Filter className="h-4 w-4 text-zinc-400" /></button>
+               <button className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-100"><Filter className="h-4 w-4 text-gray-600" /></button>
             </div>
             <div className="flex-1 overflow-auto">
                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-900/50 text-zinc-500 font-medium">
+                  <thead className="bg-gray-50 text-gray-700 font-medium sticky top-0">
                      <tr>
                         <th className="p-3 pl-4">Date</th>
                         <th className="p-3">{activeRegister === 'purchase' ? 'Vendor / GSTIN' : 'Customer / Invoice'}</th>
@@ -415,91 +413,95 @@ const RegistersAndDraft = ({ onNext }: { onNext: () => void }) => {
                         <th className="p-3 text-right">Total</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-200">
                      {activeRegister === 'purchase' ? (
                         purchaseData.map((item, i) => (
-                           <tr key={`purch-${i}`} className="hover:bg-white/5">
-                              <td className="p-3 pl-4 text-zinc-400 text-xs">{item.date}</td>
+                           <tr key={`purch-${i}`} className="hover:bg-gray-50">
+                              <td className="p-3 pl-4 text-gray-600 text-xs">{item.date}</td>
                               <td className="p-3">
-                                 <div className="text-white font-medium text-xs">{item.vendor}</div>
-                                 <div className="text-[10px] text-zinc-500">{item.invoice}</div>
-                                 <div className="text-[9px] text-zinc-600">{item.gstin}</div>
+                                 <div className="text-gray-900 font-medium text-xs">{item.vendor}</div>
+                                 <div className="text-[10px] text-gray-600">{item.invoice}</div>
+                                 <div className="text-[9px] text-gray-500">{item.gstin}</div>
                               </td>
-                              <td className="p-3 text-right text-zinc-300 font-mono text-xs">₹{item.taxable.toLocaleString()}</td>
-                              <td className="p-3 text-right text-zinc-300 font-mono text-xs">₹{item.gst.toLocaleString()}</td>
-                              <td className="p-3 text-right text-white font-bold font-mono text-xs">₹{item.total.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-700 font-mono text-xs">₹{item.taxable.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-700 font-mono text-xs">₹{item.gst.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-900 font-bold font-mono text-xs">₹{item.total.toLocaleString()}</td>
                            </tr>
                         ))
                      ) : (
                         salesData.map((item, i) => (
-                           <tr key={`sales-${i}`} className="hover:bg-white/5">
-                              <td className="p-3 pl-4 text-zinc-400 text-xs">{item.date}</td>
+                           <tr key={`sales-${i}`} className="hover:bg-gray-50">
+                              <td className="p-3 pl-4 text-gray-600 text-xs">{item.date}</td>
                               <td className="p-3">
-                                 <div className="text-white font-medium text-xs">{item.customer}</div>
-                                 <div className="text-[10px] text-zinc-500">{item.id}</div>
-                                 <div className="text-[9px] text-zinc-600">{item.gstin}</div>
+                                 <div className="text-gray-900 font-medium text-xs">{item.customer}</div>
+                                 <div className="text-[10px] text-gray-600">{item.id}</div>
+                                 <div className="text-[9px] text-gray-500">{item.gstin}</div>
                               </td>
-                              <td className="p-3 text-right text-zinc-400 font-mono text-xs">{item.quantity}</td>
-                              <td className="p-3 text-right text-zinc-400 font-mono text-xs">{item.rate}</td>
-                              <td className="p-3 text-right text-zinc-300 font-mono text-xs">₹{item.taxable.toLocaleString()}</td>
-                              <td className="p-3 text-right text-zinc-300 font-mono text-xs">₹{item.gst.toLocaleString()}</td>
-                              <td className="p-3 text-right text-white font-bold font-mono text-xs">₹{item.total.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-600 font-mono text-xs">{item.quantity}</td>
+                              <td className="p-3 text-right text-gray-600 font-mono text-xs">{item.rate}</td>
+                              <td className="p-3 text-right text-gray-700 font-mono text-xs">₹{item.taxable.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-700 font-mono text-xs">₹{item.gst.toLocaleString()}</td>
+                              <td className="p-3 text-right text-gray-900 font-bold font-mono text-xs">₹{item.total.toLocaleString()}</td>
                            </tr>
                         ))
                      )}
                   </tbody>
                </table>
             </div>
-         </GlassPanel>
+         </div>
 
          {/* Draft Panel */}
          <div className="flex flex-col gap-6 h-[550px]">
-            <BentoCard title="GSTR-1B Draft Summary" className="flex-1 flex flex-col">
-               <div className="space-y-4 mt-4 flex-1">
-                  <div className="p-4 rounded-xl bg-zinc-900 border border-white/10">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex-1 flex flex-col">
+               <div className="flex items-center gap-2 mb-6">
+                  <FileCheck className="h-5 w-5 text-emerald-600" />
+                  <h3 className="text-lg font-bold text-gray-900">GSTR-1B Draft Summary</h3>
+               </div>
+               <div className="space-y-4 flex-1">
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs text-zinc-500 uppercase">Total Sales Invoices</span>
-                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="text-xs text-gray-600 uppercase font-medium">Total Sales Invoices</span>
+                        <FileText className="h-4 w-4 text-emerald-600" />
                      </div>
-                     <p className="text-2xl font-bold text-white">21</p>
+                     <p className="text-2xl font-bold text-gray-900">21</p>
                   </div>
-                  <div className="p-4 rounded-xl bg-zinc-900 border border-white/10">
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs text-zinc-500 uppercase">Taxable Value</span>
-                        <span className="text-zinc-400 text-xs">INR</span>
+                        <span className="text-xs text-gray-600 uppercase font-medium">Taxable Value</span>
+                        <span className="text-gray-600 text-xs">INR</span>
                      </div>
-                     <p className="text-2xl font-bold text-white">₹ 61.31 L</p>
+                     <p className="text-2xl font-bold text-gray-900">₹ 61.31 L</p>
                   </div>
-                  <div className="p-4 rounded-xl bg-zinc-900 border border-white/10">
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs text-zinc-500 uppercase">Liability</span>
-                        <span className="text-zinc-400 text-xs">INR</span>
+                        <span className="text-xs text-amber-700 uppercase font-medium">Liability</span>
+                        <span className="text-amber-700 text-xs">INR</span>
                      </div>
-                     <p className="text-2xl font-bold text-amber-500">₹ 7.66 L</p>
+                     <p className="text-2xl font-bold text-amber-700">₹ 7.66 L</p>
                   </div>
                </div>
 
-               <div className="mt-auto pt-4 border-t border-white/5">
+               <div className="mt-auto pt-4 border-t border-gray-200">
                   {generating ? (
                      <div className="space-y-3">
-                        <div className="flex justify-between text-xs text-zinc-300 font-medium">
+                        <div className="flex justify-between text-xs text-gray-700 font-medium">
                            <span>{simulationStep}</span>
                            <span>{genProgress}%</span>
                         </div>
-                        <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
-                           <div className="h-full bg-gradient-to-r from-emerald-600 to-primary transition-all duration-100" style={{ width: `${genProgress}%` }}></div>
+                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                           <div className="h-full bg-gradient-to-r from-emerald-600 to-teal-600 transition-all duration-100" style={{ width: `${genProgress}%` }}></div>
                         </div>
                      </div>
                   ) : (
                      <button 
                         onClick={handleGenerate}
-                        className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                        className="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold transition-all shadow-lg flex items-center justify-center gap-2"
                      >
                         <Zap className="h-4 w-4" /> Generate GSTR-1B
                      </button>
                   )}
                </div>
-            </BentoCard>
+            </div>
          </div>
       </div>
 
@@ -707,13 +709,13 @@ const UploadGSTR2B = ({ onNext }: { onNext: () => void }) => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">GSTR-2B Upload</h2>
-          <p className="text-zinc-400 text-sm">Upload your GSTR-2B Excel file to continue</p>
+          <h2 className="text-2xl font-bold text-gray-900">GSTR-2B Upload</h2>
+          <p className="text-gray-600 text-sm">Upload your GSTR-2B Excel file to continue</p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto">
-        <GlassPanel className="p-8">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
           <input
             ref={fileInputRef}
             type="file"
@@ -724,51 +726,51 @@ const UploadGSTR2B = ({ onNext }: { onNext: () => void }) => {
 
           {!uploadComplete ? (
             <div className="text-center space-y-6">
-              <div className="h-24 w-24 bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
-                <UploadCloud className="h-12 w-12 text-zinc-400" />
+              <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                <UploadCloud className="h-12 w-12 text-gray-500" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white mb-2">Upload GSTR-2B File</h3>
-                <p className="text-zinc-500 text-sm">Select an Excel file from your device</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Upload GSTR-2B File</h3>
+                <p className="text-gray-600 text-sm">Select an Excel file from your device</p>
               </div>
               <button
                 onClick={triggerFileInput}
-                className="px-6 py-3 bg-primary hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2 mx-auto"
+                className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 mx-auto shadow-lg"
               >
                 <UploadCloud className="h-5 w-5" /> Choose File
               </button>
               <div className="flex gap-2 justify-center">
-                <span className="px-3 py-1 bg-zinc-800 rounded-full text-xs text-zinc-400">.xlsx</span>
-                <span className="px-3 py-1 bg-zinc-800 rounded-full text-xs text-zinc-400">.xls</span>
-                <span className="px-3 py-1 bg-zinc-800 rounded-full text-xs text-zinc-400">.csv</span>
+                <span className="px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700">.xlsx</span>
+                <span className="px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700">.xls</span>
+                <span className="px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700">.csv</span>
               </div>
             </div>
           ) : (
             <div className="text-center space-y-6">
-              <div className="h-24 w-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(16,185,129,0.4)]">
+              <div className="h-24 w-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-200">
                 <CheckCircle2 className="h-12 w-12 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white">Upload Successful!</h3>
-                <p className="text-emerald-400 mt-2">{fileName}</p>
+                <h3 className="text-2xl font-bold text-gray-900">Upload Successful!</h3>
+                <p className="text-emerald-600 mt-2">{fileName}</p>
               </div>
               <div className="flex gap-3 justify-center">
                 <button
                   onClick={handleReset}
-                  className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 >
                   Upload Another
                 </button>
                 <button
                   onClick={onNext}
-                  className="px-6 py-2 bg-primary hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                 >
                   Continue <ArrowRight className="h-5 w-5" />
                 </button>
               </div>
             </div>
           )}
-        </GlassPanel>
+        </div>
       </div>
     </div>
   );
@@ -857,14 +859,14 @@ const ReconciliationEngine = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Run Reconciliation</h2>
-          <p className="text-zinc-400 text-sm">Match your invoices with GSTR-2B and identify discrepancies</p>
+          <h2 className="text-2xl font-bold text-gray-900">Run Reconciliation</h2>
+          <p className="text-gray-600 text-sm">Match your invoices with GSTR-2B and identify discrepancies</p>
         </div>
         <div className="flex gap-2">
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white flex items-center gap-2">
+           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 shadow-sm">
               <Clock className="h-4 w-4" /> Schedule Run
            </button>
-           <button className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white flex items-center gap-2">
+           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 shadow-sm">
               <Settings className="h-4 w-4" /> Settings
            </button>
         </div>
@@ -872,44 +874,44 @@ const ReconciliationEngine = () => {
 
       <div className="grid grid-cols-1 gap-6">
          {/* CENTRAL STATUS CARD */}
-         <GlassPanel className="min-h-[500px] flex flex-col items-center justify-center relative overflow-hidden p-10">
+         <div className="min-h-[500px] flex flex-col items-center justify-center relative overflow-hidden p-10 bg-white rounded-xl border border-gray-200 shadow-sm">
             
             {/* IDLE STATE */}
             {state === 'idle' && (
                <div className="w-full max-w-2xl text-center space-y-10 animate-in zoom-in-95 duration-300 z-10">
                   <div className="flex flex-col items-center gap-6">
                      <div className="relative">
-                        <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
-                        <div className="relative h-24 w-24 rounded-full bg-zinc-900 border-2 border-primary/50 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                           <RefreshCw className="h-10 w-10 text-primary" />
+                        <div className="absolute inset-0 bg-emerald-200 blur-xl rounded-full"></div>
+                        <div className="relative h-24 w-24 rounded-full bg-white border-2 border-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-200">
+                           <RefreshCw className="h-10 w-10 text-emerald-600" />
                         </div>
                      </div>
                      <div>
-                        <h3 className="text-3xl font-bold text-white">Ready to Reconcile</h3>
-                        <div className="flex items-center justify-center gap-2 mt-2 text-zinc-400">
+                        <h3 className="text-3xl font-bold text-gray-900">Ready to Reconcile</h3>
+                        <div className="flex items-center justify-center gap-2 mt-2 text-gray-600">
                            <Clock className="h-4 w-4" /> Last run: 23 Nov, 4:00 PM
                         </div>
                      </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
-                     <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
-                        <p className="text-xs text-zinc-500 uppercase font-bold">Purchase Invoices</p>
-                        <p className="text-2xl font-bold text-white mt-1">21</p>
+                     <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                        <p className="text-xs text-gray-600 uppercase font-bold">Purchase Invoices</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">21</p>
                      </div>
-                     <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
-                        <p className="text-xs text-zinc-500 uppercase font-bold">GSTR-2B Entries</p>
-                        <p className="text-2xl font-bold text-white mt-1">19</p>
+                     <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                        <p className="text-xs text-gray-600 uppercase font-bold">GSTR-2B Entries</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">19</p>
                      </div>
-                     <div className="bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
-                        <p className="text-xs text-zinc-500 uppercase font-bold">Est. Time</p>
-                        <p className="text-2xl font-bold text-white mt-1">~2 mins</p>
+                     <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                        <p className="text-xs text-gray-600 uppercase font-bold">Est. Time</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">~2 mins</p>
                      </div>
                   </div>
 
                   <button 
                      onClick={handleRun}
-                     className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-primary hover:from-emerald-500 hover:to-emerald-400 text-white text-lg font-bold rounded-full shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all hover:scale-105 active:scale-95 flex items-center gap-3 mx-auto"
+                     className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg font-bold rounded-full shadow-lg shadow-emerald-200 transition-all hover:scale-105 active:scale-95 flex items-center gap-3 mx-auto"
                   >
                      <Play className="h-6 w-6 fill-current" /> Run Reconciliation Now
                   </button>
@@ -921,7 +923,7 @@ const ReconciliationEngine = () => {
                <div className="w-full max-w-xl text-center space-y-10 animate-in fade-in duration-500 z-10">
                   <div className="relative h-48 w-48 mx-auto">
                      <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="#27272a" strokeWidth="8" />
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E7EB" strokeWidth="8" />
                         <circle 
                            cx="50" cy="50" r="45" fill="none" stroke="#10B981" strokeWidth="8" 
                            strokeDasharray="283" 
@@ -931,19 +933,19 @@ const ReconciliationEngine = () => {
                         />
                      </svg>
                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-4xl font-bold text-white">{progress}%</span>
+                        <span className="text-4xl font-bold text-gray-900">{progress}%</span>
                      </div>
                   </div>
 
                   <div className="space-y-2">
-                     <h3 className="text-2xl font-bold text-white animate-pulse">Reconciliation in Progress...</h3>
-                     <p className="text-zinc-400 h-6">{tasks[currentTask]}</p>
+                     <h3 className="text-2xl font-bold text-gray-900 animate-pulse">Reconciliation in Progress...</h3>
+                     <p className="text-gray-600 h-6">{tasks[currentTask]}</p>
                   </div>
 
-                  <div className="w-full bg-zinc-900/50 rounded-xl p-4 border border-white/5 flex justify-between text-sm">
-                     <span className="text-zinc-500">Processed: <span className="text-white font-mono">{Math.floor((progress/100)*823)}</span></span>
-                     <span className="text-zinc-500">Matches: <span className="text-white font-mono">{Math.floor((progress/100)*780)}</span></span>
-                     <span className="text-zinc-500">Issues: <span className="text-red-400 font-mono">{Math.floor((progress/100)*43)}</span></span>
+                  <div className="w-full bg-gray-50 rounded-xl p-4 border border-gray-200 flex justify-between text-sm">
+                     <span className="text-gray-600">Processed: <span className="text-gray-900 font-mono">{Math.floor((progress/100)*823)}</span></span>
+                     <span className="text-gray-600">Matches: <span className="text-gray-900 font-mono">{Math.floor((progress/100)*780)}</span></span>
+                     <span className="text-gray-600">Issues: <span className="text-red-600 font-mono">{Math.floor((progress/100)*43)}</span></span>
                   </div>
                </div>
             )}
@@ -952,311 +954,311 @@ const ReconciliationEngine = () => {
             {state === 'completed' && reconData && (
                <div className="w-full text-left space-y-6 animate-in zoom-in-95 duration-500 z-10">
                   <div className="flex flex-col items-center gap-4 text-center mb-8">
-                     <div className="h-20 w-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.5)]">
+                     <div className="h-20 w-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
                         <CheckCircle2 className="h-10 w-10 text-white" />
                      </div>
                      <div>
-                        <h3 className="text-3xl font-bold text-white">Reconciliation Complete!</h3>
-                        <p className="text-zinc-400">Process finished successfully in {reconData.metadata?.duration_seconds?.toFixed(2) || '0'}s</p>
-                        <p className="text-sm text-zinc-500 mt-1">{reconData.metadata?.business_name} • {reconData.metadata?.period}</p>
+                        <h3 className="text-3xl font-bold text-gray-900">Reconciliation Complete!</h3>
+                        <p className="text-gray-600">Process finished successfully in {reconData.metadata?.duration_seconds?.toFixed(2) || '0'}s</p>
+                        <p className="text-sm text-gray-500 mt-1">{reconData.metadata?.business_name} • {reconData.metadata?.period}</p>
                      </div>
                   </div>
 
                   {/* Key Metrics */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                     <GlassPanel className="p-4 bg-emerald-500/10 border-emerald-500/20">
-                        <p className="text-xs text-emerald-400 uppercase font-bold">Matched</p>
-                        <p className="text-3xl font-bold text-emerald-500 mt-2">{reconData.summary?.matched_count || 0}</p>
-                        <p className="text-xs text-zinc-400 mt-1">{reconData.summary?.match_percentage?.toFixed(2) || 0}% Rate</p>
-                     </GlassPanel>
+                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-emerald-700 uppercase font-bold">Matched</p>
+                        <p className="text-3xl font-bold text-emerald-600 mt-2">{reconData.summary?.matched_count || 0}</p>
+                        <p className="text-xs text-gray-600 mt-1">{reconData.summary?.match_percentage?.toFixed(2) || 0}% Rate</p>
+                     </div>
 
-                     <GlassPanel className="p-4 bg-red-500/10 border-red-500/20">
-                        <p className="text-xs text-red-400 uppercase font-bold">Discrepancies</p>
-                        <p className="text-3xl font-bold text-red-500 mt-2">{reconData.summary?.discrepancies?.total || 0}</p>
-                        <p className="text-xs text-zinc-400 mt-1">Issues Found</p>
-                     </GlassPanel>
+                     <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-red-700 uppercase font-bold">Discrepancies</p>
+                        <p className="text-3xl font-bold text-red-600 mt-2">{reconData.summary?.discrepancies?.total || 0}</p>
+                        <p className="text-xs text-gray-600 mt-1">Issues Found</p>
+                     </div>
 
-                     <GlassPanel className="p-4 bg-blue-500/10 border-blue-500/20">
-                        <p className="text-xs text-blue-400 uppercase font-bold">ITC Secured</p>
-                        <p className="text-2xl font-bold text-blue-500 mt-2">₹{(reconData.summary?.itc_secured / 100000).toFixed(2)}L</p>
-                        <p className="text-xs text-zinc-400 mt-1">Available</p>
-                     </GlassPanel>
+                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-blue-700 uppercase font-bold">ITC Secured</p>
+                        <p className="text-2xl font-bold text-blue-600 mt-2">₹{(reconData.summary?.itc_secured / 100000).toFixed(2)}L</p>
+                        <p className="text-xs text-gray-600 mt-1">Available</p>
+                     </div>
 
-                     <GlassPanel className="p-4 bg-yellow-500/10 border-yellow-500/20">
-                        <p className="text-xs text-yellow-400 uppercase font-bold">ITC at Risk</p>
-                        <p className="text-2xl font-bold text-yellow-500 mt-2">₹{(reconData.summary?.itc?.at_risk / 100000).toFixed(2)}L</p>
-                        <p className="text-xs text-zinc-400 mt-1">{reconData.summary?.itc?.risk_percentage?.toFixed(2)}%</p>
-                     </GlassPanel>
+                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-amber-700 uppercase font-bold">ITC at Risk</p>
+                        <p className="text-2xl font-bold text-amber-600 mt-2">₹{(reconData.summary?.itc?.at_risk / 100000).toFixed(2)}L</p>
+                        <p className="text-xs text-gray-600 mt-1">{reconData.summary?.itc?.risk_percentage?.toFixed(2)}%</p>
+                     </div>
 
-                     <GlassPanel className="p-4 bg-zinc-900/50 border-white/10">
-                        <p className="text-xs text-zinc-400 uppercase font-bold">Total Invoices</p>
-                        <p className="text-3xl font-bold text-white mt-2">{reconData.summary?.invoices?.unique || 0}</p>
-                        <p className="text-xs text-zinc-400 mt-1">Analyzed</p>
-                     </GlassPanel>
+                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-gray-700 uppercase font-bold">Total Invoices</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">{reconData.summary?.invoices?.unique || 0}</p>
+                        <p className="text-xs text-gray-600 mt-1">Analyzed</p>
+                     </div>
                   </div>
 
                   {/* Tabs for different views */}
-                  <div className="flex gap-2 border-b border-white/10">
+                  <div className="flex gap-2 border-b border-gray-200 bg-white rounded-t-xl px-2">
                      <button 
                         onClick={() => setSelectedTab('summary')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'summary' ? 'text-white border-b-2 border-primary' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'summary' ? 'text-gray-900 border-b-2 border-emerald-600' : 'text-gray-600 hover:text-gray-900'}`}
                      >
                         Summary
                      </button>
                      <button 
                         onClick={() => setSelectedTab('matched')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'matched' ? 'text-white border-b-2 border-primary' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'matched' ? 'text-gray-900 border-b-2 border-emerald-600' : 'text-gray-600 hover:text-gray-900'}`}
                      >
                         Matched ({reconData.matched_invoices?.length || 0})
                      </button>
                      <button 
                         onClick={() => setSelectedTab('discrepancies')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'discrepancies' ? 'text-white border-b-2 border-primary' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'discrepancies' ? 'text-gray-900 border-b-2 border-emerald-600' : 'text-gray-600 hover:text-gray-900'}`}
                      >
                         Discrepancies ({reconData.summary?.discrepancies?.total || 0})
                      </button>
                      <button 
                         onClick={() => setSelectedTab('vendors')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'vendors' ? 'text-white border-b-2 border-primary' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'vendors' ? 'text-gray-900 border-b-2 border-emerald-600' : 'text-gray-600 hover:text-gray-900'}`}
                      >
                         Vendors ({reconData.vendor_compliance?.total_vendors || 0})
                      </button>
                      <button 
                         onClick={() => setSelectedTab('insights')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'insights' ? 'text-white border-b-2 border-primary' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${selectedTab === 'insights' ? 'text-gray-900 border-b-2 border-emerald-600' : 'text-gray-600 hover:text-gray-900'}`}
                      >
                         Insights ({reconData.insights?.length || 0})
                      </button>
                   </div>
 
                   {/* Tab Content */}
-                  <div className="min-h-[400px]">
+                  <div className="min-h-[400px] bg-white rounded-b-xl border border-t-0 border-gray-200 p-6">
                      {selectedTab === 'summary' && (
                         <div className="space-y-6">
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               {/* Invoice Distribution */}
-                              <GlassPanel className="p-6">
-                                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <FileText className="h-5 w-5 text-primary" /> Invoice Distribution
+                              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                                 <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <FileText className="h-5 w-5 text-emerald-600" /> Invoice Distribution
                                  </h4>
                                  <div className="space-y-3">
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">In Books</span>
-                                       <span className="text-white font-bold">{reconData.summary?.invoices?.in_books || 0}</span>
+                                       <span className="text-gray-600">In Books</span>
+                                       <span className="text-gray-900 font-bold">{reconData.summary?.invoices?.in_books || 0}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">In GSTR-2B</span>
-                                       <span className="text-white font-bold">{reconData.summary?.invoices?.in_gstr2b || 0}</span>
+                                       <span className="text-gray-600">In GSTR-2B</span>
+                                       <span className="text-gray-900 font-bold">{reconData.summary?.invoices?.in_gstr2b || 0}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">Unique Total</span>
-                                       <span className="text-white font-bold">{reconData.summary?.invoices?.unique || 0}</span>
+                                       <span className="text-gray-600">Unique Total</span>
+                                       <span className="text-gray-900 font-bold">{reconData.summary?.invoices?.unique || 0}</span>
                                     </div>
                                  </div>
-                              </GlassPanel>
+                              </div>
 
                               {/* ITC Analysis */}
-                              <GlassPanel className="p-6">
-                                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <CreditCard className="h-5 w-5 text-primary" /> ITC Analysis
+                              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                                 <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <CreditCard className="h-5 w-5 text-emerald-600" /> ITC Analysis
                                  </h4>
                                  <div className="space-y-3">
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">Available ITC</span>
-                                       <span className="text-emerald-500 font-bold">₹{(reconData.itc_analysis?.totals?.available / 100000).toFixed(2)}L</span>
+                                       <span className="text-gray-600">Available ITC</span>
+                                       <span className="text-emerald-600 font-bold">₹{(reconData.itc_analysis?.totals?.available / 100000).toFixed(2)}L</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">Utilized ITC</span>
-                                       <span className="text-blue-500 font-bold">₹{(reconData.itc_analysis?.totals?.utilized / 100000).toFixed(2)}L</span>
+                                       <span className="text-gray-600">Utilized ITC</span>
+                                       <span className="text-blue-600 font-bold">₹{(reconData.itc_analysis?.totals?.utilized / 100000).toFixed(2)}L</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                       <span className="text-zinc-400">ITC at Risk</span>
-                                       <span className="text-red-500 font-bold">₹{(reconData.itc_analysis?.totals?.at_risk / 100000).toFixed(2)}L</span>
+                                       <span className="text-gray-600">ITC at Risk</span>
+                                       <span className="text-red-600 font-bold">₹{(reconData.itc_analysis?.totals?.at_risk / 100000).toFixed(2)}L</span>
                                     </div>
                                  </div>
-                              </GlassPanel>
+                              </div>
                            </div>
 
                            {/* Discrepancy Breakdown */}
-                           <GlassPanel className="p-6">
-                              <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                 <AlertTriangle className="h-5 w-5 text-red-500" /> Discrepancy Breakdown
+                           <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                              <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                 <AlertTriangle className="h-5 w-5 text-red-600" /> Discrepancy Breakdown
                               </h4>
                               <div className="grid grid-cols-3 gap-4">
-                                 <div className="bg-zinc-900/50 border border-red-500/20 p-4 rounded-lg">
-                                    <p className="text-xs text-red-400 uppercase font-bold">Missing in Books</p>
-                                    <p className="text-2xl font-bold text-white mt-2">{reconData.summary?.discrepancies?.missing_in_books || 0}</p>
+                                 <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                    <p className="text-xs text-red-700 uppercase font-bold">Missing in Books</p>
+                                    <p className="text-2xl font-bold text-gray-900 mt-2">{reconData.summary?.discrepancies?.missing_in_books || 0}</p>
                                  </div>
-                                 <div className="bg-zinc-900/50 border border-yellow-500/20 p-4 rounded-lg">
-                                    <p className="text-xs text-yellow-400 uppercase font-bold">Missing in GSTR-2B</p>
-                                    <p className="text-2xl font-bold text-white mt-2">{reconData.summary?.discrepancies?.missing_in_gstr2b || 0}</p>
+                                 <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                                    <p className="text-xs text-amber-700 uppercase font-bold">Missing in GSTR-2B</p>
+                                    <p className="text-2xl font-bold text-gray-900 mt-2">{reconData.summary?.discrepancies?.missing_in_gstr2b || 0}</p>
                                  </div>
-                                 <div className="bg-zinc-900/50 border border-orange-500/20 p-4 rounded-lg">
-                                    <p className="text-xs text-orange-400 uppercase font-bold">Value Mismatches</p>
-                                    <p className="text-2xl font-bold text-white mt-2">{reconData.summary?.discrepancies?.value_mismatches || 0}</p>
+                                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                                    <p className="text-xs text-orange-700 uppercase font-bold">Value Mismatches</p>
+                                    <p className="text-2xl font-bold text-gray-900 mt-2">{reconData.summary?.discrepancies?.value_mismatches || 0}</p>
                                  </div>
                               </div>
-                           </GlassPanel>
+                           </div>
                         </div>
                      )}
 
                      {selectedTab === 'matched' && (
-                        <GlassPanel className="p-6">
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
                            <div className="overflow-x-auto">
                               <table className="w-full text-sm">
                                  <thead>
-                                    <tr className="border-b border-white/10">
-                                       <th className="text-left py-3 px-2 text-zinc-400 font-medium">Invoice No</th>
-                                       <th className="text-left py-3 px-2 text-zinc-400 font-medium">Date</th>
-                                       <th className="text-left py-3 px-2 text-zinc-400 font-medium">Vendor</th>
-                                       <th className="text-right py-3 px-2 text-zinc-400 font-medium">Taxable Value</th>
-                                       <th className="text-right py-3 px-2 text-zinc-400 font-medium">Total Tax</th>
-                                       <th className="text-right py-3 px-2 text-zinc-400 font-medium">ITC Eligible</th>
-                                       <th className="text-center py-3 px-2 text-zinc-400 font-medium">Match Type</th>
+                                    <tr className="border-b border-gray-200">
+                                       <th className="text-left py-3 px-2 text-gray-700 font-medium">Invoice No</th>
+                                       <th className="text-left py-3 px-2 text-gray-700 font-medium">Date</th>
+                                       <th className="text-left py-3 px-2 text-gray-700 font-medium">Vendor</th>
+                                       <th className="text-right py-3 px-2 text-gray-700 font-medium">Taxable Value</th>
+                                       <th className="text-right py-3 px-2 text-gray-700 font-medium">Total Tax</th>
+                                       <th className="text-right py-3 px-2 text-gray-700 font-medium">ITC Eligible</th>
+                                       <th className="text-center py-3 px-2 text-gray-700 font-medium">Match Type</th>
                                     </tr>
                                  </thead>
                                  <tbody>
                                     {reconData.matched_invoices?.slice(0, 10).map((invoice: any, idx: number) => (
-                                       <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
-                                          <td className="py-3 px-2 text-white font-mono text-xs">{invoice.invoice_no}</td>
-                                          <td className="py-3 px-2 text-zinc-400">{invoice.date}</td>
-                                          <td className="py-3 px-2 text-white">{invoice.vendor}</td>
-                                          <td className="py-3 px-2 text-right text-white">₹{invoice.taxable_value.toLocaleString()}</td>
-                                          <td className="py-3 px-2 text-right text-white">₹{invoice.total_tax.toLocaleString()}</td>
-                                          <td className="py-3 px-2 text-right text-emerald-500 font-bold">₹{invoice.itc_eligible.toLocaleString()}</td>
+                                       <tr key={idx} className="border-b border-gray-200 hover:bg-gray-100">
+                                          <td className="py-3 px-2 text-gray-900 font-mono text-xs">{invoice.invoice_no}</td>
+                                          <td className="py-3 px-2 text-gray-600">{invoice.date}</td>
+                                          <td className="py-3 px-2 text-gray-900">{invoice.vendor}</td>
+                                          <td className="py-3 px-2 text-right text-gray-900">₹{invoice.taxable_value.toLocaleString()}</td>
+                                          <td className="py-3 px-2 text-right text-gray-900">₹{invoice.total_tax.toLocaleString()}</td>
+                                          <td className="py-3 px-2 text-right text-emerald-600 font-bold">₹{invoice.itc_eligible.toLocaleString()}</td>
                                           <td className="py-3 px-2 text-center">
-                                             <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">{invoice.match_type}</span>
+                                             <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-full border border-emerald-200">{invoice.match_type}</span>
                                           </td>
                                        </tr>
                                     ))}
                                  </tbody>
                               </table>
                               {reconData.matched_invoices?.length > 10 && (
-                                 <p className="text-center text-zinc-500 text-xs mt-4">Showing 10 of {reconData.matched_invoices.length} matched invoices</p>
+                                 <p className="text-center text-gray-600 text-xs mt-4">Showing 10 of {reconData.matched_invoices.length} matched invoices</p>
                               )}
                            </div>
-                        </GlassPanel>
+                        </div>
                      )}
 
                      {selectedTab === 'discrepancies' && (
                         <div className="space-y-4">
                            {/* Missing in Books */}
                            {reconData.discrepancies?.missing_in_books?.invoices?.length > 0 && (
-                              <GlassPanel className="p-6 bg-red-500/5 border-red-500/20">
-                                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <AlertOctagon className="h-5 w-5 text-red-500" /> Missing in Books ({reconData.discrepancies.missing_in_books.count})
+                              <div className="p-6 bg-red-50 border border-red-200 rounded-xl">
+                                 <h4 className="text-lg font-bold text-red-900 mb-4 flex items-center gap-2">
+                                    <AlertOctagon className="h-5 w-5 text-red-600" /> Missing in Books ({reconData.discrepancies.missing_in_books.count})
                                  </h4>
                                  <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                        <thead>
-                                          <tr className="border-b border-white/10">
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Invoice No</th>
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Vendor</th>
-                                             <th className="text-right py-2 px-2 text-zinc-400 font-medium">Amount</th>
-                                             <th className="text-right py-2 px-2 text-zinc-400 font-medium">Tax</th>
-                                             <th className="text-center py-2 px-2 text-zinc-400 font-medium">Priority</th>
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Action</th>
+                                          <tr className="border-b border-red-200">
+                                             <th className="text-left py-2 px-2 text-red-700 font-medium">Invoice No</th>
+                                             <th className="text-left py-2 px-2 text-red-700 font-medium">Vendor</th>
+                                             <th className="text-right py-2 px-2 text-red-700 font-medium">Amount</th>
+                                             <th className="text-right py-2 px-2 text-red-700 font-medium">Tax</th>
+                                             <th className="text-center py-2 px-2 text-red-700 font-medium">Priority</th>
+                                             <th className="text-left py-2 px-2 text-red-700 font-medium">Action</th>
                                           </tr>
                                        </thead>
                                        <tbody>
                                           {reconData.discrepancies.missing_in_books.invoices.map((invoice: any, idx: number) => (
-                                             <tr key={idx} className="border-b border-white/5">
-                                                <td className="py-2 px-2 text-white font-mono text-xs">{invoice.invoice_no}</td>
-                                                <td className="py-2 px-2 text-zinc-400">{invoice.vendor}</td>
-                                                <td className="py-2 px-2 text-right text-white">₹{invoice.gross_amount.toLocaleString()}</td>
-                                                <td className="py-2 px-2 text-right text-red-400">₹{invoice.tax.toLocaleString()}</td>
+                                             <tr key={idx} className="border-b border-red-100">
+                                                <td className="py-2 px-2 text-red-900 font-mono text-xs">{invoice.invoice_no}</td>
+                                                <td className="py-2 px-2 text-red-700">{invoice.vendor}</td>
+                                                <td className="py-2 px-2 text-right text-red-900">₹{invoice.gross_amount.toLocaleString()}</td>
+                                                <td className="py-2 px-2 text-right text-red-600 font-bold">₹{invoice.tax.toLocaleString()}</td>
                                                 <td className="py-2 px-2 text-center">
-                                                   <span className={`px-2 py-1 text-xs rounded-full ${invoice.priority === 'High' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                                   <span className={`px-2 py-1 text-xs rounded-full border ${invoice.priority === 'High' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>
                                                       {invoice.priority}
                                                    </span>
                                                 </td>
-                                                <td className="py-2 px-2 text-zinc-400 text-xs">{invoice.action}</td>
+                                                <td className="py-2 px-2 text-red-700 text-xs">{invoice.action}</td>
                                              </tr>
                                           ))}
                                        </tbody>
                                     </table>
                                  </div>
-                              </GlassPanel>
+                              </div>
                            )}
 
                            {/* Missing in GSTR-2B */}
                            {reconData.discrepancies?.missing_in_gstr2b?.invoices?.length > 0 && (
-                              <GlassPanel className="p-6 bg-yellow-500/5 border-yellow-500/20">
-                                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-yellow-500" /> Missing in GSTR-2B ({reconData.discrepancies.missing_in_gstr2b.count})
+                              <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl">
+                                 <h4 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600" /> Missing in GSTR-2B ({reconData.discrepancies.missing_in_gstr2b.count})
                                  </h4>
                                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
                                     <table className="w-full text-sm">
-                                       <thead className="sticky top-0 bg-zinc-900">
-                                          <tr className="border-b border-white/10">
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Invoice No</th>
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Vendor</th>
-                                             <th className="text-right py-2 px-2 text-zinc-400 font-medium">Amount</th>
-                                             <th className="text-left py-2 px-2 text-zinc-400 font-medium">Reason</th>
+                                       <thead className="sticky top-0 bg-amber-50">
+                                          <tr className="border-b border-amber-200">
+                                             <th className="text-left py-2 px-2 text-amber-700 font-medium">Invoice No</th>
+                                             <th className="text-left py-2 px-2 text-amber-700 font-medium">Vendor</th>
+                                             <th className="text-right py-2 px-2 text-amber-700 font-medium">Amount</th>
+                                             <th className="text-left py-2 px-2 text-amber-700 font-medium">Reason</th>
                                           </tr>
                                        </thead>
                                        <tbody>
                                           {reconData.discrepancies.missing_in_gstr2b.invoices.slice(0, 8).map((invoice: any, idx: number) => (
-                                             <tr key={idx} className="border-b border-white/5">
-                                                <td className="py-2 px-2 text-white font-mono text-xs">{invoice.invoice_no}</td>
-                                                <td className="py-2 px-2 text-zinc-400">{invoice.vendor}</td>
-                                                <td className="py-2 px-2 text-right text-white">₹{invoice.gross_amount.toLocaleString()}</td>
-                                                <td className="py-2 px-2 text-zinc-400 text-xs">{invoice.action}</td>
+                                             <tr key={idx} className="border-b border-amber-100">
+                                                <td className="py-2 px-2 text-amber-900 font-mono text-xs">{invoice.invoice_no}</td>
+                                                <td className="py-2 px-2 text-amber-700">{invoice.vendor}</td>
+                                                <td className="py-2 px-2 text-right text-amber-900">₹{invoice.gross_amount.toLocaleString()}</td>
+                                                <td className="py-2 px-2 text-amber-700 text-xs">{invoice.action}</td>
                                              </tr>
                                           ))}
                                        </tbody>
                                     </table>
                                     {reconData.discrepancies.missing_in_gstr2b.invoices.length > 8 && (
-                                       <p className="text-center text-zinc-500 text-xs mt-2">Showing 8 of {reconData.discrepancies.missing_in_gstr2b.invoices.length} invoices</p>
+                                       <p className="text-center text-amber-600 text-xs mt-2">Showing 8 of {reconData.discrepancies.missing_in_gstr2b.invoices.length} invoices</p>
                                     )}
                                  </div>
-                              </GlassPanel>
+                              </div>
                            )}
                         </div>
                      )}
 
                      {selectedTab === 'vendors' && (
-                        <GlassPanel className="p-6">
+                        <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl">
                            <div className="mb-6 grid grid-cols-3 gap-4">
-                              <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-lg">
-                                 <p className="text-xs text-emerald-400 uppercase font-bold">Compliant</p>
-                                 <p className="text-2xl font-bold text-white mt-1">{reconData.vendor_compliance?.distribution?.compliant || 0}</p>
+                              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg">
+                                 <p className="text-xs text-emerald-700 uppercase font-bold">Compliant</p>
+                                 <p className="text-2xl font-bold text-emerald-900 mt-1">{reconData.vendor_compliance?.distribution?.compliant || 0}</p>
                               </div>
-                              <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg">
-                                 <p className="text-xs text-yellow-400 uppercase font-bold">At Risk</p>
-                                 <p className="text-2xl font-bold text-white mt-1">{reconData.vendor_compliance?.distribution?.at_risk || 0}</p>
+                              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                                 <p className="text-xs text-amber-700 uppercase font-bold">At Risk</p>
+                                 <p className="text-2xl font-bold text-amber-900 mt-1">{reconData.vendor_compliance?.distribution?.at_risk || 0}</p>
                               </div>
-                              <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
-                                 <p className="text-xs text-red-400 uppercase font-bold">Non-Compliant</p>
-                                 <p className="text-2xl font-bold text-white mt-1">{reconData.vendor_compliance?.distribution?.non_compliant || 0}</p>
+                              <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                 <p className="text-xs text-red-700 uppercase font-bold">Non-Compliant</p>
+                                 <p className="text-2xl font-bold text-red-900 mt-1">{reconData.vendor_compliance?.distribution?.non_compliant || 0}</p>
                               </div>
                            </div>
                            <div className="overflow-x-auto max-h-96 overflow-y-auto">
                               <table className="w-full text-sm">
-                                 <thead className="sticky top-0 bg-zinc-900">
-                                    <tr className="border-b border-white/10">
-                                       <th className="text-left py-2 px-2 text-zinc-400 font-medium">Vendor</th>
-                                       <th className="text-center py-2 px-2 text-zinc-400 font-medium">Score</th>
-                                       <th className="text-center py-2 px-2 text-zinc-400 font-medium">Invoices</th>
-                                       <th className="text-right py-2 px-2 text-zinc-400 font-medium">ITC Secured</th>
-                                       <th className="text-right py-2 px-2 text-zinc-400 font-medium">ITC at Risk</th>
-                                       <th className="text-center py-2 px-2 text-zinc-400 font-medium">Status</th>
+                                 <thead className="sticky top-0 bg-gray-50">
+                                    <tr className="border-b border-gray-200">
+                                       <th className="text-left py-2 px-2 text-gray-700 font-medium">Vendor</th>
+                                       <th className="text-center py-2 px-2 text-gray-700 font-medium">Score</th>
+                                       <th className="text-center py-2 px-2 text-gray-700 font-medium">Invoices</th>
+                                       <th className="text-right py-2 px-2 text-gray-700 font-medium">ITC Secured</th>
+                                       <th className="text-right py-2 px-2 text-gray-700 font-medium">ITC at Risk</th>
+                                       <th className="text-center py-2 px-2 text-gray-700 font-medium">Status</th>
                                     </tr>
                                  </thead>
                                  <tbody>
                                     {reconData.vendor_compliance?.vendors?.slice(0, 15).map((vendor: any, idx: number) => (
-                                       <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
-                                          <td className="py-2 px-2 text-white">{vendor.name}</td>
+                                       <tr key={idx} className="border-b border-gray-200 hover:bg-gray-100">
+                                          <td className="py-2 px-2 text-gray-900">{vendor.name}</td>
                                           <td className="py-2 px-2 text-center">
-                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${vendor.score >= 80 ? 'bg-emerald-500/20 text-emerald-400' : vendor.score >= 60 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                             <span className={`px-2 py-1 rounded-full text-xs font-bold border ${vendor.score >= 80 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : vendor.score >= 60 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
                                                 {vendor.score}
                                              </span>
                                           </td>
-                                          <td className="py-2 px-2 text-center text-white">{vendor.invoices.matched}/{vendor.invoices.total}</td>
-                                          <td className="py-2 px-2 text-right text-emerald-500">₹{(vendor.itc_secured / 1000).toFixed(1)}K</td>
-                                          <td className="py-2 px-2 text-right text-red-400">₹{(vendor.itc_at_risk / 1000).toFixed(1)}K</td>
+                                          <td className="py-2 px-2 text-center text-gray-900">{vendor.invoices.matched}/{vendor.invoices.total}</td>
+                                          <td className="py-2 px-2 text-right text-emerald-600 font-bold">₹{(vendor.itc_secured / 1000).toFixed(1)}K</td>
+                                          <td className="py-2 px-2 text-right text-red-600 font-bold">₹{(vendor.itc_at_risk / 1000).toFixed(1)}K</td>
                                           <td className="py-2 px-2 text-center">
-                                             <span className={`px-2 py-1 text-xs rounded-full ${vendor.status === 'Compliant' ? 'bg-emerald-500/20 text-emerald-400' : vendor.status === 'At Risk' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                             <span className={`px-2 py-1 text-xs rounded-full border ${vendor.status === 'Compliant' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : vendor.status === 'At Risk' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
                                                 {vendor.status}
                                              </span>
                                           </td>
@@ -1265,60 +1267,57 @@ const ReconciliationEngine = () => {
                                  </tbody>
                               </table>
                            </div>
-                        </GlassPanel>
+                        </div>
                      )}
 
                      {selectedTab === 'insights' && (
                         <div className="space-y-4">
                            {reconData.insights?.map((insight: any, idx: number) => (
-                              <GlassPanel key={idx} className={`p-6 ${insight.severity === 'High' ? 'bg-red-500/5 border-red-500/20' : insight.severity === 'Medium' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-blue-500/5 border-blue-500/20'}`}>
+                              <div key={idx} className={`p-6 rounded-xl border ${insight.severity === 'High' ? 'bg-red-50 border-red-200' : insight.severity === 'Medium' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
                                  <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                        <div className="flex items-center gap-2 mb-2">
-                                          <span className={`px-2 py-1 text-xs rounded-full font-bold ${insight.severity === 'High' ? 'bg-red-500/20 text-red-400' : insight.severity === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                          <span className={`px-2 py-1 text-xs rounded-full font-bold border ${insight.severity === 'High' ? 'bg-red-100 text-red-700 border-red-200' : insight.severity === 'Medium' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
                                              {insight.severity}
                                           </span>
-                                          <h4 className="text-lg font-bold text-white">{insight.title}</h4>
+                                          <h4 className={`text-lg font-bold ${insight.severity === 'High' ? 'text-red-900' : insight.severity === 'Medium' ? 'text-amber-900' : 'text-blue-900'}`}>{insight.title}</h4>
                                        </div>
                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                                           <div>
-                                             <p className="text-xs text-zinc-400">Affected Invoices</p>
-                                             <p className="text-white font-bold">{insight.affected_invoices}</p>
+                                             <p className={`text-xs ${insight.severity === 'High' ? 'text-red-600' : insight.severity === 'Medium' ? 'text-amber-600' : 'text-blue-600'}`}>Affected Invoices</p>
+                                             <p className={`font-bold ${insight.severity === 'High' ? 'text-red-900' : insight.severity === 'Medium' ? 'text-amber-900' : 'text-blue-900'}`}>{insight.affected_invoices}</p>
                                           </div>
                                           <div>
-                                             <p className="text-xs text-zinc-400">Amount</p>
-                                             <p className="text-white font-bold">₹{(insight.amount / 100000).toFixed(2)}L</p>
+                                             <p className={`text-xs ${insight.severity === 'High' ? 'text-red-600' : insight.severity === 'Medium' ? 'text-amber-600' : 'text-blue-600'}`}>Amount</p>
+                                             <p className={`font-bold ${insight.severity === 'High' ? 'text-red-900' : insight.severity === 'Medium' ? 'text-amber-900' : 'text-blue-900'}`}>₹{(insight.amount / 100000).toFixed(2)}L</p>
                                           </div>
                                           <div>
-                                             <p className="text-xs text-zinc-400">ITC at Risk</p>
-                                             <p className="text-red-400 font-bold">₹{(insight.itc_at_risk / 100000).toFixed(2)}L</p>
+                                             <p className={`text-xs ${insight.severity === 'High' ? 'text-red-600' : insight.severity === 'Medium' ? 'text-amber-600' : 'text-blue-600'}`}>ITC at Risk</p>
+                                             <p className="text-red-600 font-bold">₹{(insight.itc_at_risk / 100000).toFixed(2)}L</p>
                                           </div>
                                           <div>
-                                             <p className="text-xs text-zinc-400">Deadline</p>
-                                             <p className="text-white font-bold">{insight.deadline}</p>
+                                             <p className={`text-xs ${insight.severity === 'High' ? 'text-red-600' : insight.severity === 'Medium' ? 'text-amber-600' : 'text-blue-600'}`}>Deadline</p>
+                                             <p className={`font-bold ${insight.severity === 'High' ? 'text-red-900' : insight.severity === 'Medium' ? 'text-amber-900' : 'text-blue-900'}`}>{insight.deadline}</p>
                                           </div>
                                        </div>
-                                       <p className="text-sm text-zinc-400 mt-3">Vendor: {insight.vendor}</p>
+                                       <p className={`text-sm mt-3 ${insight.severity === 'High' ? 'text-red-700' : insight.severity === 'Medium' ? 'text-amber-700' : 'text-blue-700'}`}>Vendor: {insight.vendor}</p>
                                     </div>
                                  </div>
-                              </GlassPanel>
+                              </div>
                            ))}
                         </div>
                      )}
                   </div>
 
                   <div className="flex justify-center gap-4 mt-8">
-                     <button onClick={() => setState('idle')} className="px-6 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white">Run Again</button>
-                     {/* <button className="px-6 py-2 bg-primary hover:bg-emerald-500 text-white rounded-lg text-sm font-bold flex items-center gap-2">
+                     <button onClick={() => setState('idle')} className="px-6 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900">Run Again</button>
+                     {/* <button className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-sm font-bold flex items-center gap-2">
                         <Download className="h-4 w-4" /> Download Full Report
                      </button> */}
                   </div>
                </div>
             )}
-
-            {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none"></div>
-         </GlassPanel>
+         </div>
       </div>
     </div>
   );
@@ -1353,70 +1352,70 @@ const ITCMaximizer = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-white">ITC Claim Maximizer</h2>
-          <p className="text-zinc-400 text-sm">Monitor and maximize your eligible Input Tax Credit</p>
+          <h2 className="text-2xl font-bold text-gray-900">ITC Claim Maximizer</h2>
+          <p className="text-gray-600 text-sm">Monitor and maximize your eligible Input Tax Credit</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-         <BentoCard className="bg-emerald-500/10 border-emerald-500/30">
-            <p className="text-xs text-emerald-400 uppercase font-bold">ITC Available</p>
-            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcAvailable)}</h3>
-            <p className="text-xs text-zinc-400 mt-1">Eligible for claim</p>
-         </BentoCard>
-         <BentoCard className="bg-blue-500/10 border-blue-500/30">
-            <p className="text-xs text-blue-400 uppercase font-bold">Claimable</p>
-            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcClaimable)}</h3>
-            <p className="text-xs text-zinc-400 mt-1">Ready to file</p>
-         </BentoCard>
-         <BentoCard className="bg-red-500/10 border-red-500/30">
-            <p className="text-xs text-red-400 uppercase font-bold">Blocked / Lost</p>
-            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(itcBlocked)}</h3>
-            <p className="text-xs text-zinc-400 mt-1">Ineligible</p>
-         </BentoCard>
-         <BentoCard className="bg-amber-500/10 border-amber-500/30">
-            <p className="text-xs text-amber-400 uppercase font-bold">Potential Addl.</p>
-            <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(potentialAdditional)}</h3>
-            <p className="text-xs text-zinc-400 mt-1">Action required</p>
-         </BentoCard>
+         <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm">
+            <p className="text-xs text-emerald-700 uppercase font-bold">ITC Available</p>
+            <h3 className="text-3xl font-bold text-emerald-900 mt-2">{formatCurrency(itcAvailable)}</h3>
+            <p className="text-xs text-emerald-600 mt-1">Eligible for claim</p>
+         </div>
+         <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl shadow-sm">
+            <p className="text-xs text-blue-700 uppercase font-bold">Claimable</p>
+            <h3 className="text-3xl font-bold text-blue-900 mt-2">{formatCurrency(itcClaimable)}</h3>
+            <p className="text-xs text-blue-600 mt-1">Ready to file</p>
+         </div>
+         <div className="p-6 bg-red-50 border border-red-200 rounded-xl shadow-sm">
+            <p className="text-xs text-red-700 uppercase font-bold">Blocked / Lost</p>
+            <h3 className="text-3xl font-bold text-red-900 mt-2">{formatCurrency(itcBlocked)}</h3>
+            <p className="text-xs text-red-600 mt-1">Ineligible</p>
+         </div>
+         <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+            <p className="text-xs text-amber-700 uppercase font-bold">Potential Addl.</p>
+            <h3 className="text-3xl font-bold text-amber-900 mt-2">{formatCurrency(potentialAdditional)}</h3>
+            <p className="text-xs text-amber-600 mt-1">Action required</p>
+         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         <GlassPanel className="p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Zap className="h-5 w-5 text-primary" /> Suggestions & Alerts</h3>
+         <div className="p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-600" /> Suggestions & Alerts</h3>
             <div className="space-y-4">
                {[
                   { title: 'Missing Invoices', desc: '12 invoices in GSTR-2B not in books (>30 days)', impact: '₹ 18,500', type: 'High' },
                   { title: 'Vendor Filing', desc: 'Vendor "Alpha Corp" has not filed GSTR-1', impact: '₹ 12,000', type: 'Medium' },
                   { title: 'Amendment Required', desc: 'Tax mismatch in INV-009 (IGST vs CGST)', impact: '₹ 2,400', type: 'Low' },
                ].map((alert, i) => (
-                  <div key={i} className="p-4 rounded-xl bg-zinc-900/50 border border-white/10 flex justify-between items-center group hover:border-primary/30 transition-colors">
+                  <div key={i} className="p-4 rounded-xl bg-gray-50 border border-gray-200 flex justify-between items-center group hover:border-emerald-300 transition-colors">
                      <div className="flex gap-4">
-                        <div className={`p-2 rounded-lg h-fit ${alert.type === 'High' ? 'bg-red-500/10 text-red-500' : alert.type === 'Medium' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                        <div className={`p-2 rounded-lg h-fit ${alert.type === 'High' ? 'bg-red-100 text-red-600' : alert.type === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
                            <AlertOctagon className="h-5 w-5" />
                         </div>
                         <div>
-                           <h4 className="text-sm font-bold text-white">{alert.title}</h4>
-                           <p className="text-xs text-zinc-400 mt-1">{alert.desc}</p>
+                           <h4 className="text-sm font-bold text-gray-900">{alert.title}</h4>
+                           <p className="text-xs text-gray-600 mt-1">{alert.desc}</p>
                         </div>
                      </div>
                      <div className="text-right">
-                        <p className="text-sm font-bold text-white">{alert.impact}</p>
-                        <button className="mt-1 text-xs text-primary hover:underline">Fix Now</button>
+                        <p className="text-sm font-bold text-gray-900">{alert.impact}</p>
+                        <button className="mt-1 text-xs text-emerald-600 hover:underline">Fix Now</button>
                      </div>
                   </div>
                ))}
             </div>
-         </GlassPanel>
+         </div>
 
-         <GlassPanel className="p-6 flex flex-col">
-            <h3 className="text-lg font-bold text-white mb-4">Vendor Communication</h3>
-            <div className="flex-1 bg-zinc-900/30 rounded-xl border border-white/5 p-6 flex flex-col items-center justify-center text-center">
-               <div className="h-16 w-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
-                  <Send className="h-8 w-8 text-zinc-400" />
+         <div className="p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Vendor Communication</h3>
+            <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
+               <div className="h-16 w-16 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center mb-4">
+                  <Send className="h-8 w-8 text-gray-600" />
                </div>
-               <p className="text-zinc-300 font-medium">5 Vendors require follow-up</p>
-               <p className="text-zinc-500 text-sm mt-1 max-w-xs">Automated reminders drafted for missing invoices and filing delays.</p>
+               <p className="text-gray-900 font-medium">5 Vendors require follow-up</p>
+               <p className="text-gray-600 text-sm mt-1 max-w-xs">Automated reminders drafted for missing invoices and filing delays.</p>
                
                <div className="grid grid-cols-1  justify-center w-full mt-6">
                   <button 
@@ -1437,7 +1436,7 @@ const ITCMaximizer = () => {
                          console.error('Webhook error:', error);
                        }
                      }}
-                     className="py-2 rounded-lg bg-emerald-600/10 text-emerald-500 border border-emerald-500/20 text-sm font-bold hover:bg-emerald-600/20"
+                     className="py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold hover:bg-emerald-100"
                   >
                      WhatsApp 
                   </button>
@@ -1446,11 +1445,11 @@ const ITCMaximizer = () => {
                   </button> */}
                </div>
             </div>
-            <div className="mt-4 p-3 bg-zinc-900 border border-white/5 rounded-lg flex justify-between items-center">
-               <span className="text-xs text-zinc-500">Live Updates</span>
-               <span className="text-xs text-white">Pending Responses: 6 | Alerts Sent: 20</span>
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex justify-between items-center">
+               <span className="text-xs text-gray-600">Live Updates</span>
+               <span className="text-xs text-gray-900">Pending Responses: 6 | Alerts Sent: 20</span>
             </div>
-         </GlassPanel>
+         </div>
       </div>
     </div>
   );
@@ -1711,27 +1710,27 @@ const FilingOutput = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-white">Draft GSTR-3B & 9B</h2>
-          <p className="text-zinc-400 text-sm">Auto-generated drafts ready for final review and filing.</p>
+          <h2 className="text-2xl font-bold text-gray-900">Draft GSTR-3B & 9B</h2>
+          <p className="text-gray-600 text-sm">Auto-generated drafts ready for final review and filing.</p>
           {gstr3bData && (
-            <p className="text-xs text-zinc-500 mt-1">Period: {gstr3bData.period?.month} {gstr3bData.period?.year} • Due: {gstr3bData.period?.due_date}</p>
+            <p className="text-xs text-gray-500 mt-1">Period: {gstr3bData.period?.month} {gstr3bData.period?.year} • Due: {gstr3bData.period?.due_date}</p>
           )}
         </div>
         <div className="flex gap-2">
-           <button onClick={handleDownloadJSON} className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white flex items-center gap-2"><Download className="h-4 w-4" /> JSON</button>
-           <button onClick={handleDownloadPDF} className="px-4 py-2 bg-zinc-900 border border-white/10 rounded-lg text-sm text-zinc-300 hover:text-white flex items-center gap-2"><FileText className="h-4 w-4" /> PDF Summary</button>
+           <button onClick={handleDownloadJSON} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2"><Download className="h-4 w-4" /> JSON</button>
+           <button onClick={handleDownloadPDF} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2"><FileText className="h-4 w-4" /> PDF Summary</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          <div className="lg:col-span-2 space-y-6">
-            <GlassPanel className="p-0 overflow-hidden">
-               <div className="p-4 bg-zinc-900/50 border-b border-white/5 flex justify-between items-center">
-                  <h3 className="font-bold text-white">Tax Liability Computation (3B)</h3>
-                  <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">Verified</span>
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+               <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-900">Tax Liability Computation (3B)</h3>
+                  <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">Verified</span>
                </div>
                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/5 text-zinc-500">
+                  <thead className="bg-gray-50 text-gray-700">
                      <tr>
                         <th className="p-3 pl-4">Description</th>
                         <th className="p-3 text-right">IGST</th>
@@ -1739,38 +1738,38 @@ const FilingOutput = () => {
                         <th className="p-3 text-right">SGST</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-200">
                      <tr>
-                        <td className="p-3 pl-4 text-zinc-300">Outward Taxable Supplies</td>
-                        <td className="p-3 text-right font-mono text-zinc-400">₹ {table31?.igst?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-zinc-400">₹ {table31?.cgst?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-zinc-400">₹ {table31?.sgst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 pl-4 text-gray-700">Outward Taxable Supplies</td>
+                        <td className="p-3 text-right font-mono text-gray-900">₹ {table31?.igst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-gray-900">₹ {table31?.cgst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-gray-900">₹ {table31?.sgst?.toLocaleString() || '0'}</td>
                      </tr>
                      <tr>
-                        <td className="p-3 pl-4 text-zinc-300">Eligible ITC</td>
-                        <td className="p-3 text-right font-mono text-emerald-500">₹ {itc?.net_itc?.igst?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-emerald-500">₹ {itc?.net_itc?.cgst?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-emerald-500">₹ {itc?.net_itc?.sgst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 pl-4 text-gray-700">Eligible ITC</td>
+                        <td className="p-3 text-right font-mono text-emerald-600 font-bold">₹ {itc?.net_itc?.igst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-emerald-600 font-bold">₹ {itc?.net_itc?.cgst?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-emerald-600 font-bold">₹ {itc?.net_itc?.sgst?.toLocaleString() || '0'}</td>
                      </tr>
-                     <tr className="bg-white/5">
-                        <td className="p-3 pl-4 text-white font-bold">Net Payable (Cash)</td>
-                        <td className="p-3 text-right font-mono text-white font-bold">₹ {gstr3bData?.tax_payment?.regular?.igst?.cash?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-white font-bold">₹ {gstr3bData?.tax_payment?.regular?.cgst?.cash?.toLocaleString() || '0'}</td>
-                        <td className="p-3 text-right font-mono text-white font-bold">₹ {gstr3bData?.tax_payment?.regular?.sgst?.cash?.toLocaleString() || '0'}</td>
+                     <tr className="bg-gray-50">
+                        <td className="p-3 pl-4 text-gray-900 font-bold">Net Payable (Cash)</td>
+                        <td className="p-3 text-right font-mono text-gray-900 font-bold">₹ {gstr3bData?.tax_payment?.regular?.igst?.cash?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-gray-900 font-bold">₹ {gstr3bData?.tax_payment?.regular?.cgst?.cash?.toLocaleString() || '0'}</td>
+                        <td className="p-3 text-right font-mono text-gray-900 font-bold">₹ {gstr3bData?.tax_payment?.regular?.sgst?.cash?.toLocaleString() || '0'}</td>
                      </tr>
                   </tbody>
                </table>
-            </GlassPanel>
+            </div>
 
             {gstr3bData?.validation && gstr3bData.validation.length > 0 && (
-               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0 mt-1" />
+               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-4">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0 mt-1" />
                   <div>
-                     <h4 className="font-bold text-white text-sm">Validation Status</h4>
-                     <ul className="text-sm text-zinc-400 mt-2 space-y-1">
+                     <h4 className="font-bold text-emerald-900 text-sm">Validation Status</h4>
+                     <ul className="text-sm text-emerald-700 mt-2 space-y-1">
                         {gstr3bData.validation.slice(0, 3).map((v: any, idx: number) => (
                            <li key={idx} className="flex items-start gap-2">
-                              <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                              <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                               <span>{v.message}</span>
                            </li>
                         ))}
@@ -1781,42 +1780,42 @@ const FilingOutput = () => {
          </div>
 
          <div className="space-y-6">
-            <BentoCard className="text-center p-8">
-               <p className="text-zinc-500 text-sm uppercase mb-2">Net Cash Liability</p>
-               <h3 className="text-5xl font-bold text-white">₹ {taxPayment?.cash_paid?.toLocaleString() || '0'}</h3>
-               <div className="my-6 h-px bg-white/10"></div>
-               <p className="text-xs text-zinc-400 mb-4">
+            <div className="text-center p-8 bg-white border border-gray-200 rounded-xl shadow-sm">
+               <p className="text-gray-600 text-sm uppercase mb-2">Net Cash Liability</p>
+               <h3 className="text-5xl font-bold text-gray-900">₹ {taxPayment?.cash_paid?.toLocaleString() || '0'}</h3>
+               <div className="my-6 h-px bg-gray-200"></div>
+               <p className="text-xs text-gray-600 mb-4">
                   Total Liability: ₹{taxPayment?.total_liability?.toLocaleString() || '0'}<br/>
                   ITC Used: ₹{taxPayment?.itc_used?.toLocaleString() || '0'}
                </p>
-               <button onClick={handleCreateChallan} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
+               <button onClick={handleCreateChallan} className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
                   <CreditCard className="h-5 w-5" /> Draft GSTR3B
                </button>
-            </BentoCard>
+            </div>
             
-            <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/5">
-               <h4 className="text-sm font-bold text-white mb-3">Return Information</h4>
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+               <h4 className="text-sm font-bold text-gray-900 mb-3">Return Information</h4>
                {gstr3bData && (
                   <div className="space-y-2 text-sm">
                      <div className="flex justify-between">
-                        <span className="text-zinc-400">Business Name:</span>
-                        <span className="text-white font-medium">{gstr3bData.taxpayer?.legal_name}</span>
+                        <span className="text-gray-600">Business Name:</span>
+                        <span className="text-gray-900 font-medium">{gstr3bData.taxpayer?.legal_name}</span>
                      </div>
                      <div className="flex justify-between">
-                        <span className="text-zinc-400">GSTIN:</span>
-                        <span className="text-white font-mono text-xs">{gstr3bData.taxpayer?.gstin}</span>
+                        <span className="text-gray-600">GSTIN:</span>
+                        <span className="text-gray-900 font-mono text-xs">{gstr3bData.taxpayer?.gstin}</span>
                      </div>
                      <div className="flex justify-between">
-                        <span className="text-zinc-400">Period:</span>
-                        <span className="text-white">{gstr3bData.period?.month} {gstr3bData.period?.year}</span>
+                        <span className="text-gray-600">Period:</span>
+                        <span className="text-gray-900">{gstr3bData.period?.month} {gstr3bData.period?.year}</span>
                      </div>
                      <div className="flex justify-between">
-                        <span className="text-zinc-400">Status:</span>
-                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">{gstr3bData.period?.status}</span>
+                        <span className="text-gray-600">Status:</span>
+                        <span className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs rounded">{gstr3bData.period?.status}</span>
                      </div>
                      <div className="flex justify-between">
-                        <span className="text-zinc-400">Due Date:</span>
-                        <span className="text-red-400 font-medium">{gstr3bData.period?.due_date}</span>
+                        <span className="text-gray-600">Due Date:</span>
+                        <span className="text-red-600 font-medium">{gstr3bData.period?.due_date}</span>
                      </div>
                   </div>
                )}
@@ -1874,11 +1873,14 @@ export default function GSTRSimulatorPage() {
   ];
 
   return (
-    <div className="min-h-screen pb-20 container mx-auto max-w-7xl px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50 pb-20 container mx-auto max-w-7xl px-4 py-8">
       {/* Page Header */}
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-white">GSTR Compliance Simulator</h1>
-        <p className="text-zinc-400 mt-2">Experience the complete end-to-end automation flow</p>
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">GSTR Compliance Simulator</h1>
+          <span className="px-3 py-1 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 text-xs font-semibold border border-emerald-200">Demo Mode</span>
+        </div>
+        <p className="text-gray-600 mt-2">Experience the complete end-to-end automation flow</p>
       </div>
 
       {/* Stepper */}
@@ -1887,10 +1889,10 @@ export default function GSTRSimulatorPage() {
       {/* Main Content Container */}
       <div className="relative min-h-[600px]">
         {transitioning && (
-          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
             <div className="text-center space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-              <p className="text-white font-medium">Transitioning to next step...</p>
+              <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
+              <p className="text-gray-900 font-medium">Transitioning to next step...</p>
             </div>
           </div>
         )}
@@ -1898,24 +1900,24 @@ export default function GSTRSimulatorPage() {
       </div>
 
       {/* Navigation Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950/80 backdrop-blur-lg border-t border-white/10 z-50">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-gray-200 z-50">
         <div className="container mx-auto max-w-7xl flex justify-between items-center">
           <button 
             onClick={prevStep}
             disabled={step === 1 || transitioning}
-            className="px-6 py-2 rounded-lg border border-white/10 text-zinc-300 font-medium hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            className="px-6 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" /> Back
           </button>
           
-          <div className="text-sm text-zinc-500 font-mono">
-            Step {step} of 6 {transitioning && <span className="text-primary">(Loading...)</span>}
+          <div className="text-sm text-gray-600 font-mono">
+            Step {step} of 6 {transitioning && <span className="text-emerald-600">(Loading...)</span>}
           </div>
 
           <button 
             onClick={nextStep}
             disabled={step === 6 || transitioning}
-            className="px-6 py-2 rounded-lg bg-white text-black font-bold hover:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-lg shadow-white/10"
+            className="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-lg"
           >
             Next Step <ChevronRight className="h-4 w-4" />
           </button>
