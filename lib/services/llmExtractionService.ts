@@ -88,7 +88,8 @@ Important instructions:
 4. All amounts as numbers (not strings)
 5. Confidence scores between 0-1 based on clarity of extracted data
 6. If a field is not found, use empty string for text fields, 0 for numbers, false for booleans
-7. place_of_supply should be state name (e.g., "Maharashtra", "Delhi")`;
+7. place_of_supply should be state name (e.g., "Maharashtra", "Delhi")
+8. CRITICAL: All string values must be on a single line - replace any line breaks with spaces`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -108,10 +109,11 @@ Important instructions:
             },
           ],
           generationConfig: {
-            temperature: 0.1, // Low temperature for more deterministic output
+            temperature: 0.1,
             topK: 1,
             topP: 1,
             maxOutputTokens: 2048,
+            response_mime_type: 'application/json',
           },
         }),
       }
@@ -127,12 +129,27 @@ Important instructions:
     if (data.candidates && data.candidates[0]) {
       const text = data.candidates[0].content?.parts?.[0]?.text || '';
       
-      // Clean up the response (remove markdown code blocks if present)
+      // Robust JSON cleaning function
       let cleanedText = text.trim();
+      
+      // Remove markdown code blocks
       if (cleanedText.startsWith('```json')) {
         cleanedText = cleanedText.replace(/```json\n?/, '').replace(/\n?```$/, '');
       } else if (cleanedText.startsWith('```')) {
         cleanedText = cleanedText.replace(/```\n?/, '').replace(/\n?```$/, '');
+      }
+      
+      // Fix line breaks inside string values - more aggressive approach
+      // Replace any newline character that appears between quotes with a space
+      cleanedText = cleanedText.replace(/"([^"]*?)\n([^"]*?)"/g, (_match: string, p1: string, p2: string) => {
+        return `"${p1} ${p2}"`;
+      });
+      
+      // Run it multiple times to catch nested line breaks
+      for (let i = 0; i < 5; i++) {
+        const before = cleanedText;
+        cleanedText = cleanedText.replace(/"([^"]*?)\n([^"]*?)"/g, '"$1 $2"');
+        if (before === cleanedText) break;
       }
       
       try {
@@ -248,7 +265,8 @@ Instructions:
 3. Invoice type: B2B, B2C, Import, Export, SEZ, RCM
 4. All amounts as numbers
 5. Confidence scores between 0-1
-6. If field not found, use empty string for text, 0 for numbers, false for booleans`;
+6. If field not found, use empty string for text, 0 for numbers, false for booleans
+7. CRITICAL: All string values must be on a single line - replace any line breaks with spaces`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -278,6 +296,7 @@ Instructions:
             topK: 1,
             topP: 1,
             maxOutputTokens: 2048,
+            response_mime_type: 'application/json',
           },
         }),
       }
@@ -293,11 +312,19 @@ Instructions:
     if (data.candidates && data.candidates[0]) {
       const text = data.candidates[0].content?.parts?.[0]?.text || '';
       
+      // Robust JSON cleaning
       let cleanedText = text.trim();
       if (cleanedText.startsWith('```json')) {
         cleanedText = cleanedText.replace(/```json\n?/, '').replace(/\n?```$/, '');
       } else if (cleanedText.startsWith('```')) {
         cleanedText = cleanedText.replace(/```\n?/, '').replace(/\n?```$/, '');
+      }
+      
+      // Fix line breaks inside string values
+      for (let i = 0; i < 5; i++) {
+        const before = cleanedText;
+        cleanedText = cleanedText.replace(/"([^"]*?)\n([^"]*?)"/g, '"$1 $2"');
+        if (before === cleanedText) break;
       }
       
       try {

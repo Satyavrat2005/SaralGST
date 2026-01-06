@@ -7,10 +7,7 @@ import {
   SalesRegister,
 } from '@/lib/services/salesInvoiceService';
 import { extractTextFromInvoice } from '@/lib/services/ocrService';
-import {
-  extractInvoiceData,
-  extractInvoiceDataFromImage,
-} from '@/lib/services/llmExtractionService';
+import { extractSalesInvoiceData } from '@/lib/services/salesExtractionService';
 import { validateSalesInvoice, validationToRemarks } from '@/lib/services/salesValidationService';
 
 /**
@@ -93,104 +90,92 @@ export async function POST(request: NextRequest) {
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     const base64File = fileBuffer.toString('base64');
 
-    // Step 4: Perform OCR extraction using Tesseract + Gemini
+    // Step 4: Perform OCR extraction using Tesseract, then pass to Gemini for structured extraction
     let extractedData;
     let ocrConfidence = 0;
 
-    // Try direct image/PDF extraction with Gemini Vision first
-    const { data: directData, error: directError } = await extractInvoiceDataFromImage(
-      base64File,
-      file.type
-    );
+    // Use Tesseract OCR + Gemini LLM approach (more reliable)
+    console.log('Extracting text using Tesseract OCR...');
+    const ocrResult = await extractTextFromInvoice(fileBuffer, file.type);
 
-    if (directData && !directError) {
-      extractedData = directData;
-      ocrConfidence = (
-        directData.confidence.supplier_gstin +
-        directData.confidence.invoice_number +
-        directData.confidence.tax_values
-      ) / 3;
-    } else {
-      // Fallback to Tesseract OCR + LLM approach
-      const ocrResult = await extractTextFromInvoice(fileBuffer, file.type);
+    if (!ocrResult.success || !ocrResult.rawText) {
+      await updateSalesInvoice(invoiceId, {
+        invoice_status: 'needs_review',
+      }, true);
 
-      if (!ocrResult.success || !ocrResult.rawText) {
-        await updateSalesInvoice(invoiceId, {
-          invoice_status: 'needs_review',
-        }, true);
+      await createSalesRemarks([{
+        sales_id: invoiceId,
+        field_name: 'ocr_extraction',
+        issue_type: 'invalid',
+        detected_value: null,
+        comment: ocrResult.error || 'Failed to extract text from invoice',
+        status: 'open',
+      }], true);
 
-        await createSalesRemarks([{
-          sales_id: invoiceId,
-          field_name: 'ocr_extraction',
-          issue_type: 'invalid',
-          detected_value: null,
-          comment: ocrResult.error || 'Failed to extract text from invoice',
-          status: 'open',
-        }], true);
-
-        return NextResponse.json({
-          success: true,
-          invoiceId,
-          message: 'Invoice uploaded but OCR failed. Manual review required.',
-          invoice: createdInvoice,
-        });
-      }
-
-      ocrConfidence = ocrResult.confidence;
-
-      // Pass OCR text to LLM for structured extraction
-      const { data: llmData, error: llmError } = await extractInvoiceData(ocrResult.rawText);
-
-      if (llmError || !llmData) {
-        await updateSalesInvoice(invoiceId, {
-          invoice_status: 'needs_review',
-        }, true);
-
-        await createSalesRemarks([{
-          sales_id: invoiceId,
-          field_name: 'llm_extraction',
-          issue_type: 'invalid',
-          detected_value: null,
-          comment: llmError || 'Failed to extract structured data from invoice',
-          status: 'open',
-        }], true);
-
-        return NextResponse.json({
-          success: true,
-          invoiceId,
-          message: 'Invoice uploaded but extraction failed. Manual review required.',
-          invoice: createdInvoice,
-        });
-      }
-
-      extractedData = llmData;
+      return NextResponse.json({
+        success: true,
+        invoiceId,
+        message: 'Invoice uploaded but OCR failed. Manual review required.',
+        invoice: createdInvoice,
+      });
     }
 
-    // Step 5: Map extracted data to sales register format
+    console.log('OCR extraction successful. Passing to Gemini for sales invoice structured extraction...');
+    ocrConfidence = ocrResult.confidence;
+
+    // Pass OCR text to Gemini LLM for sales-specific structured extraction
+    const { data: llmData, error: llmError } = await extractSalesInvoiceData(ocrResult.rawText);
+
+    if (llmError || !llmData) {
+      await updateSalesInvoice(invoiceId, {
+        invoice_status: 'needs_review',
+      }, true);
+
+      await createSalesRemarks([{
+        sales_id: invoiceId,
+        field_name: 'llm_extraction',
+        issue_type: 'invalid',
+        detected_value: null,
+        comment: llmError || 'Failed to extract structured data from invoice',
+        status: 'open',
+      }], true);
+
+      return NextResponse.json({
+        success: true,
+        invoiceId,
+        message: 'Invoice uploaded but extraction failed. Manual review required.',
+        invoice: createdInvoice,
+      });
+    }
+
+    extractedData = llmData;
+
+    console.log('Raw extracted data:', JSON.stringify(extractedData).substring(0, 500));
+
+    // Step 5: Map extracted sales invoice data to sales register format
     const extractedInvoice: Partial<SalesRegister> = {
-      // Seller details (extracted from "supplier" in LLM response - for sales, supplier is us)
-      seller_gstin: extractedData.supplier_gstin || '',
-      seller_state_code: extractedData.supplier_gstin?.substring(0, 2) || '',
+      // Seller details (WE are the seller in sales invoice)
+      seller_gstin: extractedData.seller_gstin || '',
+      seller_state_code: extractedData.seller_gstin?.substring(0, 2) || '',
       
-      // Customer details (from buyer fields)
-      customer_name: extractedData.supplier_name || '', // In sales context, supplier_name from extraction is actually customer name
-      customer_gstin: extractedData.buyer_gstin || '',
-      customer_state_code: extractedData.buyer_gstin?.substring(0, 2) || '',
+      // Customer details (THEY are the buyer/customer)
+      customer_name: extractedData.customer_name || '',
+      customer_gstin: extractedData.customer_gstin || '',
+      customer_state_code: extractedData.customer_gstin?.substring(0, 2) || '',
       
       // Invoice details
       invoice_number: extractedData.invoice_number || '',
       invoice_date: extractedData.invoice_date || new Date().toISOString().split('T')[0],
-      invoice_type: determineInvoiceType(extractedData),
-      supply_type: determineSupplyType(extractedData),
-      place_of_supply_state_code: extractedData.place_of_supply || '',
+      invoice_type: (extractedData.invoice_type as 'B2B' | 'B2C' | 'SEZ' | 'Export' | 'CreditNote') || 'B2B',
+      supply_type: determineSupplyType(extractedData.seller_gstin?.substring(0, 2), extractedData.customer_gstin?.substring(0, 2)),
+      place_of_supply_state_code: extractedData.customer_gstin?.substring(0, 2) || extractedData.seller_gstin?.substring(0, 2) || '',
       
       // Item details
       hsn_or_sac: extractedData.hsn_or_sac || '',
       description: extractedData.description || '',
       quantity: extractedData.quantity ? parseFloat(extractedData.quantity) : null,
       unit: extractedData.unit || null,
-      rate: extractedData.taxable_value && extractedData.quantity ? 
-        extractedData.taxable_value / parseFloat(extractedData.quantity) : null,
+      rate: extractedData.rate || null,
       
       // Tax details
       taxable_value: extractedData.taxable_value || 0,
@@ -202,7 +187,7 @@ export async function POST(request: NextRequest) {
       
       // GST flags
       is_reverse_charge: extractedData.is_reverse_charge || false,
-      is_itc_eligible: extractedData.is_itc_eligible || false,
+      is_itc_eligible: false, // Sales invoices don't have ITC
       is_export: extractedData.invoice_type?.toLowerCase().includes('export') || false,
       is_sez: extractedData.invoice_type?.toLowerCase().includes('sez') || false,
       
@@ -214,6 +199,14 @@ export async function POST(request: NextRequest) {
 
     // Step 6: Validate the extracted data
     const validationResult = validateSalesInvoice(extractedInvoice);
+    console.log('Validation result:', {
+      isValid: validationResult.isValid,
+      errorCount: validationResult.errors.length,
+      warningCount: validationResult.warnings.length,
+      invoiceNumber: extractedInvoice.invoice_number,
+      customerName: extractedInvoice.customer_name,
+      taxableValue: extractedInvoice.taxable_value
+    });
 
     // Determine final status based on validation
     const finalStatus = validationResult.isValid ? 'extracted' : 'needs_review';
@@ -228,6 +221,18 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating invoice:', updateError);
+      // Even if update fails, return the extracted data
+      return NextResponse.json({
+        success: true,
+        invoiceId,
+        invoice: extractedInvoice,
+        validation: {
+          isValid: validationResult.isValid,
+          errorCount: validationResult.errors.length,
+          warningCount: validationResult.warnings.length,
+        },
+        message: 'Invoice extracted but update failed. Data: ' + JSON.stringify(extractedInvoice).substring(0, 200),
+      });
     }
 
     // Step 8: Store validation remarks if any issues found
@@ -261,46 +266,12 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Helper: Determine invoice type from extracted data
+ * Helper: Determine supply type from state codes
  */
-function determineInvoiceType(data: any): 'B2B' | 'B2C' | 'Export' | 'SEZ' | 'CreditNote' {
-  const type = (data.invoice_type || '').toLowerCase();
-  
-  if (type.includes('export')) return 'Export';
-  if (type.includes('sez')) return 'SEZ';
-  if (type.includes('credit')) return 'CreditNote';
-  if (type.includes('b2c')) return 'B2C';
-  
-  // Default to B2B if customer GSTIN is present
-  if (data.buyer_gstin && data.buyer_gstin.length === 15) {
-    return 'B2B';
+function determineSupplyType(sellerState?: string, customerState?: string): 'Intra' | 'Inter' {
+  if (!sellerState || !customerState) {
+    return 'Inter'; // Default to inter-state if states are unknown
   }
   
-  return 'B2C';
-}
-
-/**
- * Helper: Determine supply type from extracted data
- */
-function determineSupplyType(data: any): 'Intra' | 'Inter' {
-  const sellerState = data.supplier_gstin?.substring(0, 2) || '';
-  const buyerState = data.buyer_gstin?.substring(0, 2) || '';
-  const posState = data.place_of_supply || '';
-  
-  // If IGST is charged, it's inter-state
-  if ((data.igst || 0) > 0) {
-    return 'Inter';
-  }
-  
-  // If CGST/SGST is charged, it's intra-state
-  if ((data.cgst || 0) > 0 || (data.sgst || 0) > 0) {
-    return 'Intra';
-  }
-  
-  // Compare state codes
-  if (sellerState === buyerState || sellerState === posState.substring(0, 2)) {
-    return 'Intra';
-  }
-  
-  return 'Inter';
+  return sellerState === customerState ? 'Intra' : 'Inter';
 }

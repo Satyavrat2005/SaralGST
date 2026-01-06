@@ -110,10 +110,10 @@ export async function uploadSalesInvoice(
     const client = useAdmin ? supabaseAdmin : supabase;
     const timestamp = Date.now();
     const fileName = `${timestamp}_${file.name}`;
-    const filePath = `SARALGST/Sales Invoice/${fileName}`;
+    const filePath = `Sales Invoice/${fileName}`;
 
     const { data, error } = await client.storage
-      .from('invoices')
+      .from('SARALGST')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -126,7 +126,7 @@ export async function uploadSalesInvoice(
 
     // Get public URL
     const { data: urlData } = client.storage
-      .from('invoices')
+      .from('SARALGST')
       .getPublicUrl(filePath);
 
     return {

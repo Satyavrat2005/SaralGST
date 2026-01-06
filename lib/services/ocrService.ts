@@ -67,10 +67,9 @@ async function extractFromPDF(base64File: string): Promise<OCRResult> {
     // Use Google Cloud Vision API for document text detection
     const visionApiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
     
-    if (!visionApiKey) {
-      // Fallback: Use Gemini API for basic text extraction
-      return await fallbackTextExtraction(base64File, 'application/pdf');
-    }
+    // Always use fallback for PDFs since Vision API requires special setup
+    // and Gemini Vision works better for documents
+    return await fallbackTextExtraction(base64File, 'application/pdf');
 
     const response = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
