@@ -346,15 +346,25 @@ const RegistersAndDraft = ({ onNext }: { onNext: () => void }) => {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const url = await getGSTR1BUrl();
-      if (!url) {
-        alert('GSTR-1B PDF not found. Please generate the draft first.');
-        return;
-      }
-      await downloadFileFromUrl(url, 'GSTR-1B_Draft.pdf');
+      // Direct PDF path
+      const pdfPath = '/GSTR-1B_Draft.pdf';
+      
+      // Open PDF in a new tab
+      window.open(pdfPath, '_blank');
+      
+      // Wait for 2 seconds (loading time) then trigger download
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = pdfPath;
+        link.download = 'GSTR-1B_Draft.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 2000); // 2 second delay for loading
+      
     } catch (error) {
-      console.error('Download failed:', error);
-      alert('Failed to download PDF. Please try again.');
+      console.error('Failed to open PDF:', error);
+      alert('Failed to open PDF. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -813,38 +823,301 @@ const ReconciliationEngine = () => {
       });
     }, 150);
 
-    // Wait for progress animation to complete (15 seconds), then fetch and display data
-    setTimeout(async () => {
+    // Wait for progress animation to complete (15 seconds), then display static data
+    setTimeout(() => {
       try {
-        const data = await getReconciliationData();
-        console.log('Fetched reconciliation data:', data);
-        console.log('Data type:', typeof data);
-        console.log('Data keys:', data ? Object.keys(data) : 'null');
+        // Static reconciliation data
+        const staticReconData = {
+          metadata: {
+            business_name: "DEV KAILASH STEEL",
+            period: "March 2025",
+            duration_seconds: 14.8
+          },
+          summary: {
+            matched_count: 38,
+            match_percentage: 90.48,
+            discrepancies: {
+              total: 6,
+              missing_in_books: 1,
+              missing_in_gstr2b: 3,
+              value_mismatches: 2
+            },
+            itc_secured: 524205.50,
+            itc: {
+              at_risk: 65502.50,
+              risk_percentage: 11.11
+            },
+            invoices: {
+              in_books: 42,
+              in_gstr2b: 39,
+              unique: 44
+            }
+          },
+          matched_invoices: [
+            {
+              invoice_no: "2024-25/2620",
+              date: "2025-03-15",
+              vendor: "EFFICACIOUS ADVISORS PVT LTD",
+              gstin: "27AAGCE5803D1ZV",
+              taxable_value: 3300.00,
+              total_tax: 594.00,
+              itc_eligible: 594.00,
+              match_type: "Exact",
+              status: "Matched",
+              remark: "Fully Reconciled"
+            },
+            {
+              invoice_no: "15",
+              date: "2025-03-18",
+              vendor: "AMI METAL PRESSING WORKS",
+              gstin: "27ABCPD2938K1ZM",
+              taxable_value: 45758.00,
+              total_tax: 8236.44,
+              itc_eligible: 8236.44,
+              match_type: "Exact",
+              status: "Matched",
+              remark: "Fully Reconciled"
+            },
+            {
+              invoice_no: "INV/2025/1845",
+              date: "2025-03-05",
+              vendor: "STEEL TRADERS INDIA",
+              gstin: "27AACCS2781M1ZL",
+              taxable_value: 125000.00,
+              total_tax: 22500.00,
+              itc_eligible: 22500.00,
+              match_type: "Exact",
+              status: "Matched",
+              remark: "Fully Reconciled"
+            },
+            {
+              invoice_no: "RAW/MAR/089",
+              date: "2025-03-12",
+              vendor: "MUMBAI METALS LTD",
+              gstin: "27AABCU9603R1ZV",
+              taxable_value: 89450.00,
+              total_tax: 16101.00,
+              itc_eligible: 16101.00,
+              match_type: "Exact",
+              status: "Matched",
+              remark: "Fully Reconciled"
+            },
+            {
+              invoice_no: "SER/2025/452",
+              date: "2025-03-20",
+              vendor: "LOGISTICS EXPRESS",
+              gstin: "29AADCL7027F1ZU",
+              taxable_value: 15600.00,
+              total_tax: 2808.00,
+              itc_eligible: 2808.00,
+              match_type: "Fuzzy",
+              status: "Matched",
+              remark: "Matched with minor date variance"
+            }
+          ],
+          discrepancies: {
+            missing_in_books: {
+              count: 1,
+              invoices: [
+                {
+                  invoice_no: "3162",
+                  vendor: "J D B S TRANSLINE",
+                  gstin: "24FMZPP2968G1ZH",
+                  gross_amount: 1150.00,
+                  tax: 207.00,
+                  priority: "High",
+                  action: "Invoice in 2B but not in Purchase Register - Add to books immediately"
+                }
+              ]
+            },
+            missing_in_gstr2b: {
+              count: 3,
+              invoices: [
+                {
+                  invoice_no: "115",
+                  vendor: "SANTOSH BUFFING WORKS",
+                  gstin: "(URD)",
+                  gross_amount: 4924.00,
+                  action: "Unregistered supplier - No ITC available"
+                },
+                {
+                  invoice_no: "3484",
+                  vendor: "JDBS TRANSPORT",
+                  gstin: "24FMZPP2968G1ZH",
+                  gross_amount: 5100.00,
+                  action: "RCM entry - No ITC in 2B (expected)"
+                },
+                {
+                  invoice_no: "MAR/2025/678",
+                  vendor: "QUICK REPAIRS",
+                  gstin: "27AAFCQ3654P1Z9",
+                  gross_amount: 8500.00,
+                  action: "Supplier hasn't filed GSTR-1 yet - Follow up"
+                }
+              ]
+            },
+            value_mismatches: [
+              {
+                invoice_no: "24-25/038",
+                vendor: "ZAHUR BUFF POLISHING WORKS",
+                gstin: "27AFSPA5182M1ZD",
+                taxable_value_books: 30206.00,
+                taxable_value_2b: 28500.00,
+                difference: 1706.00,
+                remark: "Taxable value mismatch - Verify invoice copy"
+              },
+              {
+                invoice_no: "FEB/2025/223",
+                vendor: "INDUSTRIAL SUPPLIES CO",
+                gstin: "27AAECI9142J1ZK",
+                taxable_value_books: 42800.00,
+                taxable_value_2b: 42000.00,
+                difference: 800.00,
+                remark: "Minor difference in taxable amount"
+              }
+            ]
+          },
+          vendor_compliance: {
+            total_vendors: 42,
+            distribution: {
+              compliant: 34,
+              at_risk: 6,
+              non_compliant: 2
+            },
+            vendors: [
+              {
+                name: "EFFICACIOUS ADVISORS PVT LTD",
+                score: 100,
+                invoices: { matched: 1, total: 1 },
+                itc_secured: 594.00,
+                itc_at_risk: 0,
+                status: "Compliant"
+              },
+              {
+                name: "AMI METAL PRESSING WORKS",
+                score: 100,
+                invoices: { matched: 1, total: 1 },
+                itc_secured: 8236.44,
+                itc_at_risk: 0,
+                status: "Compliant"
+              },
+              {
+                name: "STEEL TRADERS INDIA",
+                score: 100,
+                invoices: { matched: 3, total: 3 },
+                itc_secured: 45000.00,
+                itc_at_risk: 0,
+                status: "Compliant"
+              },
+              {
+                name: "MUMBAI METALS LTD",
+                score: 95,
+                invoices: { matched: 4, total: 4 },
+                itc_secured: 52400.00,
+                itc_at_risk: 0,
+                status: "Compliant"
+              },
+              {
+                name: "LOGISTICS EXPRESS",
+                score: 90,
+                invoices: { matched: 2, total: 2 },
+                itc_secured: 4850.00,
+                itc_at_risk: 0,
+                status: "Compliant"
+              },
+              {
+                name: "ZAHUR BUFF POLISHING WORKS",
+                score: 75,
+                invoices: { matched: 2, total: 3 },
+                itc_secured: 18500.00,
+                itc_at_risk: 1706.00,
+                status: "At Risk"
+              },
+              {
+                name: "QUICK REPAIRS",
+                score: 60,
+                invoices: { matched: 0, total: 1 },
+                itc_secured: 0,
+                itc_at_risk: 8500.00,
+                status: "At Risk"
+              },
+              {
+                name: "J D B S TRANSLINE",
+                score: 55,
+                invoices: { matched: 3, total: 5 },
+                itc_secured: 12000.00,
+                itc_at_risk: 1357.00,
+                status: "At Risk"
+              },
+              {
+                name: "SANTOSH BUFFING WORKS",
+                score: 40,
+                invoices: { matched: 2, total: 4 },
+                itc_secured: 6200.00,
+                itc_at_risk: 4924.00,
+                status: "Non-Compliant"
+              },
+              {
+                name: "INDUSTRIAL SUPPLIES CO",
+                score: 70,
+                invoices: { matched: 2, total: 3 },
+                itc_secured: 38500.00,
+                itc_at_risk: 800.00,
+                status: "At Risk"
+              }
+            ]
+          },
+          itc_analysis: {
+            totals: {
+              available: 589708.00,
+              utilized: 524205.50,
+              at_risk: 65502.50
+            }
+          },
+          insights: [
+            {
+              severity: "High",
+              title: "Missing Invoice Entry in Books",
+              affected_invoices: 1,
+              amount: 115000,
+              itc_at_risk: 20700,
+              deadline: "Within 30 days",
+              vendor: "J D B S TRANSLINE"
+            },
+            {
+              severity: "High",
+              title: "Supplier Filing Pending",
+              affected_invoices: 1,
+              amount: 850000,
+              itc_at_risk: 15300,
+              deadline: "Before return filing",
+              vendor: "QUICK REPAIRS"
+            },
+            {
+              severity: "Medium",
+              title: "Value Mismatch Requiring Clarification",
+              affected_invoices: 2,
+              amount: 7300600,
+              itc_at_risk: 25060,
+              deadline: "45 days",
+              vendor: "ZAHUR BUFF POLISHING WORKS & 1 other"
+            },
+            {
+              severity: "Low",
+              title: "Unregistered Supplier Transactions",
+              affected_invoices: 1,
+              amount: 492400,
+              itc_at_risk: 44424,
+              deadline: "N/A - No ITC available",
+              vendor: "SANTOSH BUFFING WORKS"
+            }
+          ]
+        };
         
-        if (data) {
-          // Check if data has an 'output' property (from your JSON structure)
-          const reconOutput = data.output || data;
-          console.log('Recon output:', reconOutput);
-          console.log('Recon output keys:', reconOutput ? Object.keys(reconOutput) : 'null');
-          
-          // More flexible validation - just check if data exists and has some expected properties
-          if (reconOutput && (reconOutput.metadata || reconOutput.summary || reconOutput.matched_invoices)) {
-            setReconData(reconOutput);
-            setState('completed');
-          } else {
-            console.error('Invalid data structure. Expected properties not found.');
-            console.error('Data received:', JSON.stringify(data, null, 2).substring(0, 500));
-            alert('Invalid reconciliation data structure. Check console for details.');
-            setState('idle');
-          }
-        } else {
-          console.error('No data returned from Supabase');
-          alert('No reconciliation data found. Please run reconciliation first.');
-          setState('idle');
-        }
+        setReconData(staticReconData);
+        setState('completed');
       } catch (error) {
-        console.error('Error fetching reconciliation data:', error);
-        alert('Failed to fetch reconciliation data: ' + (error as Error).message);
+        console.error('Error setting reconciliation data:', error);
         setState('idle');
       } finally {
         clearInterval(progressInterval);
@@ -897,15 +1170,15 @@ const ReconciliationEngine = () => {
                   <div className="grid grid-cols-3 gap-4">
                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
                         <p className="text-xs text-gray-600 uppercase font-bold">Purchase Invoices</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">21</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">42</p>
                      </div>
                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
                         <p className="text-xs text-gray-600 uppercase font-bold">GSTR-2B Entries</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">19</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">39</p>
                      </div>
                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
                         <p className="text-xs text-gray-600 uppercase font-bold">Est. Time</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">~2 mins</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">~1 min</p>
                      </div>
                   </div>
 
@@ -1325,18 +1598,18 @@ const ReconciliationEngine = () => {
 
 // --- SCREEN 5: ITC MAXIMIZER ---
 const ITCMaximizer = () => {
-  // Using actual ITC values from GSTR-3B data
-  // ITC Available = IGST + CGST + SGST from itc.available
-  const itcAvailable = 43445.85 + 148402.25 + 148402.25; // = 340,250.35
+  // Updated ITC values based on reconciliation results
+  // ITC Available (from reconciliation analysis)
+  const itcAvailable = 589708.00;
   
-  // ITC Claimable = Net ITC (IGST + CGST + SGST from itc.net_itc)
-  const itcClaimable = 43445.85 + 147522 + 147522; // = 338,489.85
+  // ITC Claimable (ITC Secured from reconciliation)
+  const itcClaimable = 524205.50;
   
-  // Blocked ITC = Available - Claimable
-  const itcBlocked = itcAvailable - itcClaimable; // = 1,760.50
+  // ITC at Risk (from reconciliation discrepancies)
+  const itcBlocked = 65502.50;
   
-  // Potential Additional (estimated from reconciliation - can be enhanced)
-  const potentialAdditional = 22000; // Keep as estimate for now
+  // Potential Additional (recoverable with action)
+  const potentialAdditional = 35907.00; // From addressing discrepancies
 
   const formatCurrency = (amount: number) => {
     if (amount >= 100000) {
@@ -1385,9 +1658,10 @@ const ITCMaximizer = () => {
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-600" /> Suggestions & Alerts</h3>
             <div className="space-y-4">
                {[
-                  { title: 'Missing Invoices', desc: '12 invoices in GSTR-2B not in books (>30 days)', impact: '₹ 18,500', type: 'High' },
-                  { title: 'Vendor Filing', desc: 'Vendor "Alpha Corp" has not filed GSTR-1', impact: '₹ 12,000', type: 'Medium' },
-                  { title: 'Amendment Required', desc: 'Tax mismatch in INV-009 (IGST vs CGST)', impact: '₹ 2,400', type: 'Low' },
+                  { title: 'Missing Invoice in Books', desc: 'J D B S TRANSLINE invoice 3162 present in GSTR-2B', impact: '₹ 207', type: 'High' },
+                  { title: 'Supplier Filing Pending', desc: 'QUICK REPAIRS has not filed GSTR-1 yet', impact: '₹ 1,530', type: 'High' },
+                  { title: 'Value Mismatch', desc: 'ZAHUR BUFF invoice 24-25/038 has ₹1,706 difference', impact: '₹ 307', type: 'Medium' },
+                  { title: 'Unregistered Supplier', desc: 'SANTOSH BUFFING WORKS - No ITC available', impact: '₹ 886', type: 'Low' },
                ].map((alert, i) => (
                   <div key={i} className="p-4 rounded-xl bg-gray-50 border border-gray-200 flex justify-between items-center group hover:border-emerald-300 transition-colors">
                      <div className="flex gap-4">
@@ -1457,6 +1731,8 @@ const ITCMaximizer = () => {
 
 // --- SCREEN 6: FILING OUTPUT ---
 const FilingOutput = () => {
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  
   // Static GSTR-3B data
   const gstr3bData = {
     "form": {
@@ -1543,9 +1819,9 @@ const FilingOutput = () => {
     ],
     "itc": {
       "available": {
-        "igst": 43445.85,
-        "cgst": 148402.25,
-        "sgst": 148402.25,
+        "igst": 10890.15,
+        "cgst": 256607.75,
+        "sgst": 256607.75,
         "cess": 0
       },
       "rcm_itc": 0,
@@ -1553,26 +1829,18 @@ const FilingOutput = () => {
         {
           "row": "4A(5)",
           "desc": "All other ITC (B2B Invoices)",
-          "igst": 43388.35,
-          "cgst": 148402.25,
-          "sgst": 148402.25
-        },
-        {
-          "row": "4A(3)",
-          "desc": "Inward supplies liable for reverse charge (net)",
-          "igst": 57.5,
-          "cgst": -880.25,
-          "sgst": -880.25
+          "igst": 10890.15,
+          "cgst": 256607.75,
+          "sgst": 256607.75
         }
       ],
       "net_itc": {
-        "igst": 43445.85,
-        "cgst": 147522,
-        "sgst": 147522
+        "igst": 10890.15,
+        "cgst": 256607.75,
+        "sgst": 256607.75
       },
       "notes": {
-        "4(A)(3)": "Reverse charge ITC adjusted for amendment (₹880.25 CGST/SGST reversed)",
-        "4(A)(5)": "B2B invoices total 22 accepted in IMS (₹1,988,836.46 taxable value)"
+        "4(A)(5)": "B2B invoices: 38 matched invoices from reconciliation (₹5,24,205.50 ITC secured)"
       }
     },
     "table_5": {
@@ -1587,18 +1855,18 @@ const FilingOutput = () => {
       "regular": {
         "igst": {
           "payable": 50863.32,
-          "paid_itc": 43445.85,
-          "cash": 7417.47
+          "paid_itc": 10890.15,
+          "cash": 39973.17
         },
         "cgst": {
           "payable": 499135.98,
-          "paid_itc": 147522,
-          "cash": 351613.98
+          "paid_itc": 256607.75,
+          "cash": 242528.23
         },
         "sgst": {
           "payable": 499135.98,
-          "paid_itc": 147522,
-          "cash": 351613.98
+          "paid_itc": 256607.75,
+          "cash": 242528.23
         },
         "cess": {
           "payable": 0,
@@ -1614,12 +1882,12 @@ const FilingOutput = () => {
       },
       "summary": {
         "total_liability": 1049135.28,
-        "itc_used": 338489.85,
-        "cash_paid": 710645.43,
+        "itc_used": 524105.65,
+        "cash_paid": 525029.63,
         "itc_breakup": {
-          "igst_to_igst": 43445.85,
-          "cgst_to_cgst": 147522,
-          "sgst_to_sgst": 147522
+          "igst_to_igst": 10890.15,
+          "cgst_to_cgst": 256607.75,
+          "sgst_to_sgst": 256607.75
         }
       }
     },
@@ -1650,17 +1918,12 @@ const FilingOutput = () => {
       {
         "check": "ITC Availability",
         "status": "PASS",
-        "message": "Net ITC matches GSTR-2B available ITC (₹3,38,489.85)"
+        "message": "Net ITC: ₹5,24,105.65 (38 matched invoices, 90.48% match rate)"
       },
       {
-        "check": "Rounding",
-        "status": "PASS",
-        "message": "All amounts rounded to 2 decimal places"
-      },
-      {
-        "check": "Reverse Charge",
-        "status": "PASS",
-        "message": "No reverse charge liability reported in GSTR-1/3B"
+        "check": "Reconciliation Status",
+        "status": "WARNING",
+        "message": "6 discrepancies identified - ₹65,502.50 ITC at risk"
       }
     ],
     "computations": {
@@ -1676,7 +1939,7 @@ const FilingOutput = () => {
         "igst": 0,
         "invoices": []
       },
-      "itc_total": 338489.85
+      "itc_total": 524105.65
     }
   };
 
@@ -1694,8 +1957,27 @@ const FilingOutput = () => {
   };
 
   const handleDownloadPDF = async () => {
-    const pdfUrl = "https://hbbsmbukdjkgjpogalhq.supabase.co/storage/v1/object/public/Saral_GST/DEV%20KAILASH%20-%20GSTR3B_MAR'25.pdf";
-    await downloadFileFromUrl(pdfUrl, "DEV_KAILASH_GSTR3B_MAR25.pdf");
+    setDownloadingPDF(true);
+    
+    // Show loading for 2 seconds
+    setTimeout(() => {
+      const pdfPath = '/GSTR3B_Draft.pdf';
+      
+      // Open in new tab
+      window.open(pdfPath, '_blank');
+      
+      // Trigger download after a short delay
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = pdfPath;
+        link.download = 'DEV_KAILASH_GSTR3B_MAR25.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setDownloadingPDF(false);
+      }, 1000);
+    }, 2000);
   };
 
   const handleCreateChallan = async () => {
@@ -1788,8 +2070,21 @@ const FilingOutput = () => {
                   Total Liability: ₹{taxPayment?.total_liability?.toLocaleString() || '0'}<br/>
                   ITC Used: ₹{taxPayment?.itc_used?.toLocaleString() || '0'}
                </p>
-               <button onClick={handleCreateChallan} className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                  <CreditCard className="h-5 w-5" /> Draft GSTR3B
+               <button 
+                  onClick={handleCreateChallan} 
+                  disabled={downloadingPDF}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                  {downloadingPDF ? (
+                    <>
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-5 w-5" /> Draft GSTR3B
+                    </>
+                  )}
                </button>
             </div>
             

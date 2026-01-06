@@ -5,11 +5,11 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Function to fetch GSTR-1B URL from sale_purchase_register table
+// Function to fetch GSTR-1B URL from purchase_register table
 export async function getGSTR1BUrl(): Promise<string | null> {
   try {
     const { data, error } = await supabase
-      .from('sale_purchase_register')
+      .from('purchase_register')
       .select('gstr1b_url')
       .single();
 
@@ -49,11 +49,11 @@ export async function downloadFileFromUrl(url: string, filename: string = 'GSTR-
   }
 }
 
-// Function to fetch reconciliation JSON from sale_purchase_register table
+// Function to fetch reconciliation JSON from purchase_register table
 export async function getReconciliationData(): Promise<any | null> {
   try {
     const { data, error } = await supabase
-      .from('sale_purchase_register')
+      .from('purchase_register')
       .select('reconciliation_json')
       .single();
 
@@ -97,11 +97,11 @@ export async function getReconciliationData(): Promise<any | null> {
   }
 }
 
-// Function to fetch GSTR-3B JSON from sale_purchase_register table
+// Function to fetch GSTR-3B JSON from purchase_register table
 export async function getGSTR3BData(): Promise<any | null> {
   try {
     const { data, error } = await supabase
-      .from('sale_purchase_register')
+      .from('purchase_register')
       .select('gstr3b_json')
       .single();
 
