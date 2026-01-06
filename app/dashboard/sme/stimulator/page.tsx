@@ -473,21 +473,21 @@ const RegistersAndDraft = ({ onNext }: { onNext: () => void }) => {
                         <span className="text-xs text-gray-600 uppercase font-medium">Total Sales Invoices</span>
                         <FileText className="h-4 w-4 text-emerald-600" />
                      </div>
-                     <p className="text-2xl font-bold text-gray-900">21</p>
+                     <p className="text-2xl font-bold text-gray-900">28</p>
                   </div>
                   <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                      <div className="flex justify-between items-center mb-1">
                         <span className="text-xs text-gray-600 uppercase font-medium">Taxable Value</span>
                         <span className="text-gray-600 text-xs">INR</span>
                      </div>
-                     <p className="text-2xl font-bold text-gray-900">₹ 61.31 L</p>
+                     <p className="text-2xl font-bold text-gray-900">₹ 45.82 L</p>
                   </div>
                   <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
                      <div className="flex justify-between items-center mb-1">
                         <span className="text-xs text-amber-700 uppercase font-medium">Liability</span>
                         <span className="text-amber-700 text-xs">INR</span>
                      </div>
-                     <p className="text-2xl font-bold text-amber-700">₹ 7.66 L</p>
+                     <p className="text-2xl font-bold text-amber-700">₹ 8.25 L</p>
                   </div>
                </div>
 
@@ -1162,7 +1162,7 @@ const ReconciliationEngine = () => {
                      <div>
                         <h3 className="text-3xl font-bold text-gray-900">Ready to Reconcile</h3>
                         <div className="flex items-center justify-center gap-2 mt-2 text-gray-600">
-                           <Clock className="h-4 w-4" /> Last run: 23 Nov, 4:00 PM
+                           <Clock className="h-4 w-4" /> Last run: 06 Jan, 11:48 AM
                         </div>
                      </div>
                   </div>
