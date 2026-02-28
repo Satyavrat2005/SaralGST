@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -155,10 +156,14 @@ const SIDEBAR_CONFIG: SidebarConfig = {
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const supabase = createClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [userName, setUserName] = useState('User');
+  const [userEmail, setUserEmail] = useState('');
+  const [activeGstin, setActiveGstin] = useState('');
 
   // Determine role and config
   const currentRole = pathname.includes('/dashboard/ca') ? 'ca' : 'sme';
@@ -187,6 +192,34 @@ export default function Sidebar() {
     }
   }, [pathname, menuItems]);
 
+  useEffect(() => {
+    const fetchSidebarUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fallbackName =
+        (user.user_metadata?.full_name as string | undefined) ||
+        (user.email ? user.email.split('@')[0] : 'User');
+
+      setUserEmail(user.email || '');
+
+      const { data: profile } = await supabase
+        .from('business_profiles')
+        .select('trade_name, legal_name, gstin')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile) {
+        setUserName(profile.trade_name || profile.legal_name || fallbackName);
+        setActiveGstin(profile.gstin || '');
+      } else {
+        setUserName(fallbackName);
+      }
+    };
+
+    fetchSidebarUser();
+  }, []);
+
   const toggleSubMenu = (label: string) => {
     if (isCollapsed) setIsCollapsed(false);
     setExpandedMenus(prev => 
@@ -196,6 +229,18 @@ export default function Sidebar() {
 
   const handleNavigation = (path?: string) => {
     if (path) router.push(path);
+  };
+
+  const userInitials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join('') || 'U';
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth');
   };
 
   return (
@@ -245,7 +290,9 @@ export default function Sidebar() {
                 <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-bold">Active GSTIN</p>
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"></div>
              </div>
-             <p className="text-xs text-gray-900 font-mono font-semibold tracking-wide truncate group-hover:text-emerald-900 transition-colors">27AAACW1234F1Z5</p>
+             <p className="text-xs text-gray-900 font-mono font-semibold tracking-wide truncate group-hover:text-emerald-900 transition-colors">
+               {activeGstin || 'Not added yet'}
+             </p>
           </div>
         </div>
       )}
@@ -362,12 +409,12 @@ export default function Sidebar() {
             className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl hover:bg-white border border-gray-200 hover:border-emerald-200 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
           >
              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold shrink-0 shadow-lg group-hover:shadow-emerald-500/30 transition-shadow text-xs">
-               MK
+               {userInitials}
              </div>
              {!isCollapsed && (
                <div className="flex-1 text-left overflow-hidden">
-                 <p className="text-xs font-bold text-gray-900 truncate">Deep Jain</p>
-                 <p className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider truncate">Admin</p>
+                 <p className="text-xs font-bold text-gray-900 truncate">{userName}</p>
+                 <p className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider truncate">{currentRole === 'ca' ? 'CA' : 'SME'}</p>
                </div>
              )}
              {!isCollapsed && <ChevronDown className={`h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} />}
@@ -376,12 +423,15 @@ export default function Sidebar() {
           {/* Profile Dropdown */}
           {userMenuOpen && (
             <div className="absolute bottom-[calc(100%+8px)] left-0 w-full bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-200">
-                <User className="h-4 w-4" /> View Profile
+              <button 
+                onClick={() => router.push('/dashboard/sme/settings')}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-200"
+              >
+                <User className="h-4 w-4" /> {userEmail || 'View Profile'}
               </button>
               <div className="h-px bg-gray-200 my-1 mx-2"></div>
               <button 
-                onClick={() => router.push('/')}
+                onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-200"
               >
                 <LogOut className="h-4 w-4" /> Logout

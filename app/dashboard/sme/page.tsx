@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowUpRight, 
@@ -22,7 +22,10 @@ import {
   CheckSquare,
   AlertOctagon,
   Info,
-  X
+  X,
+  LogOut,
+  Settings,
+  User
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -39,6 +42,18 @@ import {
   Cell, 
   Legend 
 } from 'recharts';
+import { createClient } from '@/lib/supabase/client';
+
+interface BusinessProfile {
+  legal_name: string | null;
+  trade_name: string | null;
+  gstin: string | null;
+  email: string | null;
+  nature_of_business: string | null;
+  filing_frequency: string | null;
+  constitution: string | null;
+  state: string | null;
+}
 
 // --- MOCK DATA ---
 
@@ -75,8 +90,35 @@ const RecentInvoicesData = [
 
 export default function SMEDashboard() {
   const router = useRouter();
+  const supabase = createClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState('This Month');
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || null);
+        const { data } = await supabase
+          .from('business_profiles')
+          .select('legal_name, trade_name, gstin, email, nature_of_business, filing_frequency, constitution, state')
+          .eq('user_id', user.id)
+          .single();
+        if (data) setProfile(data);
+      }
+    };
+    fetchProfile();
+  }, [supabase]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth');
+  };
+
+  const displayName = profile?.trade_name || profile?.legal_name || userEmail?.split('@')[0] || 'User';
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -103,7 +145,18 @@ export default function SMEDashboard() {
             <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></div>
             LIVE
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome, {displayName}
+          </h1>
+          {profile?.gstin && (
+            <p className="text-sm text-gray-500 mt-1">
+              GSTIN: <span className="font-mono font-medium text-gray-700">{profile.gstin}</span>
+              {profile.state && <span className="ml-3 text-gray-400">|</span>}
+              {profile.state && <span className="ml-3">{profile.state}</span>}
+              {profile.nature_of_business && <span className="ml-3 text-gray-400">|</span>}
+              {profile.nature_of_business && <span className="ml-3">{profile.nature_of_business}</span>}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
            <div className="relative">
@@ -127,6 +180,38 @@ export default function SMEDashboard() {
            >
              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-emerald-600' : ''}`} />
            </button>
+
+           {/* User Menu */}
+           <div className="relative">
+             <button 
+               onClick={() => setShowUserMenu(!showUserMenu)}
+               className="flex items-center gap-2 p-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+             >
+               <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold">
+                 {displayName.charAt(0).toUpperCase()}
+               </div>
+               <span className="text-sm font-medium text-gray-700 hidden md:inline max-w-[120px] truncate">{displayName}</span>
+             </button>
+             {showUserMenu && (
+               <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-gray-200 shadow-xl z-50 py-2 animate-fade-in-up" style={{ animationDuration: '0.15s' }}>
+                 <div className="px-4 py-2 border-b border-gray-100">
+                   <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                   <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+                 </div>
+                 <button onClick={() => { setShowUserMenu(false); router.push('/dashboard/sme/settings'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                   <Settings className="h-4 w-4 text-gray-400" /> Settings
+                 </button>
+                 <button onClick={() => { setShowUserMenu(false); router.push('/onboarding'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                   <User className="h-4 w-4 text-gray-400" /> Edit Profile
+                 </button>
+                 <div className="border-t border-gray-100 mt-1 pt-1">
+                   <button onClick={handleSignOut} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                     <LogOut className="h-4 w-4" /> Sign Out
+                   </button>
+                 </div>
+               </div>
+             )}
+           </div>
            
            <span className="text-xs text-gray-500 whitespace-nowrap hidden md:inline-block">
              Last updated: <span className="text-gray-900 font-medium">2 mins ago</span>
