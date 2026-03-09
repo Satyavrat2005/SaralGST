@@ -80,7 +80,7 @@ export async function uploadInvoiceToStorage(
 
     const client = useAdmin ? supabaseAdmin : supabase;
     const { data, error } = await client.storage
-      .from('SARALGST')
+      .from('Saral_GST')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false
@@ -93,7 +93,7 @@ export async function uploadInvoiceToStorage(
 
     // Get public URL
     const { data: { publicUrl } } = client.storage
-      .from('SARALGST')
+      .from('Saral_GST')
       .getPublicUrl(filePath);
 
     return { url: publicUrl, error: null };

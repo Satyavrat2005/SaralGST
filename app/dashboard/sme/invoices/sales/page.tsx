@@ -1,39 +1,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  Filter, 
-  Download, 
-  Plus, 
-  Search, 
-  Calendar, 
-  MoreVertical, 
-  Eye, 
-  FileText, 
-  Edit3, 
-  RefreshCw, 
-  CheckCircle2, 
+import {
+  Download,
+  Plus,
+  Search,
+  Calendar,
+  MoreVertical,
+  Eye,
+  FileText,
+  Edit3,
+  CheckCircle2,
   Trash2,
   ArrowUpRight,
-  MessageSquare,
-  Mail,
   UploadCloud,
-  FileSpreadsheet,
   X,
   AlertTriangle,
   AlertCircle,
   CheckCircle,
   XCircle,
-  ChevronDown,
   Save,
-  History,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import GlassPanel from '../../../../../components/ui/GlassPanel';
-import BentoCard from '../../../../../components/ui/BentoCard';
-import { SalesRegister } from '@/lib/services/salesInvoiceService';
+import { SalesInvoice } from '@/lib/services/salesInvoiceService';
 
 interface Remark {
   id: string;
@@ -46,16 +36,14 @@ interface Remark {
 }
 
 export default function SalesRegisterPage() {
-  const router = useRouter();
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(true);
-  const [selectedInvoice, setSelectedInvoice] = useState<SalesRegister | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [modalTab, setModalTab] = useState<'details' | 'validation' | 'history'>('details');
-  const [salesInvoices, setsalesInvoices] = useState<SalesRegister[]>([]);
-  const [filteredInvoices, setFilteredInvoices] = useState<SalesRegister[]>([]);
+  const [salesInvoices, setsalesInvoices] = useState<SalesInvoice[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState<Partial<SalesRegister>>({});
+  const [editedData, setEditedData] = useState<Partial<SalesInvoice>>({});
   const [remarks, setRemarks] = useState<Remark[]>([]);
   const [loadingRemarks, setLoadingRemarks] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -140,16 +128,16 @@ export default function SalesRegisterPage() {
     }
   };
 
-  const calculateStats = (invoices: SalesRegister[]) => {
-    const totalSales = invoices.reduce((sum, inv) => sum + (inv.total_invoice_value || 0), 0);
-    const cgst = invoices.reduce((sum, inv) => sum + (inv.cgst || 0), 0);
-    const sgst = invoices.reduce((sum, inv) => sum + (inv.sgst || 0), 0);
-    const igst = invoices.reduce((sum, inv) => sum + (inv.igst || 0), 0);
+  const calculateStats = (invoices: SalesInvoice[]) => {
+    const totalSales = invoices.reduce((sum, inv) => sum + (inv.gross_total || 0), 0);
+    const cgst = invoices.reduce((sum, inv) => sum + (inv.cgst_amount || 0), 0);
+    const sgst = invoices.reduce((sum, inv) => sum + (inv.sgst_amount || 0), 0);
+    const igst = invoices.reduce((sum, inv) => sum + (inv.igst_amount || 0), 0);
     const totalTax = cgst + sgst + igst;
 
-    const validated = invoices.filter(inv => inv.invoice_status === 'extracted' || inv.invoice_status === 'verified').length;
-    const partial = invoices.filter(inv => inv.invoice_status === 'needs_review').length;
-    const failed = invoices.filter(inv => !inv.invoice_status || inv.invoice_status === null).length;
+    const validated = invoices.filter(inv => inv.extraction_status === 'extracted').length;
+    const partial = invoices.filter(inv => inv.extraction_status === 'needs_review').length;
+    const failed = invoices.filter(inv => !inv.extraction_status || inv.extraction_status === 'pending').length;
 
     setStats({
       totalSales,
@@ -188,7 +176,7 @@ export default function SalesRegisterPage() {
         'Processing': ['pending']
       };
       const statuses = statusMap[statusFilter] || [];
-      filtered = filtered.filter(inv => statuses.includes(inv.invoice_status || ''));
+      filtered = filtered.filter(inv => statuses.includes(inv.extraction_status || ''));
     }
 
     // Search filter
@@ -254,7 +242,7 @@ export default function SalesRegisterPage() {
     setEditedData({});
   };
 
-  const handleFieldChange = (field: keyof SalesRegister, value: any) => {
+  const handleFieldChange = (field: keyof SalesInvoice, value: any) => {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -262,8 +250,8 @@ export default function SalesRegisterPage() {
     if (!selectedInvoice?.id) return;
 
     try {
-      // Remove total_invoice_value from editedData as it's a generated column
-      const { total_invoice_value, ...dataToSave } = editedData;
+      // Remove generated/readonly fields from editedData before saving
+      const { created_at, updated_at, ...dataToSave } = editedData;
       
       const response = await fetch(`/api/invoice/sales/${selectedInvoice.id}`, {
         method: 'PATCH',
@@ -387,95 +375,66 @@ export default function SalesRegisterPage() {
   const exportToCSV = () => {
     // Define all columns in standard Sales Register format
     const headers = [
-      // Basic Information
       'Serial No.',
       'Invoice Number',
       'Invoice Date',
+      'Voucher Type',
       'Invoice Type',
-      'Source',
-      
-      // Customer Details
       'Customer Name',
       'Customer GSTIN',
-      'Customer State Code',
-      
-      // Buyer Details
-      'Buyer GSTIN',
       'Place of Supply',
-      
-      // Item Details
       'HSN/SAC Code',
-      'Description of Goods/Services',
       'Quantity',
-      'Unit',
-      'Rate Per Unit',
-      
-      // Tax Details
+      'UQC',
+      'Rate',
       'Taxable Value',
-      'CGST Rate',
+      'Local Sales Taxable @18%',
+      'Local Sales Taxable @12%',
+      'OMS Sales Taxable @12%',
       'CGST Amount',
-      'SGST Rate',
       'SGST Amount',
-      'IGST Rate',
       'IGST Amount',
-      'CESS Amount',
-      'Total Tax Amount',
-      'Total Invoice Value',
-      
-      // Additional Details
-      'Is Reverse Charge',
-      'Payment Status',
-      
-      // Processing Details
-      'Invoice Status',
-      'OCR Confidence Score',
+      'TCS/Cess',
+      'Round Off',
+      'Gross Total',
+      'Reverse Charge',
+      'E-Way Bill Number',
+      'IRN',
+      'Extraction Status',
       'Created At',
-      'Updated At',
       'Invoice URL'
     ];
 
-    // Map data to CSV rows
-    const rows = filteredInvoices.map((inv, index) => {
-      const cgstRate = inv.cgst && inv.taxable_value ? ((inv.cgst / inv.taxable_value) * 100).toFixed(2) : '';
-      const sgstRate = inv.sgst && inv.taxable_value ? ((inv.sgst / inv.taxable_value) * 100).toFixed(2) : '';
-      const igstRate = inv.igst && inv.taxable_value ? ((inv.igst / inv.taxable_value) * 100).toFixed(2) : '';
-      const totalTax = (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0) + (inv.cess || 0);
-      
-      return [
-        (index + 1).toString(),
-        inv.invoice_number || '',
-        inv.invoice_date || '',
-        inv.invoice_type || '',
-        inv.extraction_source || '',
-        inv.customer_name || '',
-        inv.customer_gstin || '',
-        inv.customer_state_code || '',
-        inv.customer_gstin || '',
-        inv.place_of_supply_state_code || '',
-        inv.hsn_or_sac || '',
-        inv.description || '',
-        inv.quantity?.toString() || '',
-        inv.unit || '',
-        inv.rate?.toString() || '',
-        inv.taxable_value?.toFixed(2) || '',
-        cgstRate ? `${cgstRate}%` : '',
-        inv.cgst?.toFixed(2) || '',
-        sgstRate ? `${sgstRate}%` : '',
-        inv.sgst?.toFixed(2) || '',
-        igstRate ? `${igstRate}%` : '',
-        inv.igst?.toFixed(2) || '',
-        inv.cess?.toFixed(2) || '',
-        totalTax.toFixed(2),
-        inv.total_invoice_value?.toFixed(2) || '',
-        inv.is_reverse_charge ? 'Yes' : 'No',
-        inv.payment_status || 'unpaid',
-        inv.invoice_status || '',
-        (inv.ocr_confidence_score || 0) > 0 ? `${((inv.ocr_confidence_score || 0) * 100).toFixed(2)}%` : '',
-        inv.created_at || '',
-        inv.updated_at || '',
-        inv.invoice_bucket_url || ''
-      ];
-    });
+    const rows = filteredInvoices.map((inv, index) => [
+      (index + 1).toString(),
+      inv.invoice_number || '',
+      inv.invoice_date || '',
+      inv.voucher_type || '',
+      inv.invoice_type || '',
+      inv.customer_name || '',
+      inv.customer_gstin || '',
+      inv.place_of_supply || '',
+      inv.hsn_sac_code || '',
+      inv.quantity?.toString() || '',
+      inv.uqc || '',
+      inv.rate?.toString() || '',
+      inv.taxable_value?.toFixed(2) || '',
+      inv.local_sales_taxable_18?.toFixed(2) || '',
+      inv.local_sales_taxable_12?.toFixed(2) || '',
+      inv.oms_sales_taxable_12?.toFixed(2) || '',
+      inv.cgst_amount?.toFixed(2) || '',
+      inv.sgst_amount?.toFixed(2) || '',
+      inv.igst_amount?.toFixed(2) || '',
+      inv.tcs_cess?.toFixed(2) || '',
+      inv.round_off?.toFixed(2) || '',
+      inv.gross_total?.toFixed(2) || '',
+      inv.reverse_charge ? 'Yes' : 'No',
+      inv.eway_bill_number || '',
+      inv.irn || '',
+      inv.extraction_status || '',
+      inv.created_at || '',
+      inv.invoice_file_url || ''
+    ]);
 
     // Escape and quote CSV fields
     const escapeCsvValue = (value: string) => {
@@ -508,33 +467,91 @@ export default function SalesRegisterPage() {
     document.body.removeChild(link);
   };
 
-  const getMissingFields = (invoice: SalesRegister): string[] => {
+  const handleBulkMarkReviewed = async () => {
+    if (selectedRows.length === 0) return;
+    try {
+      await Promise.all(
+        selectedRows.map(id =>
+          fetch(`/api/invoice/sales/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ extraction_status: 'extracted' }),
+          })
+        )
+      );
+      setsalesInvoices(prev =>
+        prev.map(inv =>
+          selectedRows.includes(inv.id || '')
+            ? { ...inv, extraction_status: 'extracted' }
+            : inv
+        )
+      );
+      setSelectedRows([]);
+    } catch (error: any) {
+      alert(`Failed to mark reviewed: ${error.message}`);
+    }
+  };
+
+  const handleBulkRevalidate = async () => {
+    if (selectedRows.length === 0) return;
+    try {
+      await Promise.all(
+        selectedRows.map(id =>
+          fetch(`/api/invoice/sales/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ extraction_status: 'needs_review' }),
+          })
+        )
+      );
+      setsalesInvoices(prev =>
+        prev.map(inv =>
+          selectedRows.includes(inv.id || '')
+            ? { ...inv, extraction_status: 'needs_review' }
+            : inv
+        )
+      );
+      setSelectedRows([]);
+    } catch (error: any) {
+      alert(`Failed to revalidate: ${error.message}`);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.length === 0) return;
+    if (!confirm(`Delete ${selectedRows.length} invoice(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(
+        selectedRows.map(id =>
+          fetch(`/api/invoice/sales/${id}`, { method: 'DELETE' })
+        )
+      );
+      setsalesInvoices(prev => prev.filter(inv => !selectedRows.includes(inv.id || '')));
+      setSelectedRows([]);
+    } catch (error: any) {
+      alert(`Failed to delete: ${error.message}`);
+    }
+  };
+
+  const getMissingFields = (invoice: SalesInvoice): string[] => {
     const missing: string[] = [];
-    
-    // Check required NOT NULL fields from DB schema
-    if (!invoice.seller_gstin || invoice.seller_gstin === 'TEMP') missing.push('Seller GSTIN');
-    if (!invoice.seller_state_code || invoice.seller_state_code === '00') missing.push('Seller State Code');
-    if (!invoice.invoice_number || invoice.invoice_number === 'TEMP') missing.push('Invoice Number');
+    if (!invoice.invoice_number) missing.push('Invoice Number');
     if (!invoice.invoice_date) missing.push('Invoice Date');
     if (!invoice.invoice_type) missing.push('Invoice Type');
-    if (!invoice.supply_type) missing.push('Supply Type');
-    if (!invoice.place_of_supply_state_code || invoice.place_of_supply_state_code === '00') missing.push('Place of Supply');
-    if (!invoice.taxable_value || invoice.taxable_value === 0) missing.push('Taxable Value');
-    if (!invoice.invoice_bucket_url) missing.push('Invoice File');
-    
-    // B2B specific requirements
+    if (!invoice.place_of_supply) missing.push('Place of Supply');
+    if (!invoice.taxable_value) missing.push('Taxable Value');
+    if (!invoice.invoice_file_url) missing.push('Invoice File');
     if (invoice.invoice_type === 'B2B') {
       if (!invoice.customer_name) missing.push('Customer Name');
       if (!invoice.customer_gstin) missing.push('Customer GSTIN');
     }
-    
     return missing;
   };
 
-  const getValidationStatus = (invoice: SalesRegister): 'validated' | 'partial' | 'failed' => {
+  const getValidationStatus = (invoice: SalesInvoice): 'validated' | 'partial' | 'failed' => {
     const missingFields = getMissingFields(invoice);
-    if (missingFields.length === 0 && invoice.invoice_status === 'extracted') return 'validated';
-    if (missingFields.length > 0 || invoice.invoice_status === 'needs_review') return 'partial';
+    if (missingFields.length === 0 && invoice.extraction_status === 'extracted') return 'validated';
+    if (missingFields.length > 0 || invoice.extraction_status === 'needs_review') return 'partial';
     return 'failed';
   };
 
@@ -544,60 +561,36 @@ export default function SalesRegisterPage() {
       const XLSX = await import('xlsx');
       
       // Prepare data in standard Sales Register format
-      const data = filteredInvoices.map((inv, index) => {
-        const cgstRate = inv.cgst && inv.taxable_value ? ((inv.cgst / inv.taxable_value) * 100).toFixed(2) : '';
-        const sgstRate = inv.sgst && inv.taxable_value ? ((inv.sgst / inv.taxable_value) * 100).toFixed(2) : '';
-        const igstRate = inv.igst && inv.taxable_value ? ((inv.igst / inv.taxable_value) * 100).toFixed(2) : '';
-        const totalTax = (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0) + (inv.cess || 0);
-        
-        return {
-          // Basic Information
-          'Serial No.': index + 1,
-          'Invoice Number': inv.invoice_number || '',
-          'Invoice Date': inv.invoice_date || '',
-          'Invoice Type': inv.invoice_type || '',
-          'Source': inv.extraction_source || '',
-          
-          // Customer Details
-          'Customer Name': inv.customer_name || '',
-          'Customer GSTIN': inv.customer_gstin || '',
-          'Customer State Code': inv.customer_state_code || '',
-          
-          // Buyer Details
-          'Buyer GSTIN': inv.customer_gstin || '',
-          'Place of Supply': inv.place_of_supply_state_code || '',
-          
-          // Item Details
-          'HSN/SAC Code': inv.hsn_or_sac || '',
-          'Description of Goods/Services': inv.description || '',
-          'Quantity': inv.quantity || '',
-          'Unit': inv.unit || '',
-          'Rate Per Unit': inv.rate || '',
-          
-          // Tax Details
-          'Taxable Value': inv.taxable_value || '',
-          'CGST Rate': cgstRate ? `${cgstRate}%` : '',
-          'CGST Amount': inv.cgst || '',
-          'SGST Rate': sgstRate ? `${sgstRate}%` : '',
-          'SGST Amount': inv.sgst || '',
-          'IGST Rate': igstRate ? `${igstRate}%` : '',
-          'IGST Amount': inv.igst || '',
-          'CESS Amount': inv.cess || '',
-          'Total Tax Amount': totalTax,
-          'Total Invoice Value': inv.total_invoice_value || '',
-          
-          // Additional Details
-          'Is Reverse Charge': inv.is_reverse_charge ? 'Yes' : 'No',
-          'Payment Status': inv.payment_status || 'unpaid',
-          
-          // Processing Details
-          'Invoice Status': inv.invoice_status || '',
-          'OCR Confidence Score': inv.ocr_confidence_score ? `${(inv.ocr_confidence_score * 100).toFixed(2)}%` : '',
-          'Created At': inv.created_at || '',
-          'Updated At': inv.updated_at || '',
-          'Invoice URL': inv.invoice_bucket_url || ''
-        };
-      });
+      const data = filteredInvoices.map((inv, index) => ({
+        'Serial No.': index + 1,
+        'Invoice Number': inv.invoice_number || '',
+        'Invoice Date': inv.invoice_date || '',
+        'Voucher Type': inv.voucher_type || '',
+        'Invoice Type': inv.invoice_type || '',
+        'Customer Name': inv.customer_name || '',
+        'Customer GSTIN': inv.customer_gstin || '',
+        'Place of Supply': inv.place_of_supply || '',
+        'HSN/SAC Code': inv.hsn_sac_code || '',
+        'Quantity': inv.quantity || '',
+        'UQC': inv.uqc || '',
+        'Rate': inv.rate || '',
+        'Taxable Value': inv.taxable_value || '',
+        'Local Sales @18%': inv.local_sales_taxable_18 || '',
+        'Local Sales @12%': inv.local_sales_taxable_12 || '',
+        'OMS Sales @12%': inv.oms_sales_taxable_12 || '',
+        'CGST Amount': inv.cgst_amount || '',
+        'SGST Amount': inv.sgst_amount || '',
+        'IGST Amount': inv.igst_amount || '',
+        'TCS/Cess': inv.tcs_cess || '',
+        'Round Off': inv.round_off || '',
+        'Gross Total': inv.gross_total || '',
+        'Reverse Charge': inv.reverse_charge ? 'Yes' : 'No',
+        'E-Way Bill': inv.eway_bill_number || '',
+        'IRN': inv.irn || '',
+        'Extraction Status': inv.extraction_status || '',
+        'Created At': inv.created_at || '',
+        'Invoice URL': inv.invoice_file_url || ''
+      }));
 
       // Create workbook and worksheet
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -700,29 +693,6 @@ export default function SalesRegisterPage() {
     }
   };
 
-  const getPaymentStatusColor = (status: string | null | undefined) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'partial':
-        return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-      case 'unpaid':
-        return 'bg-red-50 text-red-700 border border-red-200';
-      default:
-        return 'bg-gray-50 text-gray-700 border border-gray-200';
-    }
-  };
-
-  const getSourceIcon = (source: string) => {
-    switch (source) {
-      case 'whatsapp': return <MessageSquare className="h-4 w-4 text-emerald-500" />;
-      case 'email': return <Mail className="h-4 w-4 text-blue-500" />;
-      case 'manual': return <UploadCloud className="h-4 w-4 text-zinc-400" />;
-      case 'bulk': return <FileSpreadsheet className="h-4 w-4 text-green-600" />;
-      default: return <FileText className="h-4 w-4 text-zinc-400" />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
       <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6 pb-20">
@@ -794,17 +764,6 @@ export default function SalesRegisterPage() {
                 <option>Partial</option>
                 <option>Failed</option>
                 <option>Processing</option>
-              </select>
-
-              <select 
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-              >
-                <option>All Payments</option>
-                <option>paid</option>
-                <option>unpaid</option>
-                <option>partial</option>
               </select>
 
               <div className="relative flex-1 min-w-[200px]">
@@ -933,9 +892,9 @@ export default function SalesRegisterPage() {
               <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                  <span className="text-sm text-gray-700">{selectedRows.length} selected</span>
                  <div className="flex items-center rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
-                    <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Mark Reviewed</button>
-                    <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Re-validate</button>
-                    <button className="px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors">Delete</button>
+                    <button onClick={handleBulkMarkReviewed} className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Mark Reviewed</button>
+                    <button onClick={handleBulkRevalidate} className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Re-validate</button>
+                    <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors">Delete</button>
                  </div>
               </div>
            )}
@@ -955,7 +914,7 @@ export default function SalesRegisterPage() {
                  <th className="px-6 py-3 text-right cursor-pointer hover:text-gray-900 transition-colors">Total</th>
                  <th className="px-6 py-3 text-center">HSN</th>
                  <th className="px-6 py-3 text-center">Validation</th>
-                 <th className="px-6 py-3 text-center">Payment</th>
+                 <th className="px-6 py-3 text-center">Status</th>
                  <th className="px-6 py-3 text-right">Actions</th>
                </tr>
             </thead>
@@ -1009,13 +968,13 @@ export default function SalesRegisterPage() {
                        Rs.{(inv.taxable_value || 0).toLocaleString()}
                      </td>
                      <td className="px-6 py-4 text-right text-gray-700 font-mono group-hover:text-emerald-600 transition-colors cursor-help" title="CGST + SGST + IGST">
-                       Rs.{((inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0)).toLocaleString()}
+                       Rs.{((inv.cgst_amount || 0) + (inv.sgst_amount || 0) + (inv.igst_amount || 0)).toLocaleString()}
                      </td>
                      <td className="px-6 py-4 text-right font-bold text-gray-900 font-mono">
-                       Rs.{(inv.total_invoice_value || 0).toLocaleString()}
+                       Rs.{(inv.gross_total || 0).toLocaleString()}
                      </td>
                      <td className="px-6 py-4 text-center text-gray-500 font-mono text-xs">
-                       {inv.hsn_or_sac || 'N/A'}
+                       {inv.hsn_sac_code || 'N/A'}
                      </td>
                      <td className="px-6 py-4 text-center">
                         {(() => {
@@ -1033,15 +992,19 @@ export default function SalesRegisterPage() {
                               ) : validationStatus === 'partial' ? (
                                 <><AlertCircle className="h-3 w-3" /> Partial</>
                               ) : (
-                                <><XCircle className="h-3 w-3" /> Failed</>
+                                <><XCircle className="h-3 w-3" /> Pending</>
                               )}
                             </span>
                           );
                         })()}
                      </td>
                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(inv.payment_status)}`}>
-                          {inv.payment_status || 'unpaid'}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                          inv.extraction_status === 'extracted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          inv.extraction_status === 'needs_review' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          'bg-gray-50 text-gray-600 border border-gray-200'
+                        }`}>
+                          {inv.extraction_status || 'pending'}
                         </span>
                      </td>
                      <td className="px-6 py-4 text-right">
@@ -1049,9 +1012,9 @@ export default function SalesRegisterPage() {
                            <button onClick={() => setSelectedInvoice(inv)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-900 transition-colors" title="View Details">
                               <Eye className="h-4 w-4" />
                            </button>
-                           {inv.invoice_bucket_url && (
+                           {inv.invoice_file_url && (
                              <a 
-                               href={inv.invoice_bucket_url} 
+                               href={inv.invoice_file_url} 
                                target="_blank" 
                                rel="noopener noreferrer"
                                className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-900 transition-colors" 
@@ -1144,9 +1107,9 @@ export default function SalesRegisterPage() {
                  <div className="flex justify-between items-center mb-4">
                     <h3 className="text-gray-900 font-semibold">Original Invoice</h3>
                     <div className="flex gap-2">
-                       {selectedInvoice.invoice_bucket_url && (
+                       {selectedInvoice.invoice_file_url && (
                          <a 
-                           href={selectedInvoice.invoice_bucket_url} 
+                           href={selectedInvoice.invoice_file_url} 
                            target="_blank"
                            rel="noopener noreferrer"
                            className="p-2 hover:bg-gray-200 rounded-lg text-gray-600 hover:text-gray-900 transition-colors"
@@ -1157,14 +1120,14 @@ export default function SalesRegisterPage() {
                     </div>
                  </div>
                  <div className="flex-1 bg-white rounded-xl border border-gray-200 relative overflow-hidden shadow-sm">
-                    {selectedInvoice.invoice_bucket_url ? (
+                    {selectedInvoice.invoice_file_url ? (
                       <object 
-                        data={selectedInvoice.invoice_bucket_url} 
+                        data={selectedInvoice.invoice_file_url} 
                         type="application/pdf"
                         className="w-full h-full"
                       >
                         <iframe 
-                          src={`https://docs.google.com/viewerRs.url=${encodeURIComponent(selectedInvoice.invoice_bucket_url)}&embedded=true`}
+                          src={`https://docs.google.com/viewer?url=${encodeURIComponent(selectedInvoice.invoice_file_url)}&embedded=true`}
                           className="w-full h-full"
                           title="Invoice Preview"
                         />
@@ -1185,8 +1148,8 @@ export default function SalesRegisterPage() {
                     <div>
                        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           {selectedInvoice.invoice_number || 'N/A'} 
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedInvoice.invoice_status)}`}>
-                            {getStatusLabel(selectedInvoice.invoice_status)}
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedInvoice.extraction_status)}`}>
+                            {getStatusLabel(selectedInvoice.extraction_status)}
                           </span>
                        </h2>
                     </div>
@@ -1231,28 +1194,50 @@ export default function SalesRegisterPage() {
                  <div className="flex-1 overflow-y-auto p-6">
                     {modalTab === 'details' && (
                        <div className="space-y-6">
-                          <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-2">
-                                <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Invoice Number</label>
-                                <input 
-                                  type="text" 
-                                  value={isEditing ? (editedData.invoice_number ?? selectedInvoice.invoice_number ?? '') : (selectedInvoice.invoice_number || '')} 
-                                  onChange={(e) => handleFieldChange('invoice_number', e.target.value)}
-                                  disabled={!isEditing}
-                                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
-                                />
+                             <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Invoice Number</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.invoice_number ?? selectedInvoice.invoice_number ?? '') : (selectedInvoice.invoice_number || '')} 
+                                     onChange={(e) => handleFieldChange('invoice_number', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Voucher Type</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.voucher_type ?? selectedInvoice.voucher_type ?? '') : (selectedInvoice.voucher_type || '')} 
+                                     onChange={(e) => handleFieldChange('voucher_type', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
                              </div>
-                             <div className="space-y-2">
-                                <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Invoice Date</label>
-                                <input 
-                                  type="date" 
-                                  value={isEditing ? (editedData.invoice_date ?? selectedInvoice.invoice_date ?? '') : (selectedInvoice.invoice_date || '')} 
-                                  onChange={(e) => handleFieldChange('invoice_date', e.target.value)}
-                                  disabled={!isEditing}
-                                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
-                                />
+                             <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Invoice Date</label>
+                                   <input 
+                                     type="date" 
+                                     value={isEditing ? (editedData.invoice_date ?? selectedInvoice.invoice_date ?? '') : (selectedInvoice.invoice_date || '')} 
+                                     onChange={(e) => handleFieldChange('invoice_date', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Invoice Type</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.invoice_type ?? selectedInvoice.invoice_type ?? '') : (selectedInvoice.invoice_type || '')} 
+                                     onChange={(e) => handleFieldChange('invoice_type', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
                              </div>
-                          </div>
 
                           <div className="space-y-4 pt-4 border-t border-gray-200">
                              <h4 className="text-sm font-semibold text-gray-900">Customer Details</h4>
@@ -1285,83 +1270,99 @@ export default function SalesRegisterPage() {
                              <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                                 <div className="space-y-1">
                                    <label className="text-xs text-gray-600">Taxable Value</label>
-                                   <input 
-                                     type="number" 
-                                     value={isEditing ? (editedData.taxable_value ?? selectedInvoice.taxable_value ?? 0) : (selectedInvoice.taxable_value || 0)} 
-                                     onChange={(e) => handleFieldChange('taxable_value', parseFloat(e.target.value))}
-                                     disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
-                                   />
+                                   <input type="number" value={isEditing ? (editedData.taxable_value ?? selectedInvoice.taxable_value ?? 0) : (selectedInvoice.taxable_value || 0)} onChange={(e) => handleFieldChange('taxable_value', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
                                 </div>
                                 <div className="space-y-1">
                                    <label className="text-xs text-gray-600">CGST</label>
-                                   <input 
-                                     type="number" 
-                                     value={isEditing ? (editedData.cgst ?? selectedInvoice.cgst ?? 0) : (selectedInvoice.cgst || 0)} 
-                                     onChange={(e) => handleFieldChange('cgst', parseFloat(e.target.value))}
-                                     disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
-                                   />
+                                   <input type="number" value={isEditing ? (editedData.cgst_amount ?? selectedInvoice.cgst_amount ?? 0) : (selectedInvoice.cgst_amount || 0)} onChange={(e) => handleFieldChange('cgst_amount', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
                                 </div>
                                 <div className="space-y-1">
                                    <label className="text-xs text-gray-600">SGST</label>
-                                   <input 
-                                     type="number" 
-                                     value={isEditing ? (editedData.sgst ?? selectedInvoice.sgst ?? 0) : (selectedInvoice.sgst || 0)} 
-                                     onChange={(e) => handleFieldChange('sgst', parseFloat(e.target.value))}
-                                     disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
-                                   />
+                                   <input type="number" value={isEditing ? (editedData.sgst_amount ?? selectedInvoice.sgst_amount ?? 0) : (selectedInvoice.sgst_amount || 0)} onChange={(e) => handleFieldChange('sgst_amount', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
                                 </div>
                                 <div className="space-y-1">
                                    <label className="text-xs text-gray-600">IGST</label>
-                                   <input 
-                                     type="number" 
-                                     value={isEditing ? (editedData.igst ?? selectedInvoice.igst ?? 0) : (selectedInvoice.igst || 0)} 
-                                     onChange={(e) => handleFieldChange('igst', parseFloat(e.target.value))}
-                                     disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
-                                   />
+                                   <input type="number" value={isEditing ? (editedData.igst_amount ?? selectedInvoice.igst_amount ?? 0) : (selectedInvoice.igst_amount || 0)} onChange={(e) => handleFieldChange('igst_amount', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
                                 </div>
                                 <div className="space-y-1">
-                                   <label className="text-xs text-gray-600">CESS</label>
-                                   <input 
-                                     type="number" 
-                                     value={isEditing ? (editedData.cess ?? selectedInvoice.cess ?? 0) : (selectedInvoice.cess || 0)} 
-                                     onChange={(e) => handleFieldChange('cess', parseFloat(e.target.value))}
-                                     disabled={!isEditing}
-                                     className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-primary text-right disabled:opacity-50" 
-                                   />
+                                   <label className="text-xs text-gray-600">TCS/Cess</label>
+                                   <input type="number" value={isEditing ? (editedData.tcs_cess ?? selectedInvoice.tcs_cess ?? 0) : (selectedInvoice.tcs_cess || 0)} onChange={(e) => handleFieldChange('tcs_cess', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
+                                </div>
+                                <div className="space-y-1">
+                                   <label className="text-xs text-gray-600">Round Off</label>
+                                   <input type="number" value={isEditing ? (editedData.round_off ?? selectedInvoice.round_off ?? 0) : (selectedInvoice.round_off || 0)} onChange={(e) => handleFieldChange('round_off', parseFloat(e.target.value))} disabled={!isEditing} className="w-full bg-transparent border-b border-gray-200 py-1 text-sm text-gray-900 font-mono outline-none focus:border-emerald-500 text-right disabled:opacity-50" />
                                 </div>
                              </div>
-                             <div className="flex justify-end items-center gap-4 pt-2">
-                                <span className="text-sm text-zinc-400">Total Amount</span>
-                                <span className="text-2xl font-bold text-white font-mono">Rs. {(selectedInvoice.total_invoice_value || 0).toLocaleString()}</span>
+                             <div className="flex justify-between items-center pt-2">
+                                <span className="text-sm text-gray-500">Gross Total</span>
+                                <span className="text-2xl font-bold text-gray-900 font-mono">Rs. {(selectedInvoice.gross_total || 0).toLocaleString()}</span>
                              </div>
                           </div>
 
-                          <div className="space-y-4 pt-4 border-t border-white/5">
-                             <h4 className="text-sm font-semibold text-white">Additional Details</h4>
+                          <div className="space-y-4 pt-4 border-t border-gray-200">
+                             <h4 className="text-sm font-semibold text-gray-900">Additional Details</h4>
                              <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                    <label className="text-xs text-gray-600 font-medium uppercase">HSN/SAC Code</label>
                                    <input 
                                      type="text" 
-                                     value={isEditing ? (editedData.hsn_or_sac ?? selectedInvoice.hsn_or_sac ?? '') : (selectedInvoice.hsn_or_sac || '')} 
-                                     onChange={(e) => handleFieldChange('hsn_or_sac', e.target.value)}
+                                     value={isEditing ? (editedData.hsn_sac_code ?? selectedInvoice.hsn_sac_code ?? '') : (selectedInvoice.hsn_sac_code || '')} 
+                                     onChange={(e) => handleFieldChange('hsn_sac_code', e.target.value)}
                                      disabled={!isEditing}
                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
                                    />
                                 </div>
                                 <div className="space-y-2">
-                                   <label className="text-xs text-gray-600 font-medium uppercase">Invoice Type</label>
+                                   <label className="text-xs text-gray-600 font-medium uppercase">UQC</label>
                                    <input 
                                      type="text" 
-                                     value={isEditing ? (editedData.invoice_type ?? selectedInvoice.invoice_type ?? '') : (selectedInvoice.invoice_type || '')} 
-                                     onChange={(e) => handleFieldChange('invoice_type', e.target.value)}
+                                     value={isEditing ? (editedData.uqc ?? selectedInvoice.uqc ?? '') : (selectedInvoice.uqc || '')} 
+                                     onChange={(e) => handleFieldChange('uqc', e.target.value)}
                                      disabled={!isEditing}
                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
                                    />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase">Place of Supply</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.place_of_supply ?? selectedInvoice.place_of_supply ?? '') : (selectedInvoice.place_of_supply || '')} 
+                                     onChange={(e) => handleFieldChange('place_of_supply', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase">E-Way Bill</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.eway_bill_number ?? selectedInvoice.eway_bill_number ?? '') : (selectedInvoice.eway_bill_number || '')} 
+                                     onChange={(e) => handleFieldChange('eway_bill_number', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase">IRN</label>
+                                   <input 
+                                     type="text" 
+                                     value={isEditing ? (editedData.irn ?? selectedInvoice.irn ?? '') : (selectedInvoice.irn || '')} 
+                                     onChange={(e) => handleFieldChange('irn', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase">Reverse Charge</label>
+                                   <select 
+                                     value={isEditing ? String(editedData.reverse_charge ?? selectedInvoice.reverse_charge ?? false) : String(selectedInvoice.reverse_charge ?? false)}
+                                     onChange={(e) => handleFieldChange('reverse_charge', e.target.value === 'true')}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100"
+                                   >
+                                     <option value="false">No</option>
+                                     <option value="true">Yes</option>
+                                   </select>
                                 </div>
                              </div>
                           </div>

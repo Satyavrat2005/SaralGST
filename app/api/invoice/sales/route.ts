@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSalesInvoices } from '@/lib/services/salesInvoiceService';
+import { getNewSalesInvoices } from '@/lib/services/salesInvoiceService';
 
 /**
  * GET /api/invoice/sales
- * Fetch all sales invoices
+ * Fetch all sales invoices from the new sales_invoices table
  */
 export async function GET(request: NextRequest) {
   try {
-    const { data: invoices, error } = await getSalesInvoices(false);
+    const { data: invoices, error } = await getNewSalesInvoices(true);
 
     if (error) {
       return NextResponse.json(

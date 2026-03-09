@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getSalesInvoiceById,
-  getSalesRemarks,
-  updateSalesInvoice,
-  deleteSalesInvoice,
+  getNewSalesInvoiceById,
+  updateNewSalesInvoice,
+  deleteNewSalesInvoice,
 } from '@/lib/services/salesInvoiceService';
 
 /**
@@ -17,7 +16,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const { data: invoice, error: invoiceError } = await getSalesInvoiceById(id);
+    const { data: invoice, error: invoiceError } = await getNewSalesInvoiceById(id, true);
 
     if (invoiceError) {
       return NextResponse.json(
@@ -33,13 +32,10 @@ export async function GET(
       );
     }
 
-    // Fetch remarks for this invoice
-    const { data: remarks, error: remarksError } = await getSalesRemarks(id);
-
     return NextResponse.json({
       success: true,
       invoice,
-      remarks: remarks || [],
+      remarks: [],
     });
 
   } catch (error: any) {
@@ -63,10 +59,7 @@ export async function PATCH(
     const { id } = await params;
     const updates = await request.json();
 
-    // Remove generated column if present
-    const { total_invoice_value, ...dataToSave } = updates;
-
-    const { data, error } = await updateSalesInvoice(id, dataToSave, true);
+    const { data, error } = await updateNewSalesInvoice(id, updates, true);
 
     if (error) {
       return NextResponse.json(
@@ -100,7 +93,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const { success, error } = await deleteSalesInvoice(id, true);
+    const { success, error } = await deleteNewSalesInvoice(id, true);
 
     if (error || !success) {
       return NextResponse.json(

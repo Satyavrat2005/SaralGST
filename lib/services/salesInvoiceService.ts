@@ -113,7 +113,7 @@ export async function uploadSalesInvoice(
     const filePath = `Sales Invoice/${fileName}`;
 
     const { data, error } = await client.storage
-      .from('SARALGST')
+      .from('Saral_GST')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -126,7 +126,7 @@ export async function uploadSalesInvoice(
 
     // Get public URL
     const { data: urlData } = client.storage
-      .from('SARALGST')
+      .from('Saral_GST')
       .getPublicUrl(filePath);
 
     return {
@@ -337,5 +337,154 @@ export async function getSalesRemarks(
   } catch (error: any) {
     console.error('Exception fetching sales remarks:', error);
     return { data: null, error: error.message };
+  }
+}
+
+// ============================================================
+// NEW: sales_invoices table (improved schema)
+// ============================================================
+
+/**
+ * Interface matching the new sales_invoices Supabase table.
+ */
+export interface SalesInvoice {
+  id?: string;
+  user_id?: string;
+
+  // 1. Basic Invoice Information
+  invoice_date?: string | null;
+  voucher_type?: string | null;          // Sales | Credit Note | Debit Note
+  invoice_number?: string | null;
+  invoice_type?: string | null;          // B2B | B2C Small | B2C Large | Export
+
+  // 2. Customer Details
+  customer_name?: string | null;
+  customer_gstin?: string | null;
+  place_of_supply?: string | null;       // e.g. "27-Maharashtra"
+
+  // 3. Product & Pricing
+  hsn_sac_code?: string | null;
+  quantity?: number | null;
+  uqc?: string | null;                   // KGS | MTR | PCS | NOS | LTR | BAG | BOX
+  rate?: number | null;
+
+  // 4. Financial & Tax Breakdown
+  local_sales_taxable_18?: number | null;
+  local_sales_taxable_12?: number | null;
+  oms_sales_taxable_12?: number | null;
+  taxable_value?: number | null;
+  cgst_amount?: number | null;
+  sgst_amount?: number | null;
+  igst_amount?: number | null;
+  tcs_cess?: number | null;
+  round_off?: number | null;
+  gross_total?: number | null;
+
+  // 5. Advanced Compliance
+  reverse_charge?: boolean | null;
+  eway_bill_number?: string | null;
+  irn?: string | null;
+
+  // File & AI Processing
+  invoice_file_url?: string | null;
+  extraction_status?: 'pending' | 'extracted' | 'needs_review' | null;
+  gemini_raw_json?: any | null;
+
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Create a record in the new sales_invoices table */
+export async function createNewSalesInvoice(
+  invoice: Partial<SalesInvoice>,
+  useAdmin = false
+): Promise<{ data: SalesInvoice | null; error: string | null }> {
+  try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
+      .from('sales_invoices')
+      .insert(invoice)
+      .select()
+      .single();
+
+    if (error) return { data: null, error: error.message };
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message };
+  }
+}
+
+/** Fetch all records from sales_invoices */
+export async function getNewSalesInvoices(
+  useAdmin = false
+): Promise<{ data: SalesInvoice[] | null; error: string | null }> {
+  try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
+      .from('sales_invoices')
+      .select('*')
+      .order('invoice_date', { ascending: false });
+
+    if (error) return { data: null, error: error.message };
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message };
+  }
+}
+
+/** Fetch a single record from sales_invoices by id */
+export async function getNewSalesInvoiceById(
+  id: string,
+  useAdmin = false
+): Promise<{ data: SalesInvoice | null; error: string | null }> {
+  try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
+      .from('sales_invoices')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) return { data: null, error: error.message };
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message };
+  }
+}
+
+/** Update a record in sales_invoices */
+export async function updateNewSalesInvoice(
+  id: string,
+  updates: Partial<SalesInvoice>,
+  useAdmin = false
+): Promise<{ data: SalesInvoice | null; error: string | null }> {
+  try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { data, error } = await client
+      .from('sales_invoices')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return { data: null, error: error.message };
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message };
+  }
+}
+
+/** Delete a record from sales_invoices */
+export async function deleteNewSalesInvoice(
+  id: string,
+  useAdmin = false
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const client = useAdmin ? supabaseAdmin : supabase;
+    const { error } = await client.from('sales_invoices').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }

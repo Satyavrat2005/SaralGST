@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   uploadSalesInvoice,
-  createSalesInvoice,
-  updateSalesInvoice,
-  createSalesRemarks,
-  SalesRegister,
+  createNewSalesInvoice,
+  updateNewSalesInvoice,
+  SalesInvoice,
 } from '@/lib/services/salesInvoiceService';
-import { extractTextFromInvoice } from '@/lib/services/ocrService';
-import { extractSalesInvoiceData } from '@/lib/services/salesExtractionService';
-import { validateSalesInvoice, validationToRemarks } from '@/lib/services/salesValidationService';
+import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtractionService';
 
 /**
  * POST /api/invoice/sales/process
- * Upload and process a sales invoice through OCR, LLM extraction, validation, and storage
+ * Upload PDF/image → Gemini extracts structured data → save to sales_invoices table
  */
 export async function POST(request: NextRequest) {
   try {
@@ -27,13 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-    ];
-
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: 'Invalid file type. Only PDF, JPG, and PNG are allowed.' },
@@ -41,18 +32,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
+    // Validate file size (max 10 MB)
+    if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'File size exceeds 10MB limit' },
+        { error: 'File size exceeds 10 MB limit.' },
         { status: 400 }
       );
     }
 
-    // Step 1: Upload file to Supabase Storage
+    // ── Step 1: Upload file to Supabase Storage ──────────────────────────────
     const { data: uploadData, error: uploadError } = await uploadSalesInvoice(file, true);
-
     if (uploadError || !uploadData) {
       return NextResponse.json(
         { error: `Failed to upload file: ${uploadError}` },
@@ -60,204 +49,113 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Create initial record with pending status
-    const initialRecord: Partial<SalesRegister> = {
-      invoice_bucket_url: uploadData.url,
-      invoice_status: 'needs_review',
-      seller_gstin: 'TEMP', // Will be updated by extraction
-      seller_state_code: '00', // Will be updated by extraction
-      invoice_number: 'TEMP', // Will be updated by extraction
-      invoice_date: new Date().toISOString().split('T')[0],
-      invoice_type: 'B2B',
-      supply_type: 'Intra',
-      place_of_supply_state_code: '00',
-      taxable_value: 0,
-      extraction_source: 'ocr+llm',
-    };
+    // ── Step 2: Create a placeholder record so we have an ID immediately ─────
+    const { data: placeholder, error: createError } = await createNewSalesInvoice(
+      {
+        invoice_file_url: uploadData.url,
+        extraction_status: 'pending',
+      },
+      true
+    );
 
-    const { data: createdInvoice, error: createError } = await createSalesInvoice(initialRecord, true);
-
-    if (createError || !createdInvoice) {
+    if (createError || !placeholder) {
       return NextResponse.json(
         { error: `Failed to create invoice record: ${createError}` },
         { status: 500 }
       );
     }
 
-    const invoiceId = createdInvoice.id!;
+    const invoiceId = placeholder.id!;
 
-    // Step 3: Convert file to buffer for OCR
+    // ── Step 3: Convert file to Buffer and call Gemini ────────────────────────
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const base64File = fileBuffer.toString('base64');
+    const { data: extracted, error: geminiError } = await extractSalesInvoiceWithGemini(
+      fileBuffer,
+      file.type
+    );
 
-    // Step 4: Perform OCR extraction using Tesseract, then pass to Gemini for structured extraction
-    let extractedData;
-    let ocrConfidence = 0;
-
-    // Use Tesseract OCR + Gemini LLM approach (more reliable)
-    console.log('Extracting text using Tesseract OCR...');
-    const ocrResult = await extractTextFromInvoice(fileBuffer, file.type);
-
-    if (!ocrResult.success || !ocrResult.rawText) {
-      await updateSalesInvoice(invoiceId, {
-        invoice_status: 'needs_review',
-      }, true);
-
-      await createSalesRemarks([{
-        sales_id: invoiceId,
-        field_name: 'ocr_extraction',
-        issue_type: 'invalid',
-        detected_value: null,
-        comment: ocrResult.error || 'Failed to extract text from invoice',
-        status: 'open',
-      }], true);
-
+    if (geminiError || !extracted) {
+      // Update status so user sees it needs manual review
+      await updateNewSalesInvoice(invoiceId, { extraction_status: 'needs_review' }, true);
       return NextResponse.json({
         success: true,
         invoiceId,
-        message: 'Invoice uploaded but OCR failed. Manual review required.',
-        invoice: createdInvoice,
+        message: 'Invoice uploaded but AI extraction failed. Please fill in the details manually.',
+        invoice: placeholder,
       });
     }
 
-    console.log('OCR extraction successful. Passing to Gemini for sales invoice structured extraction...');
-    ocrConfidence = ocrResult.confidence;
+    // ── Step 4: Map extracted data → SalesInvoice row ────────────────────────
+    const invoiceData: Partial<SalesInvoice> = {
+      // Basic Invoice Information
+      invoice_date: extracted.invoice_date,
+      voucher_type: extracted.voucher_type,
+      invoice_number: extracted.invoice_number,
+      invoice_type: extracted.invoice_type,
 
-    // Pass OCR text to Gemini LLM for sales-specific structured extraction
-    const { data: llmData, error: llmError } = await extractSalesInvoiceData(ocrResult.rawText);
+      // Customer Details
+      customer_name: extracted.customer_name,
+      customer_gstin: extracted.customer_gstin,
+      place_of_supply: extracted.place_of_supply,
 
-    if (llmError || !llmData) {
-      await updateSalesInvoice(invoiceId, {
-        invoice_status: 'needs_review',
-      }, true);
+      // Product & Pricing
+      hsn_sac_code: extracted.hsn_sac_code,
+      quantity: extracted.quantity,
+      uqc: extracted.uqc,
+      rate: extracted.rate,
 
-      await createSalesRemarks([{
-        sales_id: invoiceId,
-        field_name: 'llm_extraction',
-        issue_type: 'invalid',
-        detected_value: null,
-        comment: llmError || 'Failed to extract structured data from invoice',
-        status: 'open',
-      }], true);
+      // Financial & Tax Breakdown
+      local_sales_taxable_18: extracted.local_sales_taxable_18,
+      local_sales_taxable_12: extracted.local_sales_taxable_12,
+      oms_sales_taxable_12: extracted.oms_sales_taxable_12,
+      taxable_value: extracted.taxable_value,
+      cgst_amount: extracted.cgst_amount,
+      sgst_amount: extracted.sgst_amount,
+      igst_amount: extracted.igst_amount,
+      tcs_cess: extracted.tcs_cess,
+      round_off: extracted.round_off,
+      gross_total: extracted.gross_total,
 
-      return NextResponse.json({
-        success: true,
-        invoiceId,
-        message: 'Invoice uploaded but extraction failed. Manual review required.',
-        invoice: createdInvoice,
-      });
-    }
+      // Advanced Compliance
+      reverse_charge: extracted.reverse_charge,
+      eway_bill_number: extracted.eway_bill_number,
+      irn: extracted.irn,
 
-    extractedData = llmData;
-
-    console.log('Raw extracted data:', JSON.stringify(extractedData).substring(0, 500));
-
-    // Step 5: Map extracted sales invoice data to sales register format
-    const extractedInvoice: Partial<SalesRegister> = {
-      // Seller details (WE are the seller in sales invoice)
-      seller_gstin: extractedData.seller_gstin || '',
-      seller_state_code: extractedData.seller_gstin?.substring(0, 2) || '',
-      
-      // Customer details (THEY are the buyer/customer)
-      customer_name: extractedData.customer_name || '',
-      customer_gstin: extractedData.customer_gstin || '',
-      customer_state_code: extractedData.customer_gstin?.substring(0, 2) || '',
-      
-      // Invoice details
-      invoice_number: extractedData.invoice_number || '',
-      invoice_date: extractedData.invoice_date || new Date().toISOString().split('T')[0],
-      invoice_type: (extractedData.invoice_type as 'B2B' | 'B2C' | 'SEZ' | 'Export' | 'CreditNote') || 'B2B',
-      supply_type: determineSupplyType(extractedData.seller_gstin?.substring(0, 2), extractedData.customer_gstin?.substring(0, 2)),
-      place_of_supply_state_code: extractedData.customer_gstin?.substring(0, 2) || extractedData.seller_gstin?.substring(0, 2) || '',
-      
-      // Item details
-      hsn_or_sac: extractedData.hsn_or_sac || '',
-      description: extractedData.description || '',
-      quantity: extractedData.quantity ? parseFloat(extractedData.quantity) : null,
-      unit: extractedData.unit || null,
-      rate: extractedData.rate || null,
-      
-      // Tax details
-      taxable_value: extractedData.taxable_value || 0,
-      cgst: extractedData.cgst || 0,
-      sgst: extractedData.sgst || 0,
-      igst: extractedData.igst || 0,
-      cess: extractedData.cess || 0,
-      tcs: 0,
-      
-      // GST flags
-      is_reverse_charge: extractedData.is_reverse_charge || false,
-      is_itc_eligible: false, // Sales invoices don't have ITC
-      is_export: extractedData.invoice_type?.toLowerCase().includes('export') || false,
-      is_sez: extractedData.invoice_type?.toLowerCase().includes('sez') || false,
-      
       // Processing metadata
-      ocr_raw_json: extractedData,
-      ocr_confidence_score: ocrConfidence,
-      extraction_source: 'ocr+llm',
+      invoice_file_url: uploadData.url,
+      gemini_raw_json: extracted,
+      extraction_status: determineExtractionStatus(extracted),
     };
 
-    // Step 6: Validate the extracted data
-    const validationResult = validateSalesInvoice(extractedInvoice);
-    console.log('Validation result:', {
-      isValid: validationResult.isValid,
-      errorCount: validationResult.errors.length,
-      warningCount: validationResult.warnings.length,
-      invoiceNumber: extractedInvoice.invoice_number,
-      customerName: extractedInvoice.customer_name,
-      taxableValue: extractedInvoice.taxable_value
-    });
-
-    // Determine final status based on validation
-    const finalStatus = validationResult.isValid ? 'extracted' : 'needs_review';
-    extractedInvoice.invoice_status = finalStatus;
-
-    // Step 7: Update the invoice with extracted data
-    const { data: updatedInvoice, error: updateError } = await updateSalesInvoice(
+    // ── Step 5: Update the placeholder record with extracted data ─────────────
+    const { data: updatedInvoice, error: updateError } = await updateNewSalesInvoice(
       invoiceId,
-      extractedInvoice,
+      invoiceData,
       true
     );
 
     if (updateError) {
-      console.error('Error updating invoice:', updateError);
-      // Even if update fails, return the extracted data
+      console.error('[ProcessRoute] Update failed:', updateError);
+      // Return partial success — data extracted but DB update failed
       return NextResponse.json({
         success: true,
         invoiceId,
-        invoice: extractedInvoice,
-        validation: {
-          isValid: validationResult.isValid,
-          errorCount: validationResult.errors.length,
-          warningCount: validationResult.warnings.length,
-        },
-        message: 'Invoice extracted but update failed. Data: ' + JSON.stringify(extractedInvoice).substring(0, 200),
+        invoice: invoiceData,
+        message: 'Data extracted but could not save to database. Please retry.',
       });
     }
 
-    // Step 8: Store validation remarks if any issues found
-    if (validationResult.errors.length > 0 || validationResult.warnings.length > 0) {
-      const remarks = validationToRemarks(invoiceId, validationResult);
-      await createSalesRemarks(remarks, true);
-    }
-
-    // Return success response
     return NextResponse.json({
       success: true,
       invoiceId,
-      invoice: updatedInvoice || extractedInvoice,
-      validation: {
-        isValid: validationResult.isValid,
-        errorCount: validationResult.errors.length,
-        warningCount: validationResult.warnings.length,
-      },
-      message: validationResult.isValid
-        ? 'Invoice processed successfully'
-        : 'Invoice processed with validation issues',
+      invoice: updatedInvoice,
+      message:
+        invoiceData.extraction_status === 'extracted'
+          ? `Invoice processed: ${invoiceData.invoice_number || invoiceId}`
+          : 'Invoice uploaded with some missing fields. Please review.',
     });
-
   } catch (error: any) {
-    console.error('Error processing sales invoice:', error);
+    console.error('[ProcessRoute] Unhandled error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -266,12 +164,21 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Helper: Determine supply type from state codes
+ * Decide extraction_status based on which critical fields were found.
  */
-function determineSupplyType(sellerState?: string, customerState?: string): 'Intra' | 'Inter' {
-  if (!sellerState || !customerState) {
-    return 'Inter'; // Default to inter-state if states are unknown
-  }
-  
-  return sellerState === customerState ? 'Intra' : 'Inter';
+function determineExtractionStatus(
+  data: Partial<{
+    invoice_number: string | null;
+    invoice_date: string | null;
+    taxable_value: number | null;
+    gross_total: number | null;
+  }>
+): SalesInvoice['extraction_status'] {
+  const hasCritical =
+    data.invoice_number &&
+    data.invoice_date &&
+    (data.taxable_value !== null || data.gross_total !== null);
+  return hasCritical ? 'extracted' : 'needs_review';
 }
+
+
