@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       sgst_amount: extractedData.sgst || 0,
       igst_amount: extractedData.igst || 0,
       cess_amount: extractedData.cess || 0,
-      // total_invoice_value is a generated column, calculated automatically by DB
+      total_invoice_value: (extractedData.taxable_value || 0) + (extractedData.cgst || 0) + (extractedData.sgst || 0) + (extractedData.igst || 0) + (extractedData.cess || 0),
       hsn_or_sac_code: extractedData.hsn_or_sac || null,
       description_of_goods_services: extractedData.description || null,
       quantity: parseFloat(extractedData.quantity) || null,
