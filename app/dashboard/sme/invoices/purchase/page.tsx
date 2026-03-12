@@ -255,8 +255,16 @@ export default function PurchaseRegisterPage() {
     if (!selectedInvoice?.id) return;
 
     try {
-      // Remove total_invoice_value from editedData as it's a generated column
-      const { total_invoice_value, ...dataToSave } = editedData;
+      // Calculate total_invoice_value from component values
+      const dataToSave = {
+        ...editedData,
+        total_invoice_value: 
+          (editedData.taxable_value || 0) + 
+          (editedData.cgst_amount || 0) + 
+          (editedData.sgst_amount || 0) + 
+          (editedData.igst_amount || 0) + 
+          (editedData.cess_amount || 0),
+      };
       
       const response = await fetch(`/api/invoice/purchase/${selectedInvoice.id}`, {
         method: 'PATCH',

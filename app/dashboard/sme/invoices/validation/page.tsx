@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   CheckCircle2, 
@@ -8,52 +8,311 @@ import {
   AlertTriangle, 
   RefreshCw, 
   Download, 
-  ChevronDown, 
   ChevronRight, 
   Wrench, 
-  Send, 
   Trash2, 
-  FileText,
   ExternalLink,
-  ArrowRight
+  Loader2
 } from 'lucide-react';
 
-// Mock Data
-const failedInvoices = [
-  { id: 'INV-ERR-01', date: '18 Nov 2025', vendor: 'ABC Enterprises', amount: 53808, errors: [
-    { type: 'critical', message: 'GSTIN format invalid', expected: '15-digit format', found: '27ABCDE1234F1Z' },
-    { type: 'critical', message: 'Invoice number duplicate', detail: 'Duplicate of INV-001234 from 15 Nov' }
-  ], priority: 'High' },
-  { id: 'INV-ERR-02', date: '17 Nov 2025', vendor: 'Office Supplies Co', amount: 4130, errors: [
-    { type: 'critical', message: 'Total amount mismatch', expected: '₹4,130', found: '₹4,100' }
-  ], priority: 'Medium' },
-];
+interface ValidationQueueInvoice {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  vendor: string;
+  gstin: string;
+  amount: number;
+  type: 'purchase' | 'sales';
+  validation_status: 'passed' | 'partial' | 'failed';
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  created_at: string;
+}
 
-const partialInvoices = [
-  { id: 'INV-WARN-01', date: '18 Nov 2025', vendor: 'TechSol Solutions', amount: 14160, warnings: [
-    { type: 'warning', message: 'Tax calculation minor mismatch', impact: 'Minor (₹0.50 diff)' },
-    { type: 'warning', message: 'HSN code not found in master', impact: 'Informational' }
-  ] },
-  { id: 'INV-WARN-02', date: '16 Nov 2025', vendor: 'Reddy Traders', amount: 28320, warnings: [
-     { type: 'warning', message: 'Vendor filing status unknown', impact: 'ITC Risk' }
-  ] }
-];
+interface ValidationError {
+  type: 'critical';
+  message: string;
+  expected?: string;
+  found?: string;
+  detail?: string;
+}
 
-const passedInvoices = [
-  { id: 'INV-PASS-01', date: '18 Nov 2025', vendor: 'Global Logistics', amount: 100300, validatedAt: '2 mins ago' },
-  { id: 'INV-PASS-02', date: '18 Nov 2025', vendor: 'Alpha Systems', amount: 14160, validatedAt: '10 mins ago' },
-];
+interface ValidationWarning {
+  type: 'warning';
+  message: string;
+  impact?: string;
+}
+
+interface ValidationSummary {
+  total: number;
+  passed: number;
+  partial: number;
+  failed: number;
+  purchase: number;
+  sales: number;
+}
 
 export default function ValidationQueuePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'fail' | 'partial' | 'pass'>('fail');
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<ValidationQueueInvoice[]>([]);
+  const [summary, setSummary] = useState<ValidationSummary>({
+    total: 0,
+    passed: 0,
+    partial: 0,
+    failed: 0,
+    purchase: 0,
+    sales: 0
+  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+  const fetchValidationQueue = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/invoice/validation-queue');
+      const data = await response.json();
+      
+      if (data.success) {
+        setInvoices(data.invoices);
+        setSummary(data.summary);
+      } else {
+        console.error('Failed to fetch validation queue');
+      }
+    } catch (error) {
+      console.error('Error fetching validation queue:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchValidationQueue();
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchValidationQueue();
+  };
+
+  // Export Issues to CSV
+  const handleExportIssues = () => {
+    const issueInvoices = invoices.filter(inv => inv.validation_status !== 'passed');
+    if (issueInvoices.length === 0) {
+      alert('No issues to export!');
+      return;
+    }
+
+    const csvData = issueInvoices.map(inv => ({
+      'Invoice Number': inv.invoice_number,
+      'Date': inv.invoice_date,
+      'Vendor': inv.vendor,
+      'GSTIN': inv.gstin,
+      'Amount': inv.amount,
+      'Type': inv.type,
+      'Status': inv.validation_status,
+      'Errors': inv.errors.map(e => e.message).join('; '),
+      'Warnings': inv.warnings.map(w => w.message).join('; ')
+    }));
+
+    const headers = Object.keys(csvData[0]);
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(h => `"${row[h as keyof typeof row]}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `validation-issues-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Navigate to edit invoice
+  const handleEditInvoice = (invoice: ValidationQueueInvoice) => {
+    router.push(`/dashboard/sme/invoices/${invoice.type}?id=${invoice.id}`);
+  };
+
+  // Delete invoice
+  const handleDeleteInvoice = async (invoice: ValidationQueueInvoice) => {
+    if (!confirm(`Are you sure you want to delete invoice ${invoice.invoice_number}?`)) {
+      return;
+    }
+
+    setProcessingIds(prev => new Set(prev).add(invoice.id));
+    
+    try {
+      const table = invoice.type === 'purchase' ? 'purchase_register' : 'sales_register';
+      const response = await fetch(`/api/invoice/${invoice.type}?id=${invoice.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        alert('Invoice deleted successfully');
+        fetchValidationQueue(); // Refresh the list
+      } else {
+        alert('Failed to delete invoice');
+      }
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      alert('Error deleting invoice');
+    } finally {
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoice.id);
+        return newSet;
+      });
+    }
+  };
+
+  // Approve invoice (update status to verified)
+  const handleApproveInvoice = async (invoice: ValidationQueueInvoice) => {
+    setProcessingIds(prev => new Set(prev).add(invoice.id));
+    
+    try {
+      const table = invoice.type === 'purchase' ? 'purchase_register' : 'sales_register';
+      const response = await fetch(`/api/invoice/${invoice.type}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: invoice.id,
+          invoice_status: 'verified'
+        })
+      });
+
+      if (response.ok) {
+        alert('Invoice approved successfully');
+        fetchValidationQueue(); // Refresh the list
+      } else {
+        alert('Failed to approve invoice');
+      }
+    } catch (error) {
+      console.error('Error approving invoice:', error);
+      alert('Error approving invoice');
+    } finally {
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoice.id);
+        return newSet;
+      });
+    }
+  };
+
+  // Approve all passed invoices
+  const handleApproveAll = async () => {
+    const passedInvoices = invoices.filter(inv => inv.validation_status === 'passed');
+    if (passedInvoices.length === 0) {
+      alert('No passed invoices to approve');
+      return;
+    }
+
+    if (!confirm(`Approve ${passedInvoices.length} validated invoices?`)) {
+      return;
+    }
+
+    setRefreshing(true);
+    
+    try {
+      const promises = passedInvoices.map(invoice => 
+        fetch(`/api/invoice/${invoice.type}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: invoice.id,
+            invoice_status: 'verified'
+          })
+        })
+      );
+
+      await Promise.all(promises);
+      alert('All invoices approved successfully');
+      fetchValidationQueue();
+    } catch (error) {
+      console.error('Error approving invoices:', error);
+      alert('Error approving some invoices');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Accept all partial invoices
+  const handleAcceptAllPartial = async () => {
+    const partialInvoices = invoices.filter(inv => inv.validation_status === 'partial');
+    if (partialInvoices.length === 0) {
+      alert('No partial invoices to accept');
+      return;
+    }
+
+    if (!confirm(`Accept ${partialInvoices.length} invoices with warnings?`)) {
+      return;
+    }
+
+    setRefreshing(true);
+    
+    try {
+      const promises = partialInvoices.map(invoice => 
+        fetch(`/api/invoice/${invoice.type}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: invoice.id,
+            invoice_status: 'verified'
+          })
+        })
+      );
+
+      await Promise.all(promises);
+      alert('All invoices accepted successfully');
+      fetchValidationQueue();
+    } catch (error) {
+      console.error('Error accepting invoices:', error);
+      alert('Error accepting some invoices');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const getPriority = (inv: ValidationQueueInvoice): 'High' | 'Medium' | 'Low' => {
+    if (inv.errors.length > 3) return 'High';
+    if (inv.errors.length > 0) return 'Medium';
+    return 'Low';
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const failedInvoices = invoices.filter(inv => inv.validation_status === 'failed');
+  const partialInvoices = invoices.filter(inv => inv.validation_status === 'partial');
+  const passedInvoices = invoices.filter(inv => inv.validation_status === 'passed');
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => 
       prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50 p-8">
+        <div className="flex items-center justify-center min-h-[600px]">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading validation queue...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50 p-8 space-y-6">
@@ -68,11 +327,18 @@ export default function ValidationQueuePage() {
           <p className="text-gray-600 text-sm">Review and fix invoice validation issues</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm">
+           <button 
+             onClick={handleExportIssues}
+             className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
+           >
              <Download className="h-4 w-4" /> Export Issues
            </button>
-           <button className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-2 shadow-lg">
-             <RefreshCw className="h-4 w-4" /> Re-validate All
+           <button 
+             onClick={handleRefresh}
+             disabled={refreshing}
+             className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
+           >
+             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Re-validate All
            </button>
         </div>
       </div>
@@ -85,7 +351,7 @@ export default function ValidationQueuePage() {
         >
            <div className="flex justify-between items-start">
               <div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">789</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{summary.passed}</div>
                 <div className={`text-xs font-medium ${activeTab === 'pass' ? 'text-emerald-700' : 'text-gray-600'}`}>Passed Invoices</div>
               </div>
               <div className={`p-2 rounded-lg ${activeTab === 'pass' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
@@ -93,7 +359,7 @@ export default function ValidationQueuePage() {
               </div>
            </div>
            <div className="mt-3 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 w-[96%]"></div>
+              <div className="h-full bg-emerald-500" style={{width: `${summary.total > 0 ? (summary.passed / summary.total * 100) : 0}%`}}></div>
            </div>
            <p className="text-[10px] text-gray-500 mt-2 group-hover:text-emerald-600 transition-colors">Ready for reconciliation</p>
         </button>
@@ -104,7 +370,7 @@ export default function ValidationQueuePage() {
         >
            <div className="flex justify-between items-start">
               <div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">11</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{summary.failed}</div>
                 <div className={`text-xs font-medium ${activeTab === 'fail' ? 'text-red-700' : 'text-gray-600'}`}>Failed Validation</div>
               </div>
               <div className={`p-2 rounded-lg ${activeTab === 'fail' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
@@ -112,7 +378,7 @@ export default function ValidationQueuePage() {
               </div>
            </div>
            <div className="mt-3 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-red-500 w-[4%]"></div>
+              <div className="h-full bg-red-500" style={{width: `${summary.total > 0 ? (summary.failed / summary.total * 100) : 0}%`}}></div>
            </div>
            <p className="text-[10px] text-gray-500 mt-2 group-hover:text-red-600 transition-colors">Requires immediate action</p>
         </button>
@@ -123,7 +389,7 @@ export default function ValidationQueuePage() {
         >
            <div className="flex justify-between items-start">
               <div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">23</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{summary.partial}</div>
                 <div className={`text-xs font-medium ${activeTab === 'partial' ? 'text-amber-700' : 'text-gray-600'}`}>Partial Match</div>
               </div>
               <div className={`p-2 rounded-lg ${activeTab === 'partial' ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
@@ -131,7 +397,7 @@ export default function ValidationQueuePage() {
               </div>
            </div>
            <div className="mt-3 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 w-[8%]"></div>
+              <div className="h-full bg-amber-500" style={{width: `${summary.total > 0 ? (summary.partial / summary.total * 100) : 0}%`}}></div>
            </div>
            <p className="text-[10px] text-gray-500 mt-2 group-hover:text-amber-600 transition-colors">Minor issues detected</p>
         </button>
@@ -143,19 +409,19 @@ export default function ValidationQueuePage() {
            onClick={() => setActiveTab('fail')}
            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'fail' ? 'border-red-500 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
          >
-           Failed <span className="bg-red-100 text-red-700 px-1.5 rounded text-xs border border-red-200">11</span>
+           Failed <span className="bg-red-100 text-red-700 px-1.5 rounded text-xs border border-red-200">{summary.failed}</span>
          </button>
          <button 
            onClick={() => setActiveTab('partial')}
            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'partial' ? 'border-amber-500 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
          >
-           Partial <span className="bg-amber-100 text-amber-700 px-1.5 rounded text-xs border border-amber-200">23</span>
+           Partial <span className="bg-amber-100 text-amber-700 px-1.5 rounded text-xs border border-amber-200">{summary.partial}</span>
          </button>
          <button 
            onClick={() => setActiveTab('pass')}
            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'pass' ? 'border-emerald-500 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
          >
-           Passed <span className="bg-emerald-100 text-emerald-700 px-1.5 rounded text-xs border border-emerald-200">789</span>
+           Passed <span className="bg-emerald-100 text-emerald-700 px-1.5 rounded text-xs border border-emerald-200">{summary.passed}</span>
          </button>
       </div>
 
@@ -172,8 +438,10 @@ export default function ValidationQueuePage() {
                      <p className="text-sm text-gray-600">All validations are clear.</p>
                   </div>
                ) : (
-                 failedInvoices.map((inv) => (
-                   <div key={inv.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden border-l-4 border-l-red-500">
+                 failedInvoices.map((inv) => {
+                   const priority = getPriority(inv);
+                   return (
+                     <div key={inv.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden border-l-4 border-l-red-500">
                       {/* Header Row */}
                       <div 
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
@@ -185,8 +453,11 @@ export default function ValidationQueuePage() {
                             </button>
                             <div>
                                <div className="flex items-center gap-3">
-                                  <span className="font-bold text-gray-900">{inv.id}</span>
-                                  <span className="text-xs text-gray-500">{inv.date}</span>
+                                  <span className="font-bold text-gray-900">{inv.invoice_number}</span>
+                                  <span className="text-xs text-gray-500">{formatDate(inv.invoice_date)}</span>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${inv.type === 'purchase' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                                    {inv.type === 'purchase' ? 'Purchase' : 'Sales'}
+                                  </span>
                                </div>
                                <p className="text-sm text-gray-700 mt-0.5">{inv.vendor}</p>
                             </div>
@@ -199,8 +470,8 @@ export default function ValidationQueuePage() {
                             </div>
                             <div className="flex items-center gap-3">
                                <span className="px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold border border-red-200">{inv.errors.length} Errors</span>
-                               <span className={`px-2 py-1 rounded text-xs font-medium border ${inv.priority === 'High' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-700 border-gray-300'}`}>
-                                  {inv.priority} Priority
+                               <span className={`px-2 py-1 rounded text-xs font-medium border ${priority === 'High' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-700 border-gray-300'}`}>
+                                  {priority} Priority
                                </span>
                             </div>
                          </div>
@@ -229,28 +500,30 @@ export default function ValidationQueuePage() {
                                         )}
                                         {err.detail && <p className="text-sm text-gray-600 mt-1">{err.detail}</p>}
                                      </div>
-                                     <button className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-50 border border-gray-200 text-sm text-gray-700 transition-colors shadow-sm">
-                                        Fix Now
-                                     </button>
                                   </div>
                                ))}
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4">
-                               <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 transition-colors">
+                               <button 
+                                 onClick={() => handleDeleteInvoice(inv)}
+                                 disabled={processingIds.has(inv.id)}
+                                 className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                               >
                                   <Trash2 className="h-4 w-4" /> Delete
                                </button>
-                               <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">
-                                  <Send className="h-4 w-4" /> Request Re-upload
-                               </button>
-                               <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 shadow-lg transition-colors">
-                                  <Wrench className="h-4 w-4" /> Fix All Issues
+                               <button 
+                                 onClick={() => handleEditInvoice(inv)}
+                                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 shadow-lg transition-colors"
+                               >
+                                  <Wrench className="h-4 w-4" /> Edit Invoice
                                </button>
                             </div>
                          </div>
-                      )}
-                   </div>
-                 ))
+                        )}
+                     </div>
+                   );
+                 })
                )}
             </div>
          )}
@@ -259,9 +532,22 @@ export default function ValidationQueuePage() {
          {activeTab === 'partial' && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
                <div className="flex justify-end mb-2">
-                  <button className="text-sm text-amber-600 hover:text-amber-700 font-medium bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">Accept All Warnings</button>
+                  <button 
+                    onClick={handleAcceptAllPartial}
+                    disabled={refreshing}
+                    className="text-sm text-amber-600 hover:text-amber-700 font-medium bg-amber-50 px-4 py-2 rounded-lg border border-amber-200 disabled:opacity-50"
+                  >
+                    Accept All Warnings
+                  </button>
                </div>
-               {partialInvoices.map((inv) => (
+               {partialInvoices.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-gray-200 shadow-sm">
+                     <AlertTriangle className="h-12 w-12 text-amber-600 mb-4" />
+                     <p className="text-lg font-medium text-gray-900">No partial matches!</p>
+                     <p className="text-sm text-gray-600">All invoices are either passed or failed.</p>
+                  </div>
+               ) : (
+                 partialInvoices.map((inv) => (
                    <div key={inv.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden border-l-4 border-l-amber-500">
                       <div 
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
@@ -273,8 +559,11 @@ export default function ValidationQueuePage() {
                             </button>
                             <div>
                                <div className="flex items-center gap-3">
-                                  <span className="font-bold text-gray-900">{inv.id}</span>
-                                  <span className="text-xs text-gray-500">{inv.date}</span>
+                                  <span className="font-bold text-gray-900">{inv.invoice_number}</span>
+                                  <span className="text-xs text-gray-500">{formatDate(inv.invoice_date)}</span>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${inv.type === 'purchase' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                                    {inv.type === 'purchase' ? 'Purchase' : 'Sales'}
+                                  </span>
                                </div>
                                <p className="text-sm text-gray-700 mt-0.5">{inv.vendor}</p>
                             </div>
@@ -303,26 +592,30 @@ export default function ValidationQueuePage() {
                                            <p className="text-xs text-gray-600">Impact: {warn.impact}</p>
                                         </div>
                                      </div>
-                                     <div className="flex gap-2">
-                                        <button className="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100">Fix</button>
-                                        <button className="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100">Ignore</button>
-                                     </div>
                                   </div>
                                ))}
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4">
-                               <button className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">
-                                  Mark for Review
+                               <button 
+                                 onClick={() => handleEditInvoice(inv)}
+                                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                               >
+                                  <Wrench className="h-4 w-4" /> Edit Invoice
                                </button>
-                               <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 shadow-lg transition-colors flex items-center gap-2">
+                               <button 
+                                 onClick={() => handleApproveInvoice(inv)}
+                                 disabled={processingIds.has(inv.id)}
+                                 className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                               >
                                   <CheckCircle2 className="h-4 w-4" /> Accept & Approve
                                </button>
                             </div>
                          </div>
                       )}
                    </div>
-               ))}
+               ))
+               )}
             </div>
          )}
 
@@ -330,7 +623,11 @@ export default function ValidationQueuePage() {
          {activeTab === 'pass' && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
                <div className="flex justify-end mb-2">
-                  <button className="flex items-center gap-2 text-sm text-emerald-700 hover:text-emerald-800 font-medium bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200 shadow-sm">
+                  <button 
+                    onClick={handleApproveAll}
+                    disabled={refreshing}
+                    className="flex items-center gap-2 text-sm text-emerald-700 hover:text-emerald-800 font-medium bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200 shadow-sm disabled:opacity-50"
+                  >
                      <CheckCircle2 className="h-4 w-4" /> Approve All Validated
                   </button>
                </div>
@@ -347,24 +644,44 @@ export default function ValidationQueuePage() {
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-200">
-                        {passedInvoices.map((inv) => (
-                           <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 font-medium text-gray-900">{inv.id}</td>
-                              <td className="px-6 py-4 text-gray-600">{inv.date}</td>
-                              <td className="px-6 py-4 text-gray-700">{inv.vendor}</td>
-                              <td className="px-6 py-4 text-right font-mono text-gray-900">₹{inv.amount.toLocaleString()}</td>
-                              <td className="px-6 py-4 text-center">
-                                 <span className="text-xs text-emerald-700 flex items-center justify-center gap-1">
-                                    <CheckCircle2 className="h-3 w-3" /> Passed {inv.validatedAt}
-                                 </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                 <button className="text-gray-600 hover:text-gray-900 flex items-center gap-1 ml-auto text-xs border border-gray-300 rounded px-2 py-1 hover:bg-gray-100">
-                                    Move to Register <ArrowRight className="h-3 w-3" />
-                                 </button>
+                        {passedInvoices.length === 0 ? (
+                           <tr>
+                              <td colSpan={6} className="px-6 py-12 text-center">
+                                 <CheckCircle2 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                                 <p className="text-gray-600">No passed invoices yet</p>
                               </td>
                            </tr>
-                        ))}
+                        ) : (
+                           passedInvoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                                 <td className="px-6 py-4 font-medium text-gray-900">{inv.invoice_number}</td>
+                                 <td className="px-6 py-4 text-gray-600">{formatDate(inv.invoice_date)}</td>
+                                 <td className="px-6 py-4">
+                                    <div className="text-gray-900">{inv.vendor}</div>
+                                    <div className="text-xs text-gray-500">{inv.gstin}</div>
+                                 </td>
+                                 <td className="px-6 py-4 text-right font-mono text-gray-900">₹{inv.amount.toLocaleString()}</td>
+                                 <td className="px-6 py-4 text-center">
+                                    <div className="flex flex-col items-center gap-1">
+                                       <span className="text-xs text-emerald-700 flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" /> Passed
+                                       </span>
+                                       <span className={`px-2 py-1 rounded text-xs font-medium ${inv.type === 'purchase' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                                          {inv.type === 'purchase' ? 'Purchase' : 'Sales'}
+                                       </span>
+                                    </div>
+                                 </td>
+                                 <td className="px-6 py-4 text-right">
+                                    <button 
+                                       onClick={() => router.push(`/dashboard/sme/invoices/${inv.type}?id=${inv.id}`)}
+                                       className="text-gray-600 hover:text-gray-900 flex items-center gap-1 ml-auto text-xs border border-gray-300 rounded px-2 py-1 hover:bg-gray-100"
+                                    >
+                                       View <ExternalLink className="h-3 w-3" />
+                                    </button>
+                                 </td>
+                              </tr>
+                           ))
+                        )}
                      </tbody>
                   </table>
                </div>
