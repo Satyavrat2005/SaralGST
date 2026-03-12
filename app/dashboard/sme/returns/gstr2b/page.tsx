@@ -73,6 +73,7 @@ export default function GSTR2BFetchPage() {
   const [returnData, setReturnData] = useState<ReturnData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   // OTP authentication flow
@@ -82,6 +83,28 @@ export default function GSTR2BFetchPage() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authExpiresAt, setAuthExpiresAt] = useState<string | null>(null);
+
+  // Check if user already has a valid auth token on mount — avoids repeated auth prompts
+  useEffect(() => {
+    const checkAuth = async () => {
+      setAuthChecking(true);
+      try {
+        const res = await fetch('/api/returns?action=check-auth');
+        const data = await res.json();
+        if (data.authenticated) {
+          setIsAuthenticated(true);
+          setAuthExpiresAt(data.expires_at || null);
+        }
+      } catch {
+        // silently fail — user will see the authenticate button
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const loadExistingData = useCallback(async () => {
     setLoading(true);
@@ -117,8 +140,18 @@ export default function GSTR2BFetchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'request-otp' }),
       });
+      if (res.status === 401) {
+        setOtpError('Session expired. Please refresh the page and log in again.');
+        return;
+      }
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.alreadyAuthenticated) {
+        setIsAuthenticated(true);
+        setAuthExpiresAt(data.expires_at || null);
+        setShowOTPModal(false);
+        setOtpStep('request');
+        setSuccessMsg('GST portal session is already active. You can fetch GSTR-2B now.');
+      } else if (data.success) {
         setOtpStep('verify');
       } else {
         setOtpError(data.error || 'Failed to send OTP');
@@ -140,12 +173,20 @@ export default function GSTR2BFetchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify-otp', otp: otpValue }),
       });
+      if (res.status === 401) {
+        setOtpError('Session expired. Please refresh the page and log in again.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setIsAuthenticated(true);
         setShowOTPModal(false);
         setOtpStep('request');
         setOtpValue('');
+        // Re-check auth to get expiry time
+        const authRes = await fetch('/api/returns?action=check-auth');
+        const authData = await authRes.json();
+        if (authData.expires_at) setAuthExpiresAt(authData.expires_at);
         setSuccessMsg('GST portal authenticated! You can now fetch GSTR-2B.');
       } else {
         setOtpError(data.error || 'Invalid OTP');
@@ -160,6 +201,7 @@ export default function GSTR2BFetchPage() {
   const handleFetchFromPortal = async () => {
     setFetchState('fetching');
     setError('');
+    setErrorCode(null);
     try {
       const res = await fetch('/api/returns', {
         method: 'POST',
@@ -167,26 +209,47 @@ export default function GSTR2BFetchPage() {
         body: JSON.stringify({ action: 'fetch-gstr2b', period: selectedPeriod }),
       });
       const data = await res.json();
-      if (data.error) {
-        // If auth error, prompt OTP flow
-        if (data.error.includes('authenticated') || data.error.includes('OTP') || data.error.includes('auth')) {
+      if (res.status === 401) {
+        if (data.error?.includes('GST portal') || data.error?.includes('OTP')) {
+          // Portal token expired/missing — re-authenticate with OTP
+          setIsAuthenticated(false);
+          setAuthExpiresAt(null);
           setFetchState('not_fetched');
           setShowOTPModal(true);
           setOtpStep('request');
         } else {
-          setError(data.error);
+          // Supabase session expired — page needs refresh
+          setError('Your session has expired. Please refresh the page and log in again.');
+          setErrorCode(null);
           setFetchState('failed');
         }
+      } else if (data.error) {
+        setError(data.error);
+        setErrorCode(data.code || null);
+        setFetchState('failed');
       } else {
         setIsAuthenticated(true);
+        setErrorCode(null);
         setSuccessMsg('GSTR-2B data fetched successfully from portal!');
         await loadExistingData();
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Fetch failed');
+      setErrorCode(null);
       setFetchState('failed');
     }
   };
+
+  const isPortalAvailabilityIssue = errorCode === 'GTR2B-002' || errorCode === 'IMS2B009' || errorCode === 'GSTR2B_GENERATING';
+  const failedTitle = isPortalAvailabilityIssue ? 'GSTR-2B Not Available Yet' : 'Fetch Failed';
+  const failedMessage = error || 'Could not fetch data from portal.';
+  const failedHint = errorCode === 'IMS2B009'
+    ? 'GST portal authentication is active. The sandbox is allowing GSTR-2B generation only after the date mentioned above.'
+    : errorCode === 'GTR2B-002'
+      ? 'GST portal authentication is active. The return is not generated yet on the portal for this period.'
+      : errorCode === 'GSTR2B_GENERATING'
+        ? 'GST portal authentication is active. A generation request has been submitted; try again after a short wait.'
+        : 'Could not fetch data from portal. This may happen if the data is not yet available or the portal returned an error.';
 
   const filteredRecords = records
     .filter(r => r.section === activeTab)
@@ -297,8 +360,11 @@ export default function GSTR2BFetchPage() {
       {error && (
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError('')}><X className="h-4 w-4" /></button>
+          <span className="flex-1">
+            {error}
+            {errorCode && <span className="ml-2 text-xs font-semibold">({errorCode})</span>}
+          </span>
+          <button onClick={() => { setError(''); setErrorCode(null); }}><X className="h-4 w-4" /></button>
         </div>
       )}
       {successMsg && (
@@ -310,7 +376,12 @@ export default function GSTR2BFetchPage() {
       )}
 
       {/* AUTH STATUS BAR */}
-      {!isAuthenticated ? (
+      {authChecking ? (
+        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+          <span>Checking GST portal authentication...</span>
+        </div>
+      ) : !isAuthenticated ? (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
           <KeyRound className="h-4 w-4 text-amber-600 shrink-0" />
           <span className="flex-1 text-amber-700">GST Portal authentication required before fetching GSTR-2B data.</span>
@@ -322,8 +393,15 @@ export default function GSTR2BFetchPage() {
       ) : (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          <span className="flex-1">GST Portal authenticated. Ready to fetch GSTR-2B data.</span>
-          <button onClick={() => { setIsAuthenticated(false); setOtpStep('request'); }}
+          <span className="flex-1">
+            GST Portal authenticated.
+            {authExpiresAt && (
+              <span className="text-emerald-600 text-xs ml-2">
+                (Valid until {new Date(authExpiresAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})
+              </span>
+            )}
+          </span>
+          <button onClick={() => { setIsAuthenticated(false); setAuthExpiresAt(null); setOtpStep('request'); }}
             className="text-xs text-emerald-600 hover:underline">Re-authenticate</button>
         </div>
       )}
@@ -354,7 +432,7 @@ export default function GSTR2BFetchPage() {
            )}
            <button onClick={handleFetchFromPortal}
              className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-             disabled={fetchState === 'fetching' || !isAuthenticated}>
+             disabled={fetchState === 'fetching' || !isAuthenticated || authChecking}>
              {fetchState === 'fetching' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} 
              {fetchState === 'success' ? 'Re-fetch' : 'Fetch from Portal'}
            </button>
@@ -377,11 +455,20 @@ export default function GSTR2BFetchPage() {
                   <Download className="h-8 w-8 text-gray-500" strokeWidth={2} />
                </div>
                <h3 className="text-xl font-semibold text-gray-900">GSTR-2B Not Fetched</h3>
-               <p className="text-gray-600 max-w-md mt-2 mb-6">Click the button below to fetch GSTR-2B data from the GST portal via MasterGST API.</p>
-               <button onClick={handleFetchFromPortal}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all font-semibold shadow-sm hover:shadow-md">
-                  Fetch GSTR-2B Data
-               </button>
+               <p className="text-gray-600 max-w-md mt-2 mb-6">
+                  {isAuthenticated ? 'Click the button below to fetch GSTR-2B data from the GST portal.' : 'Authenticate with the GST portal first, then fetch GSTR-2B data.'}
+               </p>
+               {!isAuthenticated ? (
+                 <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border border-amber-200 hover:from-amber-100 hover:to-orange-100 transition-all font-semibold shadow-sm hover:shadow-md flex items-center gap-2">
+                    <KeyRound className="h-5 w-5" /> Authenticate with GST Portal
+                 </button>
+               ) : (
+                 <button onClick={handleFetchFromPortal}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all font-semibold shadow-sm hover:shadow-md">
+                    Fetch GSTR-2B Data
+                 </button>
+               )}
             </div>
          )}
 
@@ -404,12 +491,27 @@ export default function GSTR2BFetchPage() {
          {fetchState === 'failed' && (
             <div className="bg-white rounded-2xl border border-red-200 shadow-lg p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
                <AlertTriangle className="h-12 w-12 text-red-400 mb-4" />
-               <h3 className="text-lg font-semibold text-gray-900">Fetch Failed</h3>
-               <p className="text-gray-600 mt-2 mb-4">Could not fetch data from portal. This may happen if OTP authentication is needed or the data is not yet available.</p>
-               <button onClick={handleFetchFromPortal}
-                 className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all font-medium text-sm">
-                 Retry Fetch
-               </button>
+               <h3 className="text-lg font-semibold text-gray-900">{failedTitle}</h3>
+               <p className="text-gray-700 mt-2 max-w-2xl">{failedMessage}</p>
+               {errorCode && (
+                 <div className="mt-3 inline-flex items-center rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-700">
+                   GST Code: {errorCode}
+                 </div>
+               )}
+               <p className="text-gray-600 mt-3 mb-4 max-w-2xl">{failedHint}</p>
+               <div className="flex gap-3">
+                 {!isAuthenticated && (
+                   <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
+                     className="px-4 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-medium text-sm flex items-center gap-1.5">
+                     <KeyRound className="h-3.5 w-3.5" /> Authenticate First
+                   </button>
+                 )}
+                 <button onClick={handleFetchFromPortal}
+                   className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all font-medium text-sm"
+                   disabled={!isAuthenticated}>
+                   {isPortalAvailabilityIssue ? 'Try Again Later' : 'Retry Fetch'}
+                 </button>
+               </div>
             </div>
          )}
 

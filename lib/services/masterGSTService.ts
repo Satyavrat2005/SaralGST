@@ -1,16 +1,17 @@
-// MasterGST API Service
-// Base URL: https://api.mastergst.com/public for public APIs
-// Authenticated APIs: https://api.mastergst.com/gstr1, /gstr2b, /gstr3b, /gstr, /authentication
+// MasterGST API Service (Whitebooks Sandbox)
+// Base URL: https://apisandbox.whitebooks.in
+// Authentication: /authentication/otprequest, /authentication/authtoken
+// GSTR APIs: /gstr1, /gstr2b, /gstr3b, /gstr
 
-const MASTERGST_BASE = 'https://api.mastergst.com';
+const MASTERGST_BASE = 'https://apisandbox.whitebooks.in';
 
 // Hardcoded credentials as per user requirement
-const MASTERGST_CONFIG = {
+export const MASTERGST_CONFIG = {
   client_id: 'GSTSe595dac1-0fc5-4214-ac7c-7bd8e06181e5',
   client_secret: 'GSTS0a145966-eced-41fc-b820-b58879c6278e',
-  gst_username: 'TN_NT2.152383',
-  gstin: '33AAGCB1286Q1ZB',
-  state_cd: '33', // Tamil Nadu
+  gst_username: 'MH_NT2.1641',
+  gstin: '27AAGCB1286Q1Z4',
+  state_cd: '27', // Maharashtra - must match first 2 digits of GSTIN
   email: 'khatigaurav8@gmail.com', // Default email for API calls
   ip_address: '127.0.0.1',
 };
@@ -33,9 +34,9 @@ export function getStateName(code: string): string {
   return STATE_CODES[code] || code;
 }
 
-// Common headers for all API calls
-function getCommonHeaders(authToken?: string, txn?: string) {
-  const headers: Record<string, string> = {
+// Base headers for ALL API calls (auth + data)
+function getBaseHeaders(): Record<string, string> {
+  return {
     'client_id': MASTERGST_CONFIG.client_id,
     'client_secret': MASTERGST_CONFIG.client_secret,
     'gst_username': MASTERGST_CONFIG.gst_username,
@@ -43,8 +44,20 @@ function getCommonHeaders(authToken?: string, txn?: string) {
     'ip_address': MASTERGST_CONFIG.ip_address,
     'Content-Type': 'application/json',
   };
-  if (authToken) headers['txn'] = txn || '';
-  if (MASTERGST_CONFIG.gstin) headers['gstin'] = MASTERGST_CONFIG.gstin;
+}
+
+// Headers for authentication endpoints — NO gstin header per API docs
+function getAuthHeaders(txn?: string): Record<string, string> {
+  const headers = getBaseHeaders();
+  if (txn) headers['txn'] = txn;
+  return headers;
+}
+
+// Headers for data endpoints (GSTR1/2B/3B) — includes gstin + txn
+function getDataHeaders(txn: string): Record<string, string> {
+  const headers = getBaseHeaders();
+  headers['txn'] = txn;
+  headers['gstin'] = MASTERGST_CONFIG.gstin;
   return headers;
 }
 
@@ -54,41 +67,81 @@ function buildQuery(params: Record<string, string>): string {
   return searchParams.toString();
 }
 
+// Helper to parse API responses (handles various response formats from Whitebooks sandbox)
+function isSuccessResponse(data: any): boolean {
+  return data.status_cd === '1' || data.status_cd === 1 || data.status === 'Success' || data.status === 1 || data.success === true;
+}
+
+function getErrorMessage(data: any): string {
+  return data.error?.message || data.error?.msg || data.message || data.error_description || data.error || 
+    (typeof data.data === 'string' ? data.data : '') || 'API request failed';
+}
+
 // ================== AUTHENTICATION ==================
 
-export async function requestOTP(): Promise<{ success: boolean; txn?: string; error?: string }> {
+export async function requestOTP(): Promise<{ success: boolean; txn?: string; error?: string; rawResponse?: any }> {
   try {
     const query = buildQuery({ email: MASTERGST_CONFIG.email });
-    const res = await fetch(`${MASTERGST_BASE}/authentication/otprequest?${query}`, {
+    const url = `${MASTERGST_BASE}/authentication/otprequest?${query}`;
+    console.log('[MasterGST] OTP Request URL:', url);
+    
+    const res = await fetch(url, {
       method: 'GET',
-      headers: getCommonHeaders(),
+      headers: getAuthHeaders(),
     });
-    const data = await res.json();
-    if (data.status_cd === '1' || data.status_cd === 1) {
-      return { success: true, txn: data.data?.txn || data.txn };
+    
+    const text = await res.text();
+    console.log('[MasterGST] OTP Response status:', res.status, 'body:', text.substring(0, 500));
+    
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { success: false, error: `Invalid response from API (status ${res.status}): ${text.substring(0, 200)}` };
     }
-    return { success: false, error: data.error?.message || 'OTP request failed' };
+    
+    if (isSuccessResponse(data)) {
+      const txn = data.data?.txn || data.txn || data.header?.txn;
+      return { success: true, txn, rawResponse: data };
+    }
+    return { success: false, error: getErrorMessage(data), rawResponse: data };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    console.error('[MasterGST] OTP Request error:', err);
+    return { success: false, error: `Connection failed: ${err.message}` };
   }
 }
 
-export async function getAuthToken(otp: string, txn: string): Promise<{ success: boolean; authToken?: string; txn?: string; error?: string }> {
+export async function getAuthToken(otp: string, txn: string): Promise<{ success: boolean; authToken?: string; txn?: string; error?: string; rawResponse?: any }> {
   try {
     const query = buildQuery({ email: MASTERGST_CONFIG.email, otp });
-    const headers = getCommonHeaders();
-    headers['txn'] = txn;
-    const res = await fetch(`${MASTERGST_BASE}/authentication/authtoken?${query}`, {
+    const headers = getAuthHeaders(txn);
+    const url = `${MASTERGST_BASE}/authentication/authtoken?${query}`;
+    console.log('[MasterGST] Auth Token URL:', url);
+    
+    const res = await fetch(url, {
       method: 'GET',
       headers,
     });
-    const data = await res.json();
-    if (data.status_cd === '1' || data.status_cd === 1) {
-      return { success: true, authToken: data.data?.auth_token, txn: data.data?.txn || txn };
+    
+    const text = await res.text();
+    console.log('[MasterGST] Auth Token Response status:', res.status, 'body:', text.substring(0, 500));
+    
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { success: false, error: `Invalid response from API (status ${res.status}): ${text.substring(0, 200)}` };
     }
-    return { success: false, error: data.error?.message || 'Auth token failed' };
+    
+    if (isSuccessResponse(data)) {
+      const authToken = data.data?.auth_token || data.auth_token || data.data?.authtoken;
+      const resTxn = data.data?.txn || data.txn || txn;
+      return { success: true, authToken, txn: resTxn, rawResponse: data };
+    }
+    return { success: false, error: getErrorMessage(data), rawResponse: data };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    console.error('[MasterGST] Auth Token error:', err);
+    return { success: false, error: `Connection failed: ${err.message}` };
   }
 }
 
@@ -101,8 +154,7 @@ export async function getGSTR1Summary(retPeriod: string, txn: string) {
       retperiod: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retsum?${query}`, {
       method: 'GET',
       headers,
@@ -120,8 +172,7 @@ export async function getGSTR1B2B(retPeriod: string, txn: string) {
       retperiod: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/b2b?${query}`, {
       method: 'GET',
       headers,
@@ -135,8 +186,7 @@ export async function getGSTR1B2B(retPeriod: string, txn: string) {
 export async function saveGSTR1(retPeriod: string, txn: string, payload: any) {
   try {
     const query = buildQuery({ email: MASTERGST_CONFIG.email });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     headers['ret_period'] = retPeriod;
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retsave?${query}`, {
       method: 'PUT',
@@ -156,8 +206,7 @@ export async function submitGSTR1(retPeriod: string, txn: string) {
       retperiod: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retsubmit?${query}`, {
       method: 'POST',
       headers,
@@ -177,8 +226,7 @@ export async function fileGSTR1(retPeriod: string, txn: string, pan: string, otp
       pan,
       otp,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retfile?${query}`, {
       method: 'POST',
       headers,
@@ -195,16 +243,41 @@ export async function getGSTR2B(retPeriod: string, txn: string) {
   try {
     const query = buildQuery({
       gstin: MASTERGST_CONFIG.gstin,
-      retperiod: retPeriod,
+      rtnprd: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
-    const res = await fetch(`${MASTERGST_BASE}/gstr2b/getall?${query}`, {
+    const headers = getDataHeaders(txn);
+    console.log('[MasterGST] GSTR2B fetch URL:', `${MASTERGST_BASE}/gstr2b/all?${query}`);
+    console.log('[MasterGST] GSTR2B headers:', JSON.stringify({ ...headers, client_secret: '***' }));
+    const res = await fetch(`${MASTERGST_BASE}/gstr2b/all?${query}`, {
       method: 'GET',
       headers,
     });
-    return await res.json();
+    const text = await res.text();
+    console.log('[MasterGST] GSTR2B response status:', res.status, 'body:', text.substring(0, 500));
+    try { return JSON.parse(text); } catch { return { error: true, message: `Invalid response (${res.status}): ${text.substring(0, 200)}` }; }
+  } catch (err: any) {
+    return { error: true, message: err.message };
+  }
+}
+
+export async function generateGSTR2BOnDemand(retPeriod: string, txn: string) {
+  try {
+    const query = buildQuery({ email: MASTERGST_CONFIG.email });
+    const headers = getDataHeaders(txn);
+    headers['ret_period'] = retPeriod;
+    const payload = {
+      rtin: MASTERGST_CONFIG.gstin,
+      itcprd: retPeriod,
+    };
+    const res = await fetch(`${MASTERGST_BASE}/gstr2b/gen2b?${query}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const text = await res.text();
+    console.log('[MasterGST] GSTR2B generate response status:', res.status, 'body:', text.substring(0, 500));
+    try { return JSON.parse(text); } catch { return { error: true, message: `Invalid response (${res.status}): ${text.substring(0, 200)}` }; }
   } catch (err: any) {
     return { error: true, message: err.message };
   }
@@ -214,11 +287,10 @@ export async function getGSTR2BSummary(retPeriod: string, txn: string) {
   try {
     const query = buildQuery({
       gstin: MASTERGST_CONFIG.gstin,
-      retperiod: retPeriod,
+      rtnprd: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr2b/retsum?${query}`, {
       method: 'GET',
       headers,
@@ -238,8 +310,7 @@ export async function getGSTR3BSummary(retPeriod: string, txn: string) {
       retperiod: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr3b/retsum?${query}`, {
       method: 'GET',
       headers,
@@ -253,8 +324,7 @@ export async function getGSTR3BSummary(retPeriod: string, txn: string) {
 export async function saveGSTR3B(retPeriod: string, txn: string, payload: any) {
   try {
     const query = buildQuery({ email: MASTERGST_CONFIG.email });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     headers['ret_period'] = retPeriod;
     const res = await fetch(`${MASTERGST_BASE}/gstr3b/retsave?${query}`, {
       method: 'PUT',
@@ -274,8 +344,7 @@ export async function submitGSTR3B(retPeriod: string, txn: string) {
       retperiod: retPeriod,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr3b/retsubmit?${query}`, {
       method: 'POST',
       headers,
@@ -296,8 +365,7 @@ export async function getReturnStatus(retPeriod: string, refId: string, txn: str
       refid: refId,
       email: MASTERGST_CONFIG.email,
     });
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr/retstatus?${query}`, {
       method: 'GET',
       headers,
@@ -317,8 +385,7 @@ export async function viewAndTrackReturns(retPeriod: string, txn: string, return
     };
     if (returnType) params['type'] = returnType;
     const query = buildQuery(params);
-    const headers = getCommonHeaders(undefined, txn);
-    headers['txn'] = txn;
+    const headers = getDataHeaders(txn);
     const res = await fetch(`${MASTERGST_BASE}/gstr/rettrack?${query}`, {
       method: 'GET',
       headers,
@@ -390,5 +457,3 @@ export function getAvailablePeriods(): { label: string; value: string }[] {
   }
   return periods;
 }
-
-export { MASTERGST_CONFIG };

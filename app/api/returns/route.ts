@@ -8,6 +8,7 @@ import {
   saveGSTR1,
   submitGSTR1,
   getGSTR2B,
+  generateGSTR2BOnDemand,
   getGSTR2BSummary,
   getGSTR3BSummary,
   saveGSTR3B,
@@ -19,10 +20,32 @@ import {
   parseReturnPeriod,
 } from '@/lib/services/masterGSTService';
 
+function getPortalErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'string' && error.trim()) return error;
+  if (error && typeof error === 'object') {
+    const maybeError = error as { message?: unknown; error_cd?: unknown };
+    if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
+      return typeof maybeError.error_cd === 'string' && maybeError.error_cd.trim()
+        ? `${maybeError.message} (${maybeError.error_cd})`
+        : maybeError.message;
+    }
+  }
+  return fallback;
+}
+
+async function getAuthenticatedUser(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (user) return user;
+  if (!error) return null;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
+}
+
 // GET /api/returns?action=...&type=...&period=...
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
 
   const url = new URL(req.url);
   const action = url.searchParams.get('action');
@@ -65,10 +88,23 @@ export async function GET(req: NextRequest) {
       case 'gstr1-invoices': {
         if (!period) return NextResponse.json({ error: 'Missing period' }, { status: 400 });
         
+        // First find the return record for this period to get return_id
+        const { data: returnRecord } = await supabase
+          .from('gst_returns')
+          .select('id')
+          .eq('return_type', 'GSTR1')
+          .eq('return_period', period)
+          .eq('user_id', user?.id)
+          .single();
+        
+        if (!returnRecord) {
+          return NextResponse.json({ data: [] });
+        }
+        
         const { data, error } = await supabase
           .from('gstr1_invoices')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('return_id', returnRecord.id)
           .order('created_at', { ascending: false });
         
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -113,6 +149,8 @@ export async function GET(req: NextRequest) {
         const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
         const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Last day of month
         
+        console.log('[GSTR-1 Generate] Period:', period, 'Date range:', startDate, 'to', endDate, 'User:', user.id);
+        
         // Fetch sales invoices for the period (include null user_id for legacy/uploaded data)
         const { data: salesInvoices, error: salesErr } = await supabase
           .from('sales_invoices')
@@ -121,7 +159,25 @@ export async function GET(req: NextRequest) {
           .gte('invoice_date', startDate)
           .lte('invoice_date', endDate);
         
-        if (salesErr) return NextResponse.json({ error: salesErr.message }, { status: 500 });
+        if (salesErr) {
+          console.error('[GSTR-1 Generate] Sales query error:', salesErr);
+          return NextResponse.json({ error: salesErr.message }, { status: 500 });
+        }
+        
+        console.log('[GSTR-1 Generate] Found', salesInvoices?.length || 0, 'invoices in date range');
+        if (salesInvoices && salesInvoices.length > 0) {
+          console.log('[GSTR-1 Generate] First invoice:', JSON.stringify(salesInvoices[0]).substring(0, 300));
+        }
+        
+        // Also try without date filter to debug
+        if (!salesInvoices || salesInvoices.length === 0) {
+          const { data: allInvoices } = await supabase
+            .from('sales_invoices')
+            .select('id, invoice_number, invoice_date, user_id')
+            .or(`user_id.eq.${user.id},user_id.is.null`)
+            .limit(5);
+          console.log('[GSTR-1 Generate] DEBUG - All invoices for user (no date filter):', JSON.stringify(allInvoices));
+        }
 
         // Create or update gst_returns record
         const existingReturn = await supabase
@@ -158,9 +214,13 @@ export async function GET(req: NextRequest) {
 
         // Transform sales invoices into GSTR1 format
         const gstr1Invoices = (salesInvoices || []).map((inv: any) => {
-          const isInterState = inv.igst_amount > 0;
+          const isInterState = (inv.igst_amount || 0) > 0;
           const section = inv.customer_gstin ? 'b2b' : 
                          (inv.gross_total > 250000 && isInterState ? 'b2cl' : 'b2cs');
+          
+          // Extract state code from place_of_supply (e.g. "19-West Bengal" → "19")
+          const posRaw = inv.place_of_supply || MASTERGST_CONFIG.state_cd;
+          const placeOfSupply = posRaw.toString().substring(0, 2).replace(/\D/g, '') || MASTERGST_CONFIG.state_cd;
           
           return {
             return_id: returnId,
@@ -169,7 +229,7 @@ export async function GET(req: NextRequest) {
             invoice_number: inv.invoice_number,
             invoice_date: inv.invoice_date,
             invoice_value: inv.gross_total || 0,
-            place_of_supply: inv.place_of_supply || MASTERGST_CONFIG.state_cd,
+            place_of_supply: placeOfSupply,
             counterparty_gstin: inv.customer_gstin,
             counterparty_name: inv.customer_name,
             taxable_value: inv.taxable_value || 0,
@@ -180,7 +240,7 @@ export async function GET(req: NextRequest) {
             tax_rate: inv.taxable_value > 0 
               ? Math.round(((inv.igst_amount || 0) + (inv.cgst_amount || 0) + (inv.sgst_amount || 0)) / inv.taxable_value * 100) 
               : 0,
-            invoice_type: inv.reverse_charge ? 'R' : 'R',
+            invoice_type: 'R',
             reverse_charge: inv.reverse_charge || false,
             hsn_code: inv.hsn_sac_code,
             description: inv.voucher_type,
@@ -412,6 +472,26 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ data });
       }
 
+      // ============ CHECK AUTH TOKEN ============
+      case 'check-auth': {
+        if (!user) return NextResponse.json({ authenticated: false });
+        const { data: tokenData } = await supabase
+          .from('mastergst_auth_tokens')
+          .select('txn, expires_at')
+          .eq('user_id', user.id)
+          .eq('gstin', MASTERGST_CONFIG.gstin)
+          .single();
+        
+        if (!tokenData?.txn || !tokenData?.expires_at) {
+          return NextResponse.json({ authenticated: false });
+        }
+        // Check if token is expired (if expires_at is set)
+        if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+          return NextResponse.json({ authenticated: false, reason: 'expired' });
+        }
+        return NextResponse.json({ authenticated: true, expires_at: tokenData.expires_at, txn: tokenData.txn });
+      }
+
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -423,7 +503,7 @@ export async function GET(req: NextRequest) {
 // POST /api/returns - Create/Update/File returns
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
   
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -436,14 +516,36 @@ export async function POST(req: NextRequest) {
     switch (action) {
       // ============ REQUEST OTP ============
       case 'request-otp': {
+        console.log('[Returns API] Requesting OTP...');
         const result = await requestOTP();
+        console.log('[Returns API] OTP result:', JSON.stringify(result).substring(0, 300));
+        if (!result.success && result.error?.includes('Maximum session allowed')) {
+          const { data: existingToken } = await supabase
+            .from('mastergst_auth_tokens')
+            .select('txn, expires_at')
+            .eq('user_id', user.id)
+            .eq('gstin', MASTERGST_CONFIG.gstin)
+            .single();
+
+          if (existingToken?.txn && existingToken.expires_at && new Date(existingToken.expires_at) > new Date()) {
+            return NextResponse.json({
+              success: true,
+              alreadyAuthenticated: true,
+              txn: existingToken.txn,
+              expires_at: existingToken.expires_at,
+            });
+          }
+        }
         if (result.success) {
           // Store txn for later use
-          await supabase.from('mastergst_auth_tokens').upsert({
+          const { error: upsertErr } = await supabase.from('mastergst_auth_tokens').upsert({
             user_id: user.id,
             gstin: MASTERGST_CONFIG.gstin,
             txn: result.txn,
           }, { onConflict: 'user_id,gstin' });
+          if (upsertErr) {
+            console.error('[Returns API] Failed to store txn:', upsertErr);
+          }
         }
         return NextResponse.json(result);
       }
@@ -451,6 +553,7 @@ export async function POST(req: NextRequest) {
       // ============ VERIFY OTP & GET AUTH TOKEN ============
       case 'verify-otp': {
         const { otp } = body;
+        console.log('[Returns API] Verifying OTP...');
         // Get stored txn
         const { data: tokenData } = await supabase
           .from('mastergst_auth_tokens')
@@ -460,18 +563,26 @@ export async function POST(req: NextRequest) {
           .single();
         
         if (!tokenData?.txn) {
-          return NextResponse.json({ error: 'No pending OTP request' }, { status: 400 });
+          return NextResponse.json({ error: 'No pending OTP request. Please request OTP first.' }, { status: 400 });
         }
 
+        console.log('[Returns API] Using txn:', tokenData.txn);
         const result = await getAuthToken(otp, tokenData.txn);
+        console.log('[Returns API] Auth result:', JSON.stringify(result).substring(0, 300));
         if (result.success) {
-          await supabase.from('mastergst_auth_tokens').upsert({
+          const { error: upsertErr } = await supabase.from('mastergst_auth_tokens').upsert({
             user_id: user.id,
             gstin: MASTERGST_CONFIG.gstin,
-            auth_token: result.authToken,
-            txn: result.txn,
+            auth_token: result.authToken || null,
+            txn: result.txn || tokenData.txn,
             expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(), // 6 hrs
           }, { onConflict: 'user_id,gstin' });
+          if (upsertErr) {
+            console.error('[Returns API] verify-otp: Failed to store auth token:', upsertErr);
+            // Do NOT fail the request — auth token is valid, just couldn't persist
+          } else {
+            console.log('[Returns API] Auth token stored for user:', user.id);
+          }
         }
         return NextResponse.json(result);
       }
@@ -483,12 +594,12 @@ export async function POST(req: NextRequest) {
         // Get auth token
         const { data: tokenData } = await supabase
           .from('mastergst_auth_tokens')
-          .select('auth_token, txn')
+          .select('txn, expires_at')
           .eq('user_id', user.id)
           .eq('gstin', MASTERGST_CONFIG.gstin)
           .single();
 
-        if (!tokenData?.auth_token) {
+        if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
           return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
         }
 
@@ -501,6 +612,16 @@ export async function POST(req: NextRequest) {
         // Transform to GSTN format
         const payload = transformToGSTNFormat(invoices || [], period);
         const result = await saveGSTR1(period, tokenData.txn, payload);
+
+        if (result?.error === true) {
+          return NextResponse.json({ error: result.message || 'Failed to save GSTR-1 to portal' }, { status: 500 });
+        }
+
+        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+          return NextResponse.json({
+            error: getPortalErrorMessage(result?.error, 'Failed to save GSTR-1 to portal'),
+          }, { status: 409 });
+        }
 
         // Update return status
         await supabase.from('gst_returns').update({
@@ -519,12 +640,12 @@ export async function POST(req: NextRequest) {
         
         const { data: tokenData } = await supabase
           .from('mastergst_auth_tokens')
-          .select('auth_token, txn')
+          .select('txn, expires_at')
           .eq('user_id', user.id)
           .eq('gstin', MASTERGST_CONFIG.gstin)
           .single();
 
-        if (!tokenData?.auth_token) {
+        if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
           return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
         }
 
@@ -543,6 +664,16 @@ export async function POST(req: NextRequest) {
         const payload = transformGSTR3BToGSTNFormat(gstr3b, period);
         const result = await saveGSTR3B(period, tokenData.txn, payload);
 
+        if (result?.error === true) {
+          return NextResponse.json({ error: result.message || 'Failed to save GSTR-3B to portal' }, { status: 500 });
+        }
+
+        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+          return NextResponse.json({
+            error: getPortalErrorMessage(result?.error, 'Failed to save GSTR-3B to portal'),
+          }, { status: 409 });
+        }
+
         await supabase.from('gst_returns').update({
           status: 'submitted',
           api_reference_id: result.reference_id || result.ref_id,
@@ -559,19 +690,51 @@ export async function POST(req: NextRequest) {
         
         const { data: tokenData } = await supabase
           .from('mastergst_auth_tokens')
-          .select('auth_token, txn')
+          .select('txn, expires_at')
           .eq('user_id', user.id)
           .eq('gstin', MASTERGST_CONFIG.gstin)
           .single();
 
-        if (!tokenData?.auth_token) {
+        if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
           return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
         }
 
         const result = await getGSTR2B(period, tokenData.txn);
         
-        if (result.error) {
+        if (result.error === true) {
           return NextResponse.json({ error: result.message || 'Failed to fetch GSTR-2B' }, { status: 500 });
+        }
+
+        if (result.status_cd !== '1' && result.status_cd !== 1 && result.status !== 'Success' && result.success !== true) {
+          const errorCode = result.error?.error_cd;
+          const errorMessage = result.error?.message || result.message || 'Failed to fetch GSTR-2B';
+
+          if (errorCode === 'GTR2B-002') {
+            const generationResult = await generateGSTR2BOnDemand(period, tokenData.txn);
+
+            if (generationResult.error === true) {
+              return NextResponse.json({
+                error: generationResult.message || 'Failed to request GSTR-2B generation',
+              }, { status: 500 });
+            }
+
+            if (generationResult.status_cd === '1' || generationResult.status_cd === 1 || generationResult.status === 'Success' || generationResult.success === true) {
+              return NextResponse.json({
+                error: 'GSTR-2B is not available yet. Generation has been requested from the GST portal. Please try again shortly.',
+                code: 'GSTR2B_GENERATING',
+                generationRequested: true,
+                generationResponse: generationResult,
+              }, { status: 409 });
+            }
+
+            return NextResponse.json({
+              error: generationResult.error?.message || generationResult.message || errorMessage,
+              code: generationResult.error?.error_cd || errorCode,
+              generationRequested: false,
+            }, { status: 409 });
+          }
+
+          return NextResponse.json({ error: errorMessage, code: errorCode }, { status: 409 });
         }
 
         // Create/update return record

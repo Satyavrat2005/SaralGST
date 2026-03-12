@@ -165,7 +165,7 @@ export default function GSTR1DraftPage() {
       b2bMap.get(inv.counterparty_gstin)!.push(inv);
     });
     const preview = {
-      gstin: '33AAGCB1286Q1ZB',
+      gstin: '27AAGCB1286Q1Z4',
       fp: selectedPeriod,
       b2b: Array.from(b2bMap.entries()).map(([ctin, invs]) => ({
         ctin,

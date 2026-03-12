@@ -93,8 +93,8 @@ export default function FilingHistoryPage() {
     return true;
   });
 
-  const totalLiability = filtered.reduce((s, r) => s + (r.total_igst || 0) + (r.total_cgst || 0) + (r.total_sgst || 0), 0);
-  const filedCount = filtered.filter(r => r.status === 'filed').length;
+  const totalLiability = filtered.reduce((s, r) => s + (r.total_igst || 0) + (r.total_cgst || 0) + (r.total_sgst || 0) + (r.total_cess || 0), 0);
+  const filedCount = filtered.filter(r => r.status === 'filed' || r.status === 'submitted').length;
 
   const statusBadge = (status: string) => {
     switch (status) {

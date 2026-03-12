@@ -97,6 +97,19 @@ interface ReturnData {
   arn: string;
 }
 
+function getDisplayErrorMessage(error: unknown, fallback: string): string {
+   if (typeof error === 'string' && error.trim()) return error;
+   if (error && typeof error === 'object') {
+      const maybeError = error as { message?: unknown; error_cd?: unknown };
+      if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
+         return typeof maybeError.error_cd === 'string' && maybeError.error_cd.trim()
+            ? `${maybeError.message} (${maybeError.error_cd})`
+            : maybeError.message;
+      }
+   }
+   return fallback;
+}
+
 const PERIODS = (() => {
   const periods: { label: string; value: string }[] = [];
   const now = new Date();
@@ -188,7 +201,7 @@ export default function GSTR3BDraftPage() {
                   igst_itc: result.data.sec_6_1_igst_itc || 0,
                   cgst_itc: result.data.sec_6_1_cgst_itc || 0,
                   sgst_itc: result.data.sec_6_1_sgst_itc || 0,
-                  cess_itc: 0,
+                  cess_itc: result.data.sec_6_1_cess_itc || 0,
                   igst_cash: result.data.sec_6_1_igst_cash || 0,
                   cgst_cash: result.data.sec_6_1_cgst_cash || 0,
                   sgst_cash: result.data.sec_6_1_sgst_cash || 0,
@@ -218,11 +231,11 @@ export default function GSTR3BDraftPage() {
     try {
       const res = await fetch(`/api/returns?action=generate-gstr3b&period=${selectedPeriod}`);
       const data = await res.json();
-      if (data.success) {
+         if (data.success) {
         setSuccessMsg('GSTR-3B draft generated from sales & purchase registers.');
         await fetchData();
       } else {
-        setError(data.error || 'Failed to generate');
+            setError(getDisplayErrorMessage(data.error, 'Failed to generate'));
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Generation failed');
@@ -242,7 +255,7 @@ export default function GSTR3BDraftPage() {
         body: JSON.stringify({ action: 'save-gstr3b', returnId: returnData.id, period: selectedPeriod }),
       });
       const data = await res.json();
-      if (data.error) setError(data.error);
+      if (data.error) setError(getDisplayErrorMessage(data.error, 'Save failed'));
       else { setSuccessMsg('GSTR-3B saved to portal!'); await fetchData(); }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Save failed');
