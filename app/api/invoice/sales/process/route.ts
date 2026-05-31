@@ -241,7 +241,15 @@ function buildSalesRemarks(
   salesId: string,
   validation: ReturnType<typeof validateSalesInvoice>
 ) {
-  const remarks = validation.errors.map((error) => ({
+  const remarks: Array<{
+    sales_id: string;
+    field_name: string;
+    issue_type: 'missing' | 'mismatch' | 'invalid' | 'low_confidence';
+    detected_value: string | null;
+    expected_value: string | null;
+    comment: string;
+    status: 'open';
+  }> = validation.errors.map((error) => ({
     sales_id: salesId,
     field_name: error.field,
     issue_type: error.issue_type,
