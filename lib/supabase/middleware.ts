@@ -6,6 +6,10 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,9 +34,13 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Do not run code between createServerClient and supabase.auth.getUser()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    user = null;
+  }
 
   const path = request.nextUrl.pathname;
 
