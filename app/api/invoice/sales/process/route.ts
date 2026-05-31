@@ -3,6 +3,7 @@ import {
   uploadSalesInvoice,
   createNewSalesInvoice,
   updateNewSalesInvoice,
+  createSalesRemarks,
   SalesInvoice,
 } from '@/lib/services/salesInvoiceService';
 import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtractionService';
@@ -127,6 +128,8 @@ export async function POST(request: NextRequest) {
       extraction_status: determineExtractionStatus(extracted),
     };
 
+    const validation = validateSalesInvoice(invoiceData);
+
     // ── Step 5: Update the placeholder record with extracted data ─────────────
     const { data: updatedInvoice, error: updateError } = await updateNewSalesInvoice(
       invoiceId,
@@ -145,12 +148,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const remarks = buildSalesRemarks(invoiceId, validation);
+    if (remarks.length > 0) {
+      const { error: remarkError } = await createSalesRemarks(remarks, true);
+      if (remarkError) {
+        console.warn('[ProcessRoute] Could not save sales remarks:', remarkError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       invoiceId,
       invoice: updatedInvoice,
+      validation: {
+        isValid: validation.isValid,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        missingFields: getMissingSalesFields(invoiceData),
+      },
       message:
-        invoiceData.extraction_status === 'extracted'
+        validation.isValid
           ? `Invoice processed: ${invoiceData.invoice_number || invoiceId}`
           : 'Invoice uploaded with some missing fields. Please review.',
     });
@@ -179,6 +196,74 @@ function determineExtractionStatus(
     data.invoice_date &&
     (data.taxable_value !== null || data.gross_total !== null);
   return hasCritical ? 'extracted' : 'needs_review';
+}
+
+function getMissingSalesFields(invoice: Partial<SalesInvoice>): string[] {
+  const missing: string[] = [];
+
+  if (!invoice.invoice_number) missing.push('Invoice Number');
+  if (!invoice.invoice_date) missing.push('Invoice Date');
+  if (!invoice.invoice_type) missing.push('Invoice Type');
+  if (!invoice.customer_name) missing.push('Customer Name');
+  if (!invoice.place_of_supply) missing.push('Place of Supply');
+  if (invoice.taxable_value === null || invoice.taxable_value === undefined) missing.push('Taxable Value');
+  if (!invoice.hsn_sac_code) missing.push('HSN/SAC Code');
+  if (!invoice.invoice_file_url) missing.push('Invoice File');
+
+  return missing;
+}
+
+function validateSalesInvoice(invoice: Partial<SalesInvoice>) {
+  const missingFields = getMissingSalesFields(invoice);
+  const warnings: Array<{ field: string; message: string }> = [];
+
+  if (invoice.invoice_type === 'B2B' && !invoice.customer_gstin) {
+    missingFields.push('Customer GSTIN');
+  }
+
+  if (invoice.gross_total === null || invoice.gross_total === undefined) {
+    warnings.push({ field: 'gross_total', message: 'Gross total could not be confirmed from the extracted data.' });
+  }
+
+  return {
+    isValid: missingFields.length === 0,
+    errors: missingFields.map((field) => ({
+      field,
+      issue_type: 'missing' as const,
+      detected_value: null,
+      message: `${field} is required for sales register and GSTR-1 review`,
+    })),
+    warnings,
+  };
+}
+
+function buildSalesRemarks(
+  salesId: string,
+  validation: ReturnType<typeof validateSalesInvoice>
+) {
+  const remarks = validation.errors.map((error) => ({
+    sales_id: salesId,
+    field_name: error.field,
+    issue_type: error.issue_type,
+    detected_value: null,
+    expected_value: null,
+    comment: error.message,
+    status: 'open' as const,
+  }));
+
+  validation.warnings.forEach((warning) => {
+    remarks.push({
+      sales_id: salesId,
+      field_name: warning.field,
+      issue_type: 'low_confidence',
+      detected_value: null,
+      expected_value: null,
+      comment: warning.message,
+      status: 'open' as const,
+    });
+  });
+
+  return remarks;
 }
 
 

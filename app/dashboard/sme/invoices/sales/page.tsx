@@ -23,7 +23,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { SalesInvoice } from '@/lib/services/salesInvoiceService';
+import type { SalesInvoice } from '@/lib/services/salesInvoiceService';
 
 interface Remark {
   id: string;
@@ -324,9 +324,15 @@ export default function SalesRegisterPage() {
       console.log('Upload response:', data);
 
       if (data.success) {
+        if (data.invoice) {
+          setSelectedInvoice(data.invoice);
+          setModalTab('validation');
+        }
+
+        const missingFields = data.validation?.missingFields || [];
         const message = data.validation?.isValid 
           ? `Invoice processed successfully: ${data.invoice?.invoice_number || 'Invoice'}`
-          : `Invoice uploaded with ${data.validation?.errorCount || 0} errors. Please review.`;
+          : `Invoice uploaded with ${missingFields.length} missing field(s). Please review.`;
         alert(message);
         setUploadModalOpen(false);
         setSelectedFile(null);
