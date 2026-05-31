@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import {
   uploadSalesInvoice,
   createNewSalesInvoice,
@@ -7,6 +8,7 @@ import {
   SalesInvoice,
 } from '@/lib/services/salesInvoiceService';
 import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtractionService';
+import { isValidGstin, normalizeGstin } from '@/lib/gstr1/utils';
 
 /**
  * POST /api/invoice/sales/process
@@ -14,6 +16,9 @@ import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtract
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -53,6 +58,7 @@ export async function POST(request: NextRequest) {
     // ── Step 2: Create a placeholder record so we have an ID immediately ─────
     const { data: placeholder, error: createError } = await createNewSalesInvoice(
       {
+        user_id: user?.id,
         invoice_file_url: uploadData.url,
         extraction_status: 'pending',
       },
@@ -87,16 +93,23 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Step 4: Map extracted data → SalesInvoice row ────────────────────────
+    const customerGstin = normalizeGstin(extracted.customer_gstin);
+    let invoiceType = extracted.invoice_type;
+    if (invoiceType === 'B2B' && !isValidGstin(customerGstin)) {
+      invoiceType = 'B2C Small';
+    }
+
     const invoiceData: Partial<SalesInvoice> = {
+      user_id: user?.id,
       // Basic Invoice Information
       invoice_date: extracted.invoice_date,
       voucher_type: extracted.voucher_type,
       invoice_number: extracted.invoice_number,
-      invoice_type: extracted.invoice_type,
+      invoice_type: invoiceType,
 
       // Customer Details
       customer_name: extracted.customer_name,
-      customer_gstin: extracted.customer_gstin,
+      customer_gstin: customerGstin,
       place_of_supply: extracted.place_of_supply,
 
       // Product & Pricing

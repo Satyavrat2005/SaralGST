@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Calendar, FileText, CheckCircle2, AlertTriangle, 
-  Clock, Code, Play, Search, RefreshCw, Loader2, X, Send
+import {
+  Calendar, FileText, CheckCircle2, AlertTriangle,
+  Clock, Code, Play, Search, RefreshCw, Loader2, X, Send,
+  KeyRound, ShieldCheck, ClipboardCheck,
 } from 'lucide-react';
+import { Gstr1SummaryPanel } from '@/components/gstr1/Gstr1SummaryPanel';
+import { Gstr1FilingStepper } from '@/components/gstr1/Gstr1FilingStepper';
+import type { Gstr1ReturnData } from '@/lib/gstr1/types';
 
 type TabType = 'b2b' | 'b2cl' | 'b2cs' | 'exports' | 'hsn' | 'docs';
+type HsnSubTab = 'b2b' | 'b2c';
 
 interface Invoice {
   id: string;
@@ -47,6 +52,8 @@ interface ReturnData {
   filed_date: string;
   created_at: string;
   updated_at: string;
+  return_data?: Gstr1ReturnData | null;
+  gstin?: string;
 }
 
 const PERIODS = (() => {
@@ -88,6 +95,41 @@ export default function GSTR1DraftPage() {
   const [jsonPreview, setJsonPreview] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [returnSummary, setReturnSummary] = useState<Gstr1ReturnData | null>(null);
+  const [hsnSubTab, setHsnSubTab] = useState<HsnSubTab>('b2b');
+  const [validationIssues, setValidationIssues] = useState<{ errors: { message: string }[]; warnings: { message: string }[] } | null>(null);
+  const [currentAction, setCurrentAction] = useState<string | null>(null);
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
+  const [otpValue, setOtpValue] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authExpiresAt, setAuthExpiresAt] = useState<string | null>(null);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [filePan, setFilePan] = useState('');
+  const [fileEvcOtp, setFileEvcOtp] = useState('');
+  const [filingLoading, setFilingLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      setAuthChecking(true);
+      try {
+        const res = await fetch('/api/returns?action=check-auth');
+        const data = await res.json();
+        if (data.authenticated) {
+          setIsAuthenticated(true);
+          setAuthExpiresAt(data.expires_at || null);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,13 +138,20 @@ export default function GSTR1DraftPage() {
       const retRes = await fetch(`/api/returns?action=list&type=GSTR1&period=${selectedPeriod}`);
       const retData = await retRes.json();
       if (retData.data && retData.data.length > 0) {
-        setReturnData(retData.data[0]);
+        const row = retData.data[0] as ReturnData;
+        setReturnData(row);
+        setReturnSummary((row.return_data as Gstr1ReturnData) || null);
         const invRes = await fetch(`/api/returns?action=gstr1-invoices&period=${selectedPeriod}`);
         const invData = await invRes.json();
         setInvoices(invData.data || []);
+        if (row.return_data?.validation) {
+          setValidationIssues(row.return_data.validation as typeof validationIssues);
+        }
       } else {
         setReturnData(null);
+        setReturnSummary(null);
         setInvoices([]);
+        setValidationIssues(null);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
@@ -120,8 +169,24 @@ export default function GSTR1DraftPage() {
     try {
       const res = await fetch(`/api/returns?action=generate-gstr1&period=${selectedPeriod}`);
       const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || `Failed to generate GSTR-1 (${res.status})`);
+        return;
+      }
       if (data.success) {
-        setSuccessMsg(`GSTR-1 draft generated with ${data.totalInvoices} invoices from sales register.`);
+        if (data.totalInvoices === 0) {
+          const d = data.diagnostics;
+          const range = d?.dateRange ? `${d.dateRange.startDate} to ${d.dateRange.endDate}` : selectedPeriod;
+          setError(
+            data.message ||
+              `No sales invoices found for ${range}. Add invoices under Sales Register for this month, then generate again.`
+          );
+          setSuccessMsg('');
+        } else {
+          setSuccessMsg(`GSTR-1 draft generated with ${data.totalInvoices} invoices from sales register.`);
+          setError('');
+        }
+        if (data.returnData) setReturnSummary(data.returnData);
         await fetchData();
       } else {
         setError(data.error || 'Failed to generate GSTR-1');
@@ -133,9 +198,97 @@ export default function GSTR1DraftPage() {
     }
   };
 
+  const handleRequestOTP = async () => {
+    setOtpLoading(true);
+    setOtpError('');
+    setCurrentAction('auth');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request-otp' }),
+      });
+      const data = await res.json();
+      if (data.success && data.alreadyAuthenticated) {
+        setIsAuthenticated(true);
+        setAuthExpiresAt(data.expires_at || null);
+        setShowOTPModal(false);
+        setSuccessMsg('GST portal session is already active.');
+      } else if (data.success) {
+        setOtpStep('verify');
+      } else {
+        setOtpError(data.error || 'Failed to send OTP');
+      }
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : 'Failed to request OTP');
+    } finally {
+      setOtpLoading(false);
+      setCurrentAction(null);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpValue.trim()) { setOtpError('Please enter the OTP'); return; }
+    setOtpLoading(true);
+    setOtpError('');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify-otp', otp: otpValue }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAuthenticated(true);
+        setShowOTPModal(false);
+        setOtpStep('request');
+        setOtpValue('');
+        const authRes = await fetch('/api/returns?action=check-auth');
+        const authData = await authRes.json();
+        if (authData.expires_at) setAuthExpiresAt(authData.expires_at);
+        setSuccessMsg('GST portal authenticated. You can save and file GSTR-1.');
+      } else {
+        setOtpError(data.error || 'Invalid OTP');
+      }
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : 'OTP verification failed');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleValidate = async () => {
+    if (!returnData?.id) return;
+    setFilingLoading(true);
+    setCurrentAction('validate');
+    setError('');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'validate-gstr1', returnId: returnData.id }),
+      });
+      const data = await res.json();
+      if (data.error) setError(data.error);
+      else {
+        setValidationIssues({ errors: data.errors || [], warnings: data.warnings || [] });
+        if (data.success) setSuccessMsg('GSTR-1 validated successfully.');
+        else setError('Validation failed. Fix errors before filing.');
+        await fetchData();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Validation failed');
+    } finally {
+      setFilingLoading(false);
+      setCurrentAction(null);
+    }
+  };
+
   const handleSaveToPortal = async () => {
     if (!returnData?.id) return;
+    if (!isAuthenticated) { setShowOTPModal(true); return; }
     setSaving(true);
+    setCurrentAction('save');
     setError('');
     try {
       const res = await fetch('/api/returns', {
@@ -144,7 +297,11 @@ export default function GSTR1DraftPage() {
         body: JSON.stringify({ action: 'save-gstr1', returnId: returnData.id, period: selectedPeriod }),
       });
       const data = await res.json();
-      if (data.error) {
+      if (res.status === 401) {
+        setIsAuthenticated(false);
+        setShowOTPModal(true);
+        setError(data.error || 'Please authenticate with GST portal');
+      } else if (data.error) {
         setError(data.error);
       } else {
         setSuccessMsg('GSTR-1 saved to GST portal successfully!');
@@ -154,37 +311,72 @@ export default function GSTR1DraftPage() {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
+      setCurrentAction(null);
     }
   };
 
-  const handlePreviewJson = () => {
-    const b2bInvs = invoices.filter(i => i.section === 'b2b');
-    const b2bMap = new Map<string, Invoice[]>();
-    b2bInvs.forEach(inv => {
-      if (!b2bMap.has(inv.counterparty_gstin)) b2bMap.set(inv.counterparty_gstin, []);
-      b2bMap.get(inv.counterparty_gstin)!.push(inv);
-    });
-    const preview = {
-      gstin: '27AAGCB1286Q1Z4',
-      fp: selectedPeriod,
-      b2b: Array.from(b2bMap.entries()).map(([ctin, invs]) => ({
-        ctin,
-        inv: invs.map(inv => ({
-          inum: inv.invoice_number, idt: inv.invoice_date, val: inv.invoice_value,
-          pos: inv.place_of_supply, rchrg: inv.reverse_charge ? 'Y' : 'N', inv_typ: 'R',
-          itms: [{ num: 1, itm_det: { rt: inv.tax_rate, txval: inv.taxable_value, iamt: inv.igst_amount, camt: inv.cgst_amount, samt: inv.sgst_amount, csamt: inv.cess_amount } }]
-        }))
-      })),
-      b2cs_count: invoices.filter(i => i.section === 'b2cs').length,
-      b2cl_count: invoices.filter(i => i.section === 'b2cl').length,
-    };
-    setJsonPreview(JSON.stringify(preview, null, 2));
-    setShowJsonPreview(true);
+  const handleSubmitToPortal = async () => {
+    if (!returnData?.id || !isAuthenticated) { setShowOTPModal(true); return; }
+    setFilingLoading(true);
+    setCurrentAction('submit');
+    setError('');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit-gstr1', returnId: returnData.id, period: selectedPeriod }),
+      });
+      const data = await res.json();
+      if (data.error) setError(data.error);
+      else {
+        setSuccessMsg('GSTR-1 submitted to portal.');
+        await fetchData();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Submit failed');
+    } finally {
+      setFilingLoading(false);
+      setCurrentAction(null);
+    }
+  };
+
+  const handleFileWithEvc = async () => {
+    if (!returnData?.id || !filePan.trim() || !fileEvcOtp.trim()) return;
+    setFilingLoading(true);
+    setCurrentAction('file');
+    setError('');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'file-gstr1',
+          returnId: returnData.id,
+          period: selectedPeriod,
+          pan: filePan.trim(),
+          evcOtp: fileEvcOtp.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) setError(data.error);
+      else {
+        setSuccessMsg(data.arn ? `GSTR-1 filed. ARN: ${data.arn}` : 'GSTR-1 filed successfully.');
+        setShowFileModal(false);
+        setFilePan('');
+        setFileEvcOtp('');
+        await fetchData();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Filing failed');
+    } finally {
+      setFilingLoading(false);
+      setCurrentAction(null);
+    }
   };
 
   const handleMarkFiled = async () => {
     if (!returnData?.id) return;
-    const arn = prompt('Enter ARN (Acknowledgment Reference Number):');
+    const arn = prompt('Enter ARN (manual override for sandbox):');
     if (!arn) return;
     try {
       await fetch('/api/returns', {
@@ -196,6 +388,27 @@ export default function GSTR1DraftPage() {
       await fetchData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to mark as filed');
+    }
+  };
+
+  const handlePreviewJson = async () => {
+    if (!returnSummary || !returnData) return;
+    setShowJsonPreview(true);
+    setJsonPreview('Loading...');
+    try {
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview-gstr1-json', returnId: returnData.id, period: selectedPeriod }),
+      });
+      const data = await res.json();
+      if (data.payload) {
+        setJsonPreview(JSON.stringify(data.payload, null, 2));
+      } else {
+        setJsonPreview(JSON.stringify({ gstin: returnSummary.header.gstin, fp: selectedPeriod, note: 'Generate draft first' }, null, 2));
+      }
+    } catch {
+      setJsonPreview(JSON.stringify(returnSummary, null, 2));
     }
   };
 
@@ -236,22 +449,15 @@ export default function GSTR1DraftPage() {
     return Array.from(map.values());
   })();
 
-  const hsnSummary = (() => {
-    const map = new Map<string, { hsn: string; uqc: string; qty: number; taxable: number; igst: number; cgst: number; sgst: number; cess: number; count: number }>();
-    invoices.forEach(inv => {
-      if (!inv.hsn_code) return;
-      if (!map.has(inv.hsn_code)) map.set(inv.hsn_code, { hsn: inv.hsn_code, uqc: inv.uqc || 'NOS', qty: 0, taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, count: 0 });
-      const entry = map.get(inv.hsn_code)!;
-      entry.qty += inv.quantity || 0;
-      entry.taxable += inv.taxable_value || 0;
-      entry.igst += inv.igst_amount || 0;
-      entry.cgst += inv.cgst_amount || 0;
-      entry.sgst += inv.sgst_amount || 0;
-      entry.cess += inv.cess_amount || 0;
-      entry.count += 1;
-    });
-    return Array.from(map.values());
-  })();
+  const hsnSummaryB2b = returnSummary?.hsn_b2b ?? [];
+  const hsnSummaryB2c = returnSummary?.hsn_b2c ?? [];
+  const hsnSummary = hsnSubTab === 'b2b' ? hsnSummaryB2b : hsnSummaryB2c;
+  const docSeries = returnSummary?.sections?.['13']?.series ?? [];
+  const isValidated = returnData?.status === 'validated' || returnData?.status === 'submitted' || returnData?.status === 'filed';
+  const canFile =
+    invoices.length > 0 &&
+    (returnSummary?.sections?.['13']?.net_issued ?? 0) > 0 &&
+    (returnSummary?.sections['4A']?.count === 0 || (returnSummary?.sections['12_b2b']?.hsn_rows ?? 0) > 0);
 
   const getDeadline = () => {
     const m = parseInt(selectedPeriod.substring(0, 2));
@@ -263,7 +469,14 @@ export default function GSTR1DraftPage() {
   const deadline = getDeadline();
   const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
-  const completedSections = [sectionCounts.b2b > 0, sectionCounts.b2cl > 0, sectionCounts.b2cs > 0, sectionCounts.exports > 0, hsnSummary.length > 0, sectionCounts.docs > 0].filter(Boolean).length;
+  const completedSections = [
+    sectionCounts.b2b > 0,
+    sectionCounts.b2cl > 0,
+    sectionCounts.b2cs > 0,
+    sectionCounts.exports > 0,
+    hsnSummaryB2b.length > 0 || hsnSummaryB2c.length > 0,
+    (returnSummary?.sections?.['13']?.net_issued ?? 0) > 0,
+  ].filter(Boolean).length;
 
   const statusLabel = returnData?.status === 'filed' ? 'Filed' :
     returnData?.status === 'submitted' ? 'Submitted to Portal' :
@@ -324,6 +537,14 @@ export default function GSTR1DraftPage() {
         </div>
       ) : (
       <>
+      <Gstr1FilingStepper
+        returnStatus={returnData?.status}
+        hasInvoices={invoices.length > 0}
+        isAuthenticated={isAuthenticated}
+        isValidated={isValidated}
+        currentAction={currentAction}
+      />
+
       {/* STATUS CARD */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
          <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
@@ -362,8 +583,8 @@ export default function GSTR1DraftPage() {
                     { label: `B2C Large (${sectionCounts.b2cl})`, done: sectionCounts.b2cl > 0 },
                     { label: `B2C Small (${sectionCounts.b2cs})`, done: sectionCounts.b2cs > 0 },
                     { label: `Exports (${sectionCounts.exports})`, done: sectionCounts.exports > 0 },
-                    { label: 'HSN Summary', done: hsnSummary.length > 0 },
-                    { label: 'Documents', done: sectionCounts.docs > 0 },
+                    { label: `HSN B2B (${hsnSummaryB2b.length})`, done: hsnSummaryB2b.length > 0 },
+                    { label: `Docs (${returnSummary?.sections?.['13']?.net_issued ?? 0})`, done: (returnSummary?.sections?.['13']?.net_issued ?? 0) > 0 },
                   ].map((item, i) => (
                     <div key={i} className={`flex items-center gap-2 text-xs font-medium ${item.done ? 'text-emerald-600' : 'text-gray-400'}`}>
                       {item.done ? <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> : <Clock className="h-3.5 w-3.5" />}
@@ -389,6 +610,15 @@ export default function GSTR1DraftPage() {
                   </span>
                </div>
                <div className="flex flex-col gap-2 pt-2">
+                  {!authChecking && !isAuthenticated && returnData?.status !== 'filed' && (
+                    <button onClick={() => { setShowOTPModal(true); setOtpStep('request'); }}
+                      className="w-full px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 font-semibold flex items-center justify-center gap-1.5">
+                      <KeyRound className="h-3.5 w-3.5" /> Authenticate GST Portal
+                    </button>
+                  )}
+                  {isAuthenticated && authExpiresAt && (
+                    <p className="text-[10px] text-emerald-600 text-center">Portal session until {new Date(authExpiresAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                  )}
                   <div className="flex gap-2">
                      <button onClick={handlePreviewJson} disabled={invoices.length === 0}
                        className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-300 text-xs text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5 font-medium disabled:opacity-40">
@@ -401,14 +631,28 @@ export default function GSTR1DraftPage() {
                   </div>
                   {returnData?.status !== 'filed' && (
                     <>
-                      <button onClick={handleSaveToPortal} disabled={saving || invoices.length === 0}
+                      <button onClick={handleValidate} disabled={filingLoading || invoices.length === 0}
+                        className="w-full px-4 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-50 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                        {filingLoading && currentAction === 'validate' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+                        Validate Draft
+                      </button>
+                      <button onClick={handleSaveToPortal} disabled={saving || invoices.length === 0 || !canFile}
                         className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-md hover:shadow-lg hover:bg-blue-700 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
                         {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                         {saving ? 'Saving...' : 'Save to Portal'}
                       </button>
-                      <button onClick={handleMarkFiled} disabled={invoices.length === 0}
+                      <button onClick={handleSubmitToPortal} disabled={filingLoading || !isValidated}
+                        className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-md hover:bg-indigo-700 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                        {filingLoading && currentAction === 'submit' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                        Submit Return
+                      </button>
+                      <button onClick={() => setShowFileModal(true)} disabled={filingLoading || returnData?.status !== 'submitted'}
                         className="btn-primary-custom w-full px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-40">
-                        File Return
+                        File with EVC
+                      </button>
+                      <button onClick={handleMarkFiled} disabled={invoices.length === 0}
+                        className="w-full px-3 py-1.5 rounded-lg text-[10px] text-gray-500 hover:text-gray-700 underline">
+                        Manual ARN (sandbox)
                       </button>
                     </>
                   )}
@@ -421,6 +665,19 @@ export default function GSTR1DraftPage() {
             </div>
          </div>
       </div>
+
+      {validationIssues && (validationIssues.errors.length > 0 || validationIssues.warnings.length > 0) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+          {validationIssues.errors.map((e, i) => (
+            <p key={`e-${i}`} className="text-xs text-red-700 flex gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{e.message}</p>
+          ))}
+          {validationIssues.warnings.map((w, i) => (
+            <p key={`w-${i}`} className="text-xs text-amber-700 flex gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{w.message}</p>
+          ))}
+        </div>
+      )}
+
+      <Gstr1SummaryPanel returnData={returnSummary} formatCurrency={formatCurrency} />
 
       {/* TAB NAVIGATION */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1 overflow-x-auto">
@@ -655,10 +912,20 @@ export default function GSTR1DraftPage() {
          {/* HSN Summary Tab */}
          {activeTab === 'hsn' && (
            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+             <div className="inline-flex gap-1 p-1 bg-gray-100 rounded-xl">
+               <button onClick={() => setHsnSubTab('b2b')}
+                 className={`px-4 py-2 text-xs font-semibold rounded-lg ${hsnSubTab === 'b2b' ? 'bg-white shadow text-emerald-700' : 'text-gray-600'}`}>
+                 B2B Supplies ({hsnSummaryB2b.length})
+               </button>
+               <button onClick={() => setHsnSubTab('b2c')}
+                 className={`px-4 py-2 text-xs font-semibold rounded-lg ${hsnSubTab === 'b2c' ? 'bg-white shadow text-emerald-700' : 'text-gray-600'}`}>
+                 B2C Supplies ({hsnSummaryB2c.length})
+               </button>
+             </div>
              {hsnSummary.length === 0 ? (
                <div className="flex flex-col items-center justify-center h-48 text-gray-400 bg-white border border-gray-200 rounded-2xl shadow-sm">
                  <FileText className="h-10 w-10 mb-3 opacity-20" />
-                 <p className="text-gray-500 text-sm">No HSN data available. HSN codes in invoices will be summarized here.</p>
+                 <p className="text-gray-500 text-sm">No HSN data for {hsnSubTab === 'b2b' ? 'B2B' : 'B2C'} supplies in this period.</p>
                </div>
              ) : (
                <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
@@ -666,19 +933,21 @@ export default function GSTR1DraftPage() {
                    <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                      <tr>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">HSN Code</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">Rate</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">UQC</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">Quantity</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">Taxable</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">IGST</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">CGST</th>
                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">SGST</th>
-                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">Invoices</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-right">Lines</th>
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
                      {hsnSummary.map((row, idx) => (
                        <tr key={idx} className="hover:bg-gray-50">
                          <td className="px-4 py-3 font-semibold text-gray-900">{row.hsn}</td>
+                         <td className="px-4 py-3 text-gray-600 text-xs">{row.rate}%</td>
                          <td className="px-4 py-3 text-gray-600 text-xs">{row.uqc}</td>
                          <td className="px-4 py-3 text-right text-gray-700 text-xs">{row.qty}</td>
                          <td className="px-4 py-3 text-right font-semibold text-gray-700 text-xs">{formatCurrency(row.taxable)}</td>
@@ -697,14 +966,99 @@ export default function GSTR1DraftPage() {
 
          {/* Documents Tab */}
          {activeTab === 'docs' && (
-           <div className="flex flex-col items-center justify-center h-48 text-gray-400 bg-white border border-gray-200 rounded-2xl shadow-sm animate-in fade-in">
-             <FileText className="h-10 w-10 mb-3 opacity-20" />
-             <p className="text-gray-500 text-sm">Document issued details will be auto-populated from invoice numbering series.</p>
+           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+             <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+               Table 13 — Documents issued during the tax period (auto-derived from invoice series).
+             </div>
+             {docSeries.length === 0 ? (
+               <div className="flex flex-col items-center justify-center h-48 text-gray-400 bg-white border border-gray-200 rounded-2xl shadow-sm">
+                 <FileText className="h-10 w-10 mb-3 opacity-20" />
+                 <p className="text-gray-500 text-sm">Generate draft to populate document summary.</p>
+               </div>
+             ) : (
+               <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                 <table className="w-full text-left text-sm">
+                   <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                     <tr>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">Document Type</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">From</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase">To</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-center">Total</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-center">Cancelled</th>
+                       <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase text-center">Net Issued</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100">
+                     {docSeries.map((d, idx) => (
+                       <tr key={idx} className="hover:bg-gray-50">
+                         <td className="px-4 py-3 text-gray-900 font-medium text-xs">{d.doc_type}</td>
+                         <td className="px-4 py-3 font-mono text-xs">{d.from}</td>
+                         <td className="px-4 py-3 font-mono text-xs">{d.to}</td>
+                         <td className="px-4 py-3 text-center font-semibold">{d.totnum}</td>
+                         <td className="px-4 py-3 text-center text-gray-600">{d.cancel}</td>
+                         <td className="px-4 py-3 text-center font-bold text-emerald-700">{d.net_issue}</td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             )}
            </div>
          )}
 
       </div>
       </>
+      )}
+
+      {/* OTP Modal */}
+      {showOTPModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowOTPModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-900">GST Portal Authentication</h3>
+              <button onClick={() => setShowOTPModal(false)}><X className="h-5 w-5" /></button>
+            </div>
+            {otpError && <p className="text-sm text-red-600 mb-3">{otpError}</p>}
+            {otpStep === 'request' ? (
+              <button onClick={handleRequestOTP} disabled={otpLoading}
+                className="btn-primary-custom w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Request OTP on Registered Mobile
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <input type="text" value={otpValue} onChange={(e) => setOtpValue(e.target.value)}
+                  placeholder="Enter OTP" maxLength={10}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-center text-lg tracking-widest" />
+                <button onClick={handleVerifyOTP} disabled={otpLoading}
+                  className="btn-primary-custom w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                  {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  Verify OTP
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* File with EVC Modal */}
+      {showFileModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowFileModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-900">File GSTR-1 with EVC</h3>
+            <p className="text-xs text-gray-600">Enter signatory PAN and EVC OTP received on registered mobile/email.</p>
+            <input type="text" value={filePan} onChange={(e) => setFilePan(e.target.value.toUpperCase())}
+              placeholder="PAN (e.g. ABCDE1234F)" maxLength={10}
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm" />
+            <input type="text" value={fileEvcOtp} onChange={(e) => setFileEvcOtp(e.target.value)}
+              placeholder="EVC OTP" maxLength={10}
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm text-center tracking-widest" />
+            <button onClick={handleFileWithEvc} disabled={filingLoading || !filePan || !fileEvcOtp}
+              className="btn-primary-custom w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-50">
+              {filingLoading ? 'Filing...' : 'File Return'}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* JSON Preview Modal */}

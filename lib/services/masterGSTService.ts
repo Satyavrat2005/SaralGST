@@ -3,7 +3,11 @@
 // Authentication: /authentication/otprequest, /authentication/authtoken
 // GSTR APIs: /gstr1, /gstr2b, /gstr3b, /gstr
 
-const MASTERGST_BASE = 'https://apisandbox.whitebooks.in';
+export const MASTERGST_BASE = 'https://apisandbox.whitebooks.in';
+
+export function isMasterGstSandbox(): boolean {
+  return MASTERGST_BASE.includes('sandbox') && process.env.MASTERGST_SANDBOX !== 'false';
+}
 
 // Hardcoded credentials as per user requirement
 export const MASTERGST_CONFIG = {
@@ -15,6 +19,24 @@ export const MASTERGST_CONFIG = {
   email: 'khatigaurav8@gmail.com', // Default email for API calls
   ip_address: '127.0.0.1',
 };
+
+export type MasterGstRuntimeConfig = typeof MASTERGST_CONFIG;
+
+export function resolveMasterGstConfig(gstin?: string | null): MasterGstRuntimeConfig {
+  if (!gstin || gstin.trim() === '') return MASTERGST_CONFIG;
+  const normalized = gstin.trim().toUpperCase();
+  const state_cd = normalized.substring(0, 2);
+  return {
+    ...MASTERGST_CONFIG,
+    gstin: normalized,
+    state_cd,
+  };
+}
+
+/** Portal session is sandbox-bound to MASTERGST_CONFIG.gstin — do not swap in profile GSTIN. */
+export function getPortalFilerConfig(): MasterGstRuntimeConfig {
+  return MASTERGST_CONFIG;
+}
 
 // State code mapping
 const STATE_CODES: Record<string, string> = {
@@ -54,10 +76,11 @@ function getAuthHeaders(txn?: string): Record<string, string> {
 }
 
 // Headers for data endpoints (GSTR1/2B/3B) — includes gstin + txn
-function getDataHeaders(txn: string): Record<string, string> {
+function getDataHeaders(txn: string, config: MasterGstRuntimeConfig = MASTERGST_CONFIG): Record<string, string> {
   const headers = getBaseHeaders();
   headers['txn'] = txn;
-  headers['gstin'] = MASTERGST_CONFIG.gstin;
+  headers['gstin'] = config.gstin;
+  headers['state_cd'] = config.state_cd;
   return headers;
 }
 
@@ -183,10 +206,15 @@ export async function getGSTR1B2B(retPeriod: string, txn: string) {
   }
 }
 
-export async function saveGSTR1(retPeriod: string, txn: string, payload: any) {
+export async function saveGSTR1(
+  retPeriod: string,
+  txn: string,
+  payload: any,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
-    const query = buildQuery({ email: MASTERGST_CONFIG.email });
-    const headers = getDataHeaders(txn);
+    const query = buildQuery({ email: config.email });
+    const headers = getDataHeaders(txn, config);
     headers['ret_period'] = retPeriod;
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retsave?${query}`, {
       method: 'PUT',
@@ -199,14 +227,18 @@ export async function saveGSTR1(retPeriod: string, txn: string, payload: any) {
   }
 }
 
-export async function submitGSTR1(retPeriod: string, txn: string) {
+export async function submitGSTR1(
+  retPeriod: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
     const query = buildQuery({
-      gstin: MASTERGST_CONFIG.gstin,
+      gstin: config.gstin,
       retperiod: retPeriod,
-      email: MASTERGST_CONFIG.email,
+      email: config.email,
     });
-    const headers = getDataHeaders(txn);
+    const headers = getDataHeaders(txn, config);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retsubmit?${query}`, {
       method: 'POST',
       headers,
@@ -217,16 +249,22 @@ export async function submitGSTR1(retPeriod: string, txn: string) {
   }
 }
 
-export async function fileGSTR1(retPeriod: string, txn: string, pan: string, otp: string) {
+export async function fileGSTR1(
+  retPeriod: string,
+  txn: string,
+  pan: string,
+  otp: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
     const query = buildQuery({
-      gstin: MASTERGST_CONFIG.gstin,
+      gstin: config.gstin,
       retperiod: retPeriod,
-      email: MASTERGST_CONFIG.email,
+      email: config.email,
       pan,
       otp,
     });
-    const headers = getDataHeaders(txn);
+    const headers = getDataHeaders(txn, config);
     const res = await fetch(`${MASTERGST_BASE}/gstr1/retfile?${query}`, {
       method: 'POST',
       headers,
@@ -239,35 +277,50 @@ export async function fileGSTR1(retPeriod: string, txn: string, pan: string, otp
 
 // ================== GSTR-2B APIs ==================
 
-export async function getGSTR2B(retPeriod: string, txn: string) {
+function parseMasterGstJson(text: string, status: number) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: true, message: `Invalid response (${status}): ${text.substring(0, 200)}` };
+  }
+}
+
+export async function getGSTR2B(
+  retPeriod: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
     const query = buildQuery({
-      gstin: MASTERGST_CONFIG.gstin,
+      gstin: config.gstin,
       rtnprd: retPeriod,
-      email: MASTERGST_CONFIG.email,
+      email: config.email,
     });
-    const headers = getDataHeaders(txn);
+    const headers = getDataHeaders(txn, config);
     console.log('[MasterGST] GSTR2B fetch URL:', `${MASTERGST_BASE}/gstr2b/all?${query}`);
-    console.log('[MasterGST] GSTR2B headers:', JSON.stringify({ ...headers, client_secret: '***' }));
     const res = await fetch(`${MASTERGST_BASE}/gstr2b/all?${query}`, {
       method: 'GET',
       headers,
     });
     const text = await res.text();
     console.log('[MasterGST] GSTR2B response status:', res.status, 'body:', text.substring(0, 500));
-    try { return JSON.parse(text); } catch { return { error: true, message: `Invalid response (${res.status}): ${text.substring(0, 200)}` }; }
+    return parseMasterGstJson(text, res.status);
   } catch (err: any) {
     return { error: true, message: err.message };
   }
 }
 
-export async function generateGSTR2BOnDemand(retPeriod: string, txn: string) {
+export async function generateGSTR2BOnDemand(
+  retPeriod: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
-    const query = buildQuery({ email: MASTERGST_CONFIG.email });
-    const headers = getDataHeaders(txn);
+    const query = buildQuery({ email: config.email });
+    const headers = getDataHeaders(txn, config);
     headers['ret_period'] = retPeriod;
     const payload = {
-      rtin: MASTERGST_CONFIG.gstin,
+      rtin: config.gstin,
       itcprd: retPeriod,
     };
     const res = await fetch(`${MASTERGST_BASE}/gstr2b/gen2b?${query}`, {
@@ -277,28 +330,79 @@ export async function generateGSTR2BOnDemand(retPeriod: string, txn: string) {
     });
     const text = await res.text();
     console.log('[MasterGST] GSTR2B generate response status:', res.status, 'body:', text.substring(0, 500));
-    try { return JSON.parse(text); } catch { return { error: true, message: `Invalid response (${res.status}): ${text.substring(0, 200)}` }; }
+    return parseMasterGstJson(text, res.status);
   } catch (err: any) {
     return { error: true, message: err.message };
   }
 }
 
-export async function getGSTR2BSummary(retPeriod: string, txn: string) {
+export async function getGSTR2BGenerateStatus(
+  intTranId: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
   try {
     const query = buildQuery({
-      gstin: MASTERGST_CONFIG.gstin,
-      rtnprd: retPeriod,
-      email: MASTERGST_CONFIG.email,
+      gstin: config.gstin,
+      int_tran_id: intTranId,
+      email: config.email,
     });
-    const headers = getDataHeaders(txn);
+    const headers = getDataHeaders(txn, config);
+    const res = await fetch(`${MASTERGST_BASE}/gstr2b/get2b?${query}`, {
+      method: 'GET',
+      headers,
+    });
+    const text = await res.text();
+    console.log('[MasterGST] GSTR2B get2b status:', res.status, 'body:', text.substring(0, 300));
+    return parseMasterGstJson(text, res.status);
+  } catch (err: any) {
+    return { error: true, message: err.message };
+  }
+}
+
+export async function getGSTR2BSummary(
+  retPeriod: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG
+) {
+  try {
+    const query = buildQuery({
+      gstin: config.gstin,
+      rtnprd: retPeriod,
+      email: config.email,
+    });
+    const headers = getDataHeaders(txn, config);
     const res = await fetch(`${MASTERGST_BASE}/gstr2b/retsum?${query}`, {
       method: 'GET',
       headers,
     });
-    return await res.json();
+    const text = await res.text();
+    return parseMasterGstJson(text, res.status);
   } catch (err: any) {
     return { error: true, message: err.message };
   }
+}
+
+export async function pollGstr2bGeneration(
+  intTranId: string,
+  txn: string,
+  config: MasterGstRuntimeConfig = MASTERGST_CONFIG,
+  maxAttempts = 8,
+  delayMs = 3000
+): Promise<{ ready: boolean; lastStatus?: unknown }> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const status = await getGSTR2BGenerateStatus(intTranId, txn, config);
+    const done =
+      status.status_cd === '1' ||
+      status.status_cd === 1 ||
+      status.status === 'Success' ||
+      status.success === true ||
+      status.data?.status === 'SUCCESS' ||
+      status.data?.status === 'Success';
+    if (done) return { ready: true, lastStatus: status };
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return { ready: false };
 }
 
 // ================== GSTR-3B APIs ==================

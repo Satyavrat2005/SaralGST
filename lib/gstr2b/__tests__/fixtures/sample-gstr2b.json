@@ -1,0 +1,74 @@
+{
+  "status_cd": "1",
+  "data": {
+    "docdata": {
+      "b2b": [
+        {
+          "ctin": "27AABCU9603R1ZM",
+          "trdnm": "Test Supplier Pvt Ltd",
+          "inv": [
+            {
+              "inum": "INV-1001",
+              "idt": "15-03-2025",
+              "val": 118000,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [
+                {
+                  "num": 1,
+                  "itm_det": { "rt": 18, "txval": 100000, "iamt": 0, "camt": 9000, "samt": 9000, "csamt": 0 }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "cdnr": [
+        {
+          "ctin": "27AABCU9603R1ZM",
+          "trdnm": "Test Supplier Pvt Ltd",
+          "nt": [
+            {
+              "nt_num": "CN-001",
+              "nt_dt": "20-03-2025",
+              "ntty": "C",
+              "val": 5900,
+              "pos": "27",
+              "itc_avl": "Y",
+              "itms": [
+                {
+                  "num": 1,
+                  "itm_det": { "rt": 18, "txval": 5000, "iamt": 0, "camt": 450, "samt": 450, "csamt": 0 }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "isd": [
+        {
+          "ctin": "27AAECS1234F1Z5",
+          "trdnm": "ISD Corp",
+          "docnum": "ISD-001",
+          "docdt": "10-03-2025",
+          "igst": 1000,
+          "cgst": 0,
+          "sgst": 0,
+          "cess": 0,
+          "itc_avl": "Y"
+        }
+      ],
+      "impg": [
+        {
+          "boenum": "BOE-12345",
+          "boedt": "05-03-2025",
+          "portcode": "INNSA1",
+          "txval": 50000,
+          "igst": 9000,
+          "cess": 0
+        }
+      ]
+    }
+  }
+}

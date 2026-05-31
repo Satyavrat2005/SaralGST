@@ -1,43 +1,102 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  AlertOctagon, 
-  ArrowRight, 
-  AlertTriangle, 
-  HelpCircle, 
-  MessageSquare, 
-  Mail, 
-  Download, 
-  ChevronRight,
-  Plus,
-  Trash2,
+import {
+  AlertOctagon,
+  AlertTriangle,
+  ArrowRight,
   CheckCircle2,
-  X,
-  Phone
+  Download,
+  ChevronRight,
+  HelpCircle,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Phone,
+  Plus,
 } from 'lucide-react';
 
-// Mock Data
-const missingInBooks = [
-  { id: 'INV-005678', date: '15 Nov 2025', vendor: 'XYZ Suppliers Ltd', gstin: '27XYZAB1234C1Z5', amount: 34560, gst: 6220, reason: 'Not Uploaded', status: 'Active' },
-  { id: 'INV-005679', date: '14 Nov 2025', vendor: 'Alpha Systems', gstin: '33ALPHA9876Z1Z3', amount: 12000, gst: 2160, reason: 'Validation Failed', status: 'Active' },
-];
-
-const missingInGSTR2B = [
-  { id: 'INV-001234', date: '12 Nov 2025', vendor: 'ABC Enterprises', gstin: '27ABCDE1234F1Z5', amount: 45600, gst: 8208, daysPending: 11, filingStatus: 'Not Filed', lastReminder: '2 days ago' },
-  { id: 'INV-001299', date: '01 Nov 2025', vendor: 'Global Logistics', gstin: '07KLMNO4321J1Z9', amount: 15000, gst: 2700, daysPending: 22, filingStatus: 'Missing in Return', lastReminder: 'Never' },
-];
-
-const valueMismatches = [
-  { id: 'INV-003456', date: '20 Nov 2025', vendor: 'LMN Traders', bookAmount: 53808, gstr2bAmount: 53800, diff: 8, type: 'Rounding', withinTolerance: true },
-  { id: 'INV-003457', date: '19 Nov 2025', vendor: 'PQR Industries', bookAmount: 11800, gstr2bAmount: 10000, diff: 1800, type: 'GST Amount', withinTolerance: false },
-];
+const PERIODS = (() => {
+  const periods: { label: string; value: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    periods.push({
+      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`,
+      value: `${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getFullYear()}`,
+    });
+  }
+  return periods;
+})();
 
 export default function DiscrepanciesPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'books' | 'gstr2b' | 'value'>('books');
+  const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
+  const [loading, setLoading] = useState(true);
+  const [returnId, setReturnId] = useState<string | null>(null);
+  const [missingInBooks, setMissingInBooks] = useState<Array<Record<string, unknown>>>([]);
+  const [missingInGSTR2B, setMissingInGSTR2B] = useState<Array<Record<string, unknown>>>([]);
+  const [valueMismatches, setValueMismatches] = useState<Array<Record<string, unknown>>>([]);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const listRes = await fetch(`/api/returns?action=list&type=GSTR2B&period=${selectedPeriod}`);
+      const listData = await listRes.json();
+      const ret = listData.data?.[0];
+      if (!ret?.id) {
+        setReturnId(null);
+        setMissingInBooks([]);
+        setMissingInGSTR2B([]);
+        setValueMismatches([]);
+        return;
+      }
+      setReturnId(ret.id);
+      const res = await fetch(`/api/returns?action=reconciliation-results&returnId=${ret.id}`);
+      const data = await res.json();
+      setMissingInBooks((data.missing_in_books || []).map((g: Record<string, unknown>) => ({
+        id: g.invoice_number || g.id,
+        date: g.invoice_date,
+        vendor: g.supplier_name,
+        gstin: g.supplier_gstin,
+        amount: g.taxable_value,
+        gst: (Number(g.igst_amount) || 0) + (Number(g.cgst_amount) || 0) + (Number(g.sgst_amount) || 0),
+        reason: 'In GSTR-2B only',
+        status: 'Active',
+      })));
+      setMissingInGSTR2B((data.missing_in_gstr2b || []).map((p: Record<string, unknown>) => ({
+        id: p.invoice_number || p.id,
+        date: p.invoice_date,
+        vendor: p.supplier_name,
+        gstin: p.supplier_gstin,
+        amount: p.taxable_value || p.total_invoice_value,
+        gst: (Number(p.igst_amount) || 0) + (Number(p.cgst_amount) || 0) + (Number(p.sgst_amount) || 0),
+        daysPending: 0,
+        filingStatus: 'Not in GSTR-2B',
+        lastReminder: '—',
+      })));
+      setValueMismatches((data.partial || []).map((pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown>; diff: { taxable: number; tax: number } }) => ({
+        id: pair.gstr2b.invoice_number || pair.gstr2b.id,
+        date: pair.gstr2b.invoice_date,
+        vendor: pair.gstr2b.supplier_name,
+        bookAmount: pair.purchase.taxable_value,
+        gstr2bAmount: pair.gstr2b.taxable_value,
+        diff: pair.diff?.taxable ?? pair.diff?.tax ?? 0,
+        type: Math.abs(pair.diff?.taxable || 0) <= 1 ? 'Rounding' : 'Value/GST',
+        withinTolerance: Math.abs(pair.diff?.taxable || 0) <= 1,
+      })));
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPeriod]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => 
@@ -50,6 +109,14 @@ export default function DiscrepanciesPage() {
       prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
@@ -65,10 +132,16 @@ export default function DiscrepanciesPage() {
           <p className="text-gray-600 text-sm mt-1">Invoices that didn't match or have differences</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm">
-             <MessageSquare className="h-4 w-4" /> Send Bulk Reminders
-           </button>
-           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm">
+           <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)}
+             className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+             {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+           </select>
+           {!returnId && (
+             <button onClick={() => router.push('/dashboard/sme/returns/gstr2b')} className="text-sm text-emerald-700 underline">
+               Fetch GSTR-2B first
+             </button>
+           )}
+           <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 flex items-center gap-2 shadow-sm">
              <Download className="h-4 w-4" /> Export All
            </button>
         </div>

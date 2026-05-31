@@ -3,22 +3,329 @@ import { createClient } from '@/lib/supabase/server';
 import {
   requestOTP,
   getAuthToken,
-  getGSTR1Summary,
-  getGSTR1B2B,
   saveGSTR1,
   submitGSTR1,
+  fileGSTR1,
   getGSTR2B,
   generateGSTR2BOnDemand,
   getGSTR2BSummary,
-  getGSTR3BSummary,
+  pollGstr2bGeneration,
   saveGSTR3B,
-  submitGSTR3B,
-  getReturnStatus,
-  viewAndTrackReturns,
   MASTERGST_CONFIG,
   getFinancialYear,
   parseReturnPeriod,
+  getPortalFilerConfig,
+  resolveMasterGstConfig,
 } from '@/lib/services/masterGSTService';
+import {
+  buildGstr1ReturnData,
+  buildGstnPayload,
+  mapSalesInvoiceToGstr1,
+  validateGstr1Return,
+  getPortalGstinIssues,
+  getReturnPeriodDateRange,
+  invoiceDateInPeriod,
+  type BusinessProfileContext,
+  type Gstr1ReturnData,
+} from '@/lib/gstr1';
+import {
+  parseGstr2bResponse,
+  buildGstr2bReturnData,
+  reconcileGstr2bWithPurchase,
+  checkGstr2bPeriodFetchable,
+  PORTAL_UNAVAILABLE_CODES,
+  SANDBOX_GSTR2B_PERIOD,
+  formatPeriodLabel,
+  getSandboxGstr2bPortalResponse,
+  isMasterGstSandboxEnv,
+  buildSandboxPurchaseRows,
+  purchaseSeedKey,
+  toGstr2bDbRows,
+  type Gstr2bReturnData,
+} from '@/lib/gstr2b';
+
+function isMasterGstSuccess(data: Record<string, unknown>): boolean {
+  return (
+    data.status_cd === '1' ||
+    data.status_cd === 1 ||
+    data.status === 'Success' ||
+    data.success === true
+  );
+}
+
+function extractPortalErrorCode(result: Record<string, unknown>): string | undefined {
+  const err = result.error as { error_cd?: string } | undefined;
+  return err?.error_cd || (result.error_cd as string | undefined);
+}
+
+function getPortalErrorFromResult(result: Record<string, unknown>): { code?: string; message: string } {
+  const code = extractPortalErrorCode(result);
+  const err = result.error as { message?: string } | undefined;
+  const message =
+    err?.message ||
+    (typeof result.status_desc === 'string' ? result.status_desc : undefined) ||
+    'Portal request failed';
+  return { code, message };
+}
+
+async function fetchGstr2bWithGeneration(
+  period: string,
+  txn: string,
+  portalConfig: ReturnType<typeof getPortalFilerConfig>
+) {
+  let result = await getGSTR2B(period, txn, portalConfig);
+  if (result?.error === true) {
+    return { error: result.message || 'Failed to fetch GSTR-2B', status: 500 as const };
+  }
+
+  if (!isMasterGstSuccess(result)) {
+    const errorCode = extractPortalErrorCode(result);
+    const errorMessage =
+      (result.error as { message?: string })?.message ||
+      (result.message as string) ||
+      'Failed to fetch GSTR-2B';
+
+    if (errorCode === 'GTR2B-002') {
+      const generationResult = await generateGSTR2BOnDemand(period, txn, portalConfig);
+      if (generationResult?.error === true) {
+        return {
+          error: generationResult.message || 'Failed to request GSTR-2B generation',
+          status: 500 as const,
+        };
+      }
+
+      if (!isMasterGstSuccess(generationResult)) {
+        const genErr = getPortalErrorFromResult(generationResult);
+        return {
+          error: genErr.message,
+          code: genErr.code,
+          status: 409 as const,
+        };
+      }
+
+      const intTranId =
+        generationResult.data?.int_tran_id ||
+        generationResult.int_tran_id ||
+        generationResult.data?.intTranId;
+
+      if (intTranId) {
+        const poll = await pollGstr2bGeneration(String(intTranId), txn, portalConfig);
+        if (poll.ready) {
+          result = await getGSTR2B(period, txn, portalConfig);
+          if (result?.error === true) {
+            return { error: result.message || 'Failed to fetch GSTR-2B after generation', status: 500 as const };
+          }
+          if (isMasterGstSuccess(result)) {
+            return { result, generationRequested: true, polled: true };
+          }
+        }
+      }
+
+      return {
+        error: 'GSTR-2B is not available yet. Generation has been requested; please try again shortly.',
+        code: 'GSTR2B_GENERATING',
+        generationRequested: true,
+        status: 409 as const,
+      };
+    }
+
+    return { error: errorMessage, code: errorCode, status: 409 as const };
+  }
+
+  return { result, generationRequested: false, polled: false };
+}
+
+async function persistGstr2bFetch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  period: string,
+  portalConfig: ReturnType<typeof getPortalFilerConfig>,
+  result: Record<string, unknown>,
+  options: {
+    portalSummary?: unknown;
+    generationRequested?: boolean;
+    priorRecon?: Gstr2bReturnData['reconciliation'];
+    source?: 'portal' | 'sandbox_fixture';
+    portalErrorCode?: string;
+    portalErrorMessage?: string;
+    requestedPeriod?: string;
+  } = {}
+) {
+  const { month, year } = parseReturnPeriod(period);
+  const fy = getFinancialYear(month, year);
+
+  const existingReturn = await supabase
+    .from('gst_returns')
+    .select('id, return_data')
+    .eq('user_id', userId)
+    .eq('return_type', 'GSTR2B')
+    .eq('return_period', period)
+    .maybeSingle();
+
+  let returnId: string;
+  const priorRecon =
+    options.priorRecon ??
+    (existingReturn.data?.return_data as Gstr2bReturnData | null)?.reconciliation;
+
+  if (existingReturn.data?.id) {
+    returnId = existingReturn.data.id;
+    await supabase.from('gstr2b_data').delete().eq('return_id', returnId);
+  } else {
+    const { data: newReturn, error: createErr } = await supabase
+      .from('gst_returns')
+      .insert({
+        user_id: userId,
+        gstin: portalConfig.gstin,
+        return_type: 'GSTR2B',
+        return_period: period,
+        financial_year: fy,
+        status: 'generated',
+      })
+      .select('id')
+      .single();
+    if (createErr) throw new Error(createErr.message);
+    returnId = newReturn!.id;
+  }
+
+  const gstr2bInvoices = parseGstr2bResponse(result, returnId, userId);
+  const returnData = buildGstr2bReturnData(gstr2bInvoices, period, options.portalSummary);
+  returnData.diagnostics = {
+    recordsParsed: gstr2bInvoices.length,
+    generationRequested: options.generationRequested,
+    emptyPortal: gstr2bInvoices.length === 0,
+    source: options.source || 'portal',
+    portalErrorCode: options.portalErrorCode,
+    portalErrorMessage: options.portalErrorMessage,
+    requestedPeriod: options.requestedPeriod,
+  };
+  if (priorRecon) returnData.reconciliation = priorRecon;
+
+  if (gstr2bInvoices.length > 0) {
+    const { error: insertErr } = await supabase.from('gstr2b_data').insert(toGstr2bDbRows(gstr2bInvoices));
+    if (insertErr) throw new Error(insertErr.message);
+  }
+
+  let purchaseSeeded = 0;
+  if (options.source === 'sandbox_fixture' && gstr2bInvoices.length > 0) {
+    const seed = await seedSandboxPurchaseBooks(supabase, gstr2bInvoices, period, portalConfig.gstin);
+    purchaseSeeded = seed.inserted;
+  }
+
+  const totals = gstr2bInvoices.reduce(
+    (acc, inv) => ({
+      taxable: acc.taxable + (inv.taxable_value || 0),
+      igst: acc.igst + (inv.igst_amount || 0),
+      cgst: acc.cgst + (inv.cgst_amount || 0),
+      sgst: acc.sgst + (inv.sgst_amount || 0),
+      cess: acc.cess + (inv.cess_amount || 0),
+    }),
+    { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }
+  );
+
+  await supabase
+    .from('gst_returns')
+    .update({
+      status: 'generated',
+      total_taxable_value: totals.taxable,
+      total_igst: totals.igst,
+      total_cgst: totals.cgst,
+      total_sgst: totals.sgst,
+      total_cess: totals.cess,
+      total_tax: totals.igst + totals.cgst + totals.sgst + totals.cess,
+      total_invoices: gstr2bInvoices.length,
+      return_data: returnData,
+      api_response: result,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', returnId);
+
+  return { returnId, gstr2bInvoices, returnData, totals, purchaseSeeded };
+}
+
+async function seedSandboxPurchaseBooks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gstr2bRows: ReturnType<typeof parseGstr2bResponse>,
+  period: string,
+  buyerGstin: string
+): Promise<{ inserted: number; skipped: number }> {
+  const { startDate, endDate } = getReturnPeriodDateRange(period);
+  const { data: existing } = await supabase
+    .from('purchase_register')
+    .select('supplier_gstin, invoice_number, invoice_date')
+    .gte('invoice_date', startDate)
+    .lte('invoice_date', endDate);
+
+  const existingKeys = new Set(
+    (existing || []).map((p) =>
+      purchaseSeedKey({
+        source: 'manual',
+        supplier_gstin: p.supplier_gstin,
+        invoice_number: p.invoice_number,
+        invoice_date: p.invoice_date ? String(p.invoice_date).slice(0, 10) : null,
+        invoice_type: 'B2B',
+        buyer_gstin: buyerGstin,
+        taxable_value: 0,
+        cgst_amount: 0,
+        sgst_amount: 0,
+        igst_amount: 0,
+        cess_amount: 0,
+        total_invoice_value: 0,
+        is_itc_eligible: true,
+        invoice_status: 'verified',
+      })
+    )
+  );
+
+  const candidates = buildSandboxPurchaseRows(gstr2bRows, buyerGstin);
+  const toInsert = candidates.filter((row) => !existingKeys.has(purchaseSeedKey(row)));
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from('purchase_register').insert(toInsert);
+    if (error) throw new Error(error.message);
+  }
+
+  return { inserted: toInsert.length, skipped: candidates.length - toInsert.length };
+}
+
+function shouldUseSandboxGstr2bFallback(code?: string, useSandboxFallback?: boolean): boolean {
+  if (useSandboxFallback === false) return false;
+  if (!isMasterGstSandboxEnv()) return false;
+  return !!code && PORTAL_UNAVAILABLE_CODES.has(code);
+}
+
+async function loadSandboxGstr2bFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  requestedPeriod: string,
+  portalConfig: ReturnType<typeof getPortalFilerConfig>,
+  portalError: { code?: string; message: string }
+) {
+  const period = SANDBOX_GSTR2B_PERIOD;
+  const result = getSandboxGstr2bPortalResponse();
+  const persisted = await persistGstr2bFetch(supabase, userId, period, portalConfig, result, {
+    source: 'sandbox_fixture',
+    portalErrorCode: portalError.code,
+    portalErrorMessage: portalError.message,
+    requestedPeriod,
+  });
+
+  return NextResponse.json({
+    success: true,
+    sandboxFallback: true,
+    requestedPeriod,
+    period,
+    returnId: persisted.returnId,
+    totalInvoices: persisted.gstr2bInvoices.length,
+    returnData: persisted.returnData,
+    totals: persisted.totals,
+    portalError,
+    message:
+      requestedPeriod === period
+        ? `Portal unavailable (${portalError.code || 'error'}). Loaded sandbox sample GSTR-2B with ${persisted.gstr2bInvoices.length} documents${persisted.purchaseSeeded ? ` and ${persisted.purchaseSeeded} matching purchase book entries` : ''}.`
+        : `Portal unavailable for ${formatPeriodLabel(requestedPeriod)} (${portalError.code}). Loaded sandbox sample for ${formatPeriodLabel(period)} instead${persisted.purchaseSeeded ? ` with ${persisted.purchaseSeeded} purchase book entries` : ''}.`,
+    purchaseSeeded: persisted.purchaseSeeded,
+  });
+}
 
 function getPortalErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'string' && error.trim()) return error;
@@ -40,6 +347,44 @@ async function getAuthenticatedUser(supabase: Awaited<ReturnType<typeof createCl
 
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user ?? null;
+}
+
+async function loadBusinessProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<BusinessProfileContext> {
+  const { data } = await supabase
+    .from('business_profiles')
+    .select('gstin, legal_name, trade_name, state, annual_turnover_range')
+    .eq('user_id', userId)
+    .single();
+
+  const gstin = data?.gstin?.trim().toUpperCase() || MASTERGST_CONFIG.gstin;
+  return {
+    gstin,
+    legal_name: data?.legal_name ?? null,
+    trade_name: data?.trade_name ?? null,
+    state_cd: gstin.substring(0, 2),
+    annual_turnover_range: data?.annual_turnover_range ?? null,
+  };
+}
+
+async function getPortalTxn(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  gstin: string
+) {
+  const { data: tokenData } = await supabase
+    .from('mastergst_auth_tokens')
+    .select('txn, expires_at')
+    .eq('user_id', userId)
+    .eq('gstin', gstin)
+    .single();
+
+  if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
+    return null;
+  }
+  return tokenData.txn;
 }
 
 // GET /api/returns?action=...&type=...&period=...
@@ -117,7 +462,7 @@ export async function GET(req: NextRequest) {
         let query = supabase
           .from('gstr2b_data')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('invoice_date', { ascending: false });
         
         if (returnId) query = query.eq('return_id', returnId);
         if (user) query = query.eq('user_id', user.id);
@@ -125,6 +470,114 @@ export async function GET(req: NextRequest) {
         const { data, error } = await query;
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         return NextResponse.json({ data });
+      }
+
+      // ============ GSTR2B RETURN SUMMARY ============
+      case 'gstr2b-summary': {
+        const returnId = url.searchParams.get('returnId');
+        if (!returnId || !user) {
+          return NextResponse.json({ error: 'Missing returnId' }, { status: 400 });
+        }
+        const { data: returnRecord, error } = await supabase
+          .from('gst_returns')
+          .select('id, return_data, return_period, status, updated_at, total_invoices')
+          .eq('id', returnId)
+          .eq('user_id', user.id)
+          .eq('return_type', 'GSTR2B')
+          .single();
+        if (error || !returnRecord) {
+          return NextResponse.json({ error: 'Return not found' }, { status: 404 });
+        }
+        return NextResponse.json({
+          data: returnRecord.return_data as Gstr2bReturnData,
+          return: returnRecord,
+        });
+      }
+
+      // ============ RECONCILIATION RESULTS ============
+      case 'reconciliation-results': {
+        const returnId = url.searchParams.get('returnId');
+        const view = url.searchParams.get('view') || 'all';
+        if (!returnId || !user) {
+          return NextResponse.json({ error: 'Missing returnId' }, { status: 400 });
+        }
+
+        const { data: returnRow } = await supabase
+          .from('gst_returns')
+          .select('return_data, return_period')
+          .eq('id', returnId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (!returnRow) return NextResponse.json({ error: 'Return not found' }, { status: 404 });
+
+        const { data: gstr2bRows } = await supabase
+          .from('gstr2b_data')
+          .select('*')
+          .eq('return_id', returnId);
+
+        const { startDate, endDate } = getReturnPeriodDateRange(returnRow.return_period);
+        const { data: purchaseRows } = await supabase
+          .from('purchase_register')
+          .select('*')
+          .gte('invoice_date', startDate)
+          .lte('invoice_date', endDate);
+
+        const recon = reconcileGstr2bWithPurchase(
+          (gstr2bRows || []) as Parameters<typeof reconcileGstr2bWithPurchase>[0],
+          purchaseRows || []
+        );
+
+        if (view === 'matched') {
+          return NextResponse.json({ data: recon.matchedPairs, stats: recon.stats });
+        }
+        if (view === 'partial') {
+          return NextResponse.json({ data: recon.partialMatches, stats: recon.stats });
+        }
+        if (view === 'missing-gstr2b') {
+          return NextResponse.json({ data: recon.missingInGstr2b, stats: recon.stats });
+        }
+        if (view === 'missing-books') {
+          return NextResponse.json({ data: recon.missingInBooks, stats: recon.stats });
+        }
+        if (view === 'vendor-summary') {
+          const byVendor = new Map<string, { name: string; gstr2b: number; books: number; value: number; total: number }>();
+          recon.missingInBooks.forEach((g) => {
+            const key = g.supplier_gstin || g.supplier_name || 'Unknown';
+            const cur = byVendor.get(key) || { name: g.supplier_name || key, gstr2b: 0, books: 0, value: 0, total: 0 };
+            cur.gstr2b += 1;
+            cur.total += 1;
+            byVendor.set(key, cur);
+          });
+          recon.missingInGstr2b.forEach((p) => {
+            const key = p.supplier_gstin || p.supplier_name || 'Unknown';
+            const cur = byVendor.get(key) || { name: p.supplier_name || key, gstr2b: 0, books: 0, value: 0, total: 0 };
+            cur.books += 1;
+            cur.total += 1;
+            byVendor.set(key, cur);
+          });
+          recon.partialMatches.forEach(({ gstr2b: g }) => {
+            const key = g.supplier_gstin || g.supplier_name || 'Unknown';
+            const cur = byVendor.get(key) || { name: g.supplier_name || key, gstr2b: 0, books: 0, value: 0, total: 0 };
+            cur.value += 1;
+            cur.total += 1;
+            byVendor.set(key, cur);
+          });
+          return NextResponse.json({
+            data: Array.from(byVendor.values()).sort((a, b) => b.total - a.total),
+            stats: recon.stats,
+            return_data: returnRow.return_data,
+          });
+        }
+
+        return NextResponse.json({
+          stats: recon.stats,
+          return_data: returnRow.return_data,
+          matched: recon.matchedPairs,
+          partial: recon.partialMatches,
+          missing_in_gstr2b: recon.missingInGstr2b,
+          missing_in_books: recon.missingInBooks,
+        });
       }
 
       // ============ GET GSTR3B DATA ============
@@ -141,154 +594,159 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ data });
       }
 
+      // ============ GSTR1 RETURN SUMMARY (return_data JSON) ============
+      case 'gstr1-summary': {
+        if (!period || !user) return NextResponse.json({ error: 'Missing period or user' }, { status: 400 });
+        const { data: returnRecord } = await supabase
+          .from('gst_returns')
+          .select('id, return_data, gstin, financial_year, status')
+          .eq('return_type', 'GSTR1')
+          .eq('return_period', period)
+          .eq('user_id', user.id)
+          .single();
+        if (!returnRecord) return NextResponse.json({ data: null });
+        return NextResponse.json({ data: returnRecord.return_data, return: returnRecord });
+      }
+
       // ============ GENERATE GSTR1 FROM SALES REGISTER ============
       case 'generate-gstr1': {
         if (!period || !user) return NextResponse.json({ error: 'Missing period or user' }, { status: 400 });
-        
-        const { month, year } = parseReturnPeriod(period);
-        const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-        const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Last day of month
-        
-        console.log('[GSTR-1 Generate] Period:', period, 'Date range:', startDate, 'to', endDate, 'User:', user.id);
-        
-        // Fetch sales invoices for the period (include null user_id for legacy/uploaded data)
-        const { data: salesInvoices, error: salesErr } = await supabase
-          .from('sales_invoices')
-          .select('*')
-          .or(`user_id.eq.${user.id},user_id.is.null`)
-          .gte('invoice_date', startDate)
-          .lte('invoice_date', endDate);
-        
-        if (salesErr) {
-          console.error('[GSTR-1 Generate] Sales query error:', salesErr);
-          return NextResponse.json({ error: salesErr.message }, { status: 500 });
-        }
-        
-        console.log('[GSTR-1 Generate] Found', salesInvoices?.length || 0, 'invoices in date range');
-        if (salesInvoices && salesInvoices.length > 0) {
-          console.log('[GSTR-1 Generate] First invoice:', JSON.stringify(salesInvoices[0]).substring(0, 300));
-        }
-        
-        // Also try without date filter to debug
-        if (!salesInvoices || salesInvoices.length === 0) {
-          const { data: allInvoices } = await supabase
-            .from('sales_invoices')
-            .select('id, invoice_number, invoice_date, user_id')
-            .or(`user_id.eq.${user.id},user_id.is.null`)
-            .limit(5);
-          console.log('[GSTR-1 Generate] DEBUG - All invoices for user (no date filter):', JSON.stringify(allInvoices));
-        }
 
-        // Create or update gst_returns record
-        const existingReturn = await supabase
-          .from('gst_returns')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('return_type', 'GSTR1')
-          .eq('return_period', period)
-          .single();
-
-        let returnId: string;
-
-        if (existingReturn.data) {
-          returnId = existingReturn.data.id;
-          // Delete old gstr1_invoices for this return
-          await supabase.from('gstr1_invoices').delete().eq('return_id', returnId);
-        } else {
+        try {
+          const profile = await loadBusinessProfile(supabase, user.id);
+          const { startDate, endDate, month, year } = getReturnPeriodDateRange(period);
           const fy = getFinancialYear(month, year);
-          const { data: newReturn, error: createErr } = await supabase
+
+          // Sales uploads often have null user_id (admin insert) — include owned + unassigned rows
+          const { data: salesRows, error: salesErr } = await supabase
+            .from('sales_invoices')
+            .select('*')
+            .or(`user_id.eq.${user.id},user_id.is.null`);
+
+          if (salesErr) {
+            console.error('[GSTR-1 Generate] sales_invoices query error:', salesErr);
+            return NextResponse.json({ error: salesErr.message }, { status: 500 });
+          }
+
+          const salesInPeriod = (salesRows || []).filter((inv) =>
+            invoiceDateInPeriod(inv.invoice_date, startDate, endDate)
+          );
+
+          const { count: totalSalesCount } = await supabase
+            .from('sales_invoices')
+            .select('id', { count: 'exact', head: true })
+            .or(`user_id.eq.${user.id},user_id.is.null`);
+
+          const existingReturn = await supabase
             .from('gst_returns')
-            .insert({
-              user_id: user.id,
-              gstin: MASTERGST_CONFIG.gstin,
-              return_type: 'GSTR1',
-              return_period: period,
-              financial_year: fy,
-              status: 'draft',
-            })
             .select('id')
-            .single();
-          if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
-          returnId = newReturn.id;
-        }
+            .eq('user_id', user.id)
+            .eq('return_type', 'GSTR1')
+            .eq('return_period', period)
+            .maybeSingle();
 
-        // Transform sales invoices into GSTR1 format
-        const gstr1Invoices = (salesInvoices || []).map((inv: any) => {
-          const isInterState = (inv.igst_amount || 0) > 0;
-          const section = inv.customer_gstin ? 'b2b' : 
-                         (inv.gross_total > 250000 && isInterState ? 'b2cl' : 'b2cs');
-          
-          // Extract state code from place_of_supply (e.g. "19-West Bengal" → "19")
-          const posRaw = inv.place_of_supply || MASTERGST_CONFIG.state_cd;
-          const placeOfSupply = posRaw.toString().substring(0, 2).replace(/\D/g, '') || MASTERGST_CONFIG.state_cd;
-          
-          return {
-            return_id: returnId,
-            user_id: user.id,
-            section,
-            invoice_number: inv.invoice_number,
-            invoice_date: inv.invoice_date,
-            invoice_value: inv.gross_total || 0,
-            place_of_supply: placeOfSupply,
-            counterparty_gstin: inv.customer_gstin,
-            counterparty_name: inv.customer_name,
-            taxable_value: inv.taxable_value || 0,
-            igst_amount: inv.igst_amount || 0,
-            cgst_amount: inv.cgst_amount || 0,
-            sgst_amount: inv.sgst_amount || 0,
-            cess_amount: inv.tcs_cess || 0,
-            tax_rate: inv.taxable_value > 0 
-              ? Math.round(((inv.igst_amount || 0) + (inv.cgst_amount || 0) + (inv.sgst_amount || 0)) / inv.taxable_value * 100) 
-              : 0,
-            invoice_type: 'R',
-            reverse_charge: inv.reverse_charge || false,
-            hsn_code: inv.hsn_sac_code,
-            description: inv.voucher_type,
-            uqc: inv.uqc,
-            quantity: inv.quantity,
-            validation_status: 'valid',
-            source: 'sales_register',
-            source_invoice_id: inv.id,
+          let returnId: string;
+
+          if (existingReturn.data?.id) {
+            returnId = existingReturn.data.id;
+            await supabase.from('gstr1_invoices').delete().eq('return_id', returnId);
+          } else {
+            const { data: newReturn, error: createErr } = await supabase
+              .from('gst_returns')
+              .insert({
+                user_id: user.id,
+                gstin: profile.gstin,
+                return_type: 'GSTR1',
+                return_period: period,
+                financial_year: fy,
+                status: 'draft',
+              })
+              .select('id')
+              .single();
+            if (createErr) {
+              console.error('[GSTR-1 Generate] create return error:', createErr);
+              return NextResponse.json({ error: createErr.message }, { status: 500 });
+            }
+            returnId = newReturn!.id;
+          }
+
+          // Claim legacy rows without user_id for this account
+          const unassignedIds = salesInPeriod.filter((inv) => !inv.user_id).map((inv) => inv.id);
+          if (unassignedIds.length > 0) {
+            await supabase
+              .from('sales_invoices')
+              .update({ user_id: user.id })
+              .in('id', unassignedIds);
+          }
+
+          const gstr1Invoices = salesInPeriod.map((inv) =>
+            mapSalesInvoiceToGstr1(inv, profile, returnId, user.id)
+          );
+
+          if (gstr1Invoices.length > 0) {
+            const { error: insertErr } = await supabase.from('gstr1_invoices').insert(gstr1Invoices);
+            if (insertErr) {
+              console.error('[GSTR-1 Generate] insert gstr1_invoices error:', insertErr);
+              return NextResponse.json({ error: insertErr.message }, { status: 500 });
+            }
+          }
+
+          const returnData = buildGstr1ReturnData(gstr1Invoices, profile, fy, period);
+          const totals = returnData.total_liability;
+
+          const { error: updateErr } = await supabase
+            .from('gst_returns')
+            .update({
+              gstin: profile.gstin,
+              status: 'generated',
+              total_taxable_value: totals.value,
+              total_igst: totals.igst,
+              total_cgst: totals.cgst,
+              total_sgst: totals.sgst,
+              total_cess: totals.cess,
+              total_tax: totals.igst + totals.cgst + totals.sgst + totals.cess,
+              total_invoices: gstr1Invoices.length,
+              return_data: returnData,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', returnId);
+
+          if (updateErr) {
+            console.error('[GSTR-1 Generate] update return error:', updateErr);
+            return NextResponse.json({ error: updateErr.message }, { status: 500 });
+          }
+
+          const diagnostics = {
+            period,
+            dateRange: { startDate, endDate },
+            salesInPeriod: salesInPeriod.length,
+            salesTotal: totalSalesCount ?? 0,
+            unassignedClaimed: unassignedIds.length,
           };
-        });
 
-        if (gstr1Invoices.length > 0) {
-          const { error: insertErr } = await supabase
-            .from('gstr1_invoices')
-            .insert(gstr1Invoices);
-          if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+          return NextResponse.json({
+            success: true,
+            returnId,
+            totalInvoices: gstr1Invoices.length,
+            returnData,
+            diagnostics,
+            message:
+              gstr1Invoices.length === 0
+                ? `No sales invoices found between ${startDate} and ${endDate}. Upload invoices in Sales Register for this month.`
+                : undefined,
+            totals: {
+              taxable: totals.value,
+              igst: totals.igst,
+              cgst: totals.cgst,
+              sgst: totals.sgst,
+              cess: totals.cess,
+            },
+          });
+        } catch (err: unknown) {
+          console.error('[GSTR-1 Generate] unexpected error:', err);
+          const message = err instanceof Error ? err.message : 'Failed to generate GSTR-1';
+          return NextResponse.json({ error: message }, { status: 500 });
         }
-
-        // Calculate totals
-        const totals = gstr1Invoices.reduce((acc: any, inv: any) => ({
-          taxable: acc.taxable + (inv.taxable_value || 0),
-          igst: acc.igst + (inv.igst_amount || 0),
-          cgst: acc.cgst + (inv.cgst_amount || 0),
-          sgst: acc.sgst + (inv.sgst_amount || 0),
-          cess: acc.cess + (inv.cess_amount || 0),
-        }), { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
-
-        // Update return with totals
-        await supabase
-          .from('gst_returns')
-          .update({
-            status: 'generated',
-            total_taxable_value: totals.taxable,
-            total_igst: totals.igst,
-            total_cgst: totals.cgst,
-            total_sgst: totals.sgst,
-            total_cess: totals.cess,
-            total_tax: totals.igst + totals.cgst + totals.sgst + totals.cess,
-            total_invoices: gstr1Invoices.length,
-          })
-          .eq('id', returnId);
-
-        return NextResponse.json({ 
-          success: true, 
-          returnId,
-          totalInvoices: gstr1Invoices.length,
-          totals,
-        });
       }
 
       // ============ GENERATE GSTR3B FROM REGISTERS ============
@@ -335,14 +793,51 @@ export async function GET(req: NextRequest) {
           cess: acc.cess + (p.cess_amount || 0),
         }), { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
 
-        // Compute Section 4 ITC from purchases
-        const eligiblePurchases = (purchaseInvoices || []).filter((p: any) => p.is_itc_eligible);
-        const itc = eligiblePurchases.reduce((acc: any, p: any) => ({
-          igst: acc.igst + (p.igst_amount || 0),
-          cgst: acc.cgst + (p.cgst_amount || 0),
-          sgst: acc.sgst + (p.sgst_amount || 0),
-          cess: acc.cess + (p.cess_amount || 0),
-        }), { igst: 0, cgst: 0, sgst: 0, cess: 0 });
+        // Compute Section 4 ITC — prefer GSTR-2B when fetched for period
+        const { data: gstr2bReturn } = await supabase
+          .from('gst_returns')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('return_type', 'GSTR2B')
+          .eq('return_period', period)
+          .maybeSingle();
+
+        let itcSource: 'gstr2b' | 'purchase_register' = 'purchase_register';
+        let itc = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
+
+        if (gstr2bReturn?.id) {
+          const { data: gstr2bRows } = await supabase
+            .from('gstr2b_data')
+            .select('itc_eligible, itc_igst, itc_cgst, itc_sgst, itc_cess')
+            .eq('return_id', gstr2bReturn.id);
+
+          const eligible2b = (gstr2bRows || []).filter((r) => r.itc_eligible !== false);
+          if (eligible2b.length > 0) {
+            itcSource = 'gstr2b';
+            itc = eligible2b.reduce(
+              (acc, r) => ({
+                igst: acc.igst + (r.itc_igst || 0),
+                cgst: acc.cgst + (r.itc_cgst || 0),
+                sgst: acc.sgst + (r.itc_sgst || 0),
+                cess: acc.cess + (r.itc_cess || 0),
+              }),
+              { igst: 0, cgst: 0, sgst: 0, cess: 0 }
+            );
+          }
+        }
+
+        if (itcSource === 'purchase_register') {
+          const eligiblePurchases = (purchaseInvoices || []).filter((p: { is_itc_eligible?: boolean }) => p.is_itc_eligible);
+          itc = eligiblePurchases.reduce(
+            (acc: { igst: number; cgst: number; sgst: number; cess: number }, p: { igst_amount?: number; cgst_amount?: number; sgst_amount?: number; cess_amount?: number }) => ({
+              igst: acc.igst + (p.igst_amount || 0),
+              cgst: acc.cgst + (p.cgst_amount || 0),
+              sgst: acc.sgst + (p.sgst_amount || 0),
+              cess: acc.cess + (p.cess_amount || 0),
+            }),
+            { igst: 0, cgst: 0, sgst: 0, cess: 0 }
+          );
+        }
 
         // Create/update return
         const existingReturn = await supabase
@@ -441,6 +936,7 @@ export async function GET(req: NextRequest) {
             total_cess: totalOutputTax.cess,
             total_tax: totalTax,
             total_invoices: sales.length,
+            return_data: { itc_source: itcSource, generated_at: new Date().toISOString() },
           })
           .eq('id', returnId);
 
@@ -449,9 +945,14 @@ export async function GET(req: NextRequest) {
           returnId,
           outputTax: totalOutputTax,
           itcAvailable: totalITC,
+          itcSource,
           cashPayable,
           totalTax,
           totalCash,
+          warning:
+            itcSource === 'purchase_register'
+              ? 'GSTR-2B not fetched for this period — ITC computed from purchase register.'
+              : undefined,
         });
       }
 
@@ -587,31 +1088,103 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result);
       }
 
-      // ============ SAVE GSTR1 TO PORTAL ============
-      case 'save-gstr1': {
+      // ============ PREVIEW GSTR1 JSON ============
+      case 'preview-gstr1-json': {
         const { returnId, period } = body;
-        
-        // Get auth token
-        const { data: tokenData } = await supabase
-          .from('mastergst_auth_tokens')
-          .select('txn, expires_at')
+        const profile = await loadBusinessProfile(supabase, user.id);
+        const { data: returnRow } = await supabase
+          .from('gst_returns')
+          .select('return_data')
+          .eq('id', returnId)
           .eq('user_id', user.id)
-          .eq('gstin', MASTERGST_CONFIG.gstin)
+          .single();
+        const { data: invoices } = await supabase
+          .from('gstr1_invoices')
+          .select('*')
+          .eq('return_id', returnId);
+        const returnData = (returnRow?.return_data || {}) as Gstr1ReturnData;
+        const portalConfig = getPortalFilerConfig();
+        const payload = buildGstnPayload(invoices || [], returnData, period, portalConfig.gstin);
+        return NextResponse.json({ payload });
+      }
+
+      // ============ VALIDATE GSTR1 ============
+      case 'validate-gstr1': {
+        const { returnId } = body;
+        if (!returnId) return NextResponse.json({ error: 'Missing returnId' }, { status: 400 });
+
+        const profile = await loadBusinessProfile(supabase, user.id);
+        const { data: returnRow } = await supabase
+          .from('gst_returns')
+          .select('id, return_data, return_period')
+          .eq('id', returnId)
+          .eq('user_id', user.id)
           .single();
 
-        if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
-          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
-        }
+        if (!returnRow) return NextResponse.json({ error: 'Return not found' }, { status: 404 });
 
-        // Fetch GSTR1 invoices
         const { data: invoices } = await supabase
           .from('gstr1_invoices')
           .select('*')
           .eq('return_id', returnId);
 
-        // Transform to GSTN format
-        const payload = transformToGSTNFormat(invoices || [], period);
-        const result = await saveGSTR1(period, tokenData.txn, payload);
+        const returnData = (returnRow.return_data || {}) as Gstr1ReturnData;
+        if (!returnData.sections) {
+          return NextResponse.json({ error: 'Generate draft before validating' }, { status: 400 });
+        }
+
+        const portalConfig = getPortalFilerConfig();
+        const validation = validateGstr1Return(invoices || [], returnData, profile);
+        const gstinIssues = getPortalGstinIssues(invoices || [], portalConfig.gstin);
+        validation.errors.push(...gstinIssues);
+        validation.isValid = validation.errors.length === 0;
+        const status = validation.isValid ? 'validated' : 'error';
+
+        await supabase.from('gst_returns').update({
+          status,
+          return_data: {
+            ...returnData,
+            validation: { errors: validation.errors, warnings: validation.warnings, validated_at: new Date().toISOString() },
+          },
+        }).eq('id', returnId);
+
+        return NextResponse.json({ success: validation.isValid, ...validation });
+      }
+
+      // ============ SAVE GSTR1 TO PORTAL ============
+      case 'save-gstr1': {
+        const { returnId, period } = body;
+
+        const portalConfig = getPortalFilerConfig();
+        const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
+
+        if (!txn) {
+          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
+        }
+
+        const { data: returnRow } = await supabase
+          .from('gst_returns')
+          .select('return_data')
+          .eq('id', returnId)
+          .eq('user_id', user.id)
+          .single();
+
+        const { data: invoices } = await supabase
+          .from('gstr1_invoices')
+          .select('*')
+          .eq('return_id', returnId);
+
+        const gstinIssues = getPortalGstinIssues(invoices || [], portalConfig.gstin);
+        if (gstinIssues.length > 0) {
+          return NextResponse.json({
+            error: gstinIssues.map((i) => i.message).join(' '),
+            gstinIssues,
+          }, { status: 400 });
+        }
+
+        const returnData = (returnRow?.return_data || {}) as Gstr1ReturnData;
+        const payload = buildGstnPayload(invoices || [], returnData, period, portalConfig.gstin);
+        const result = await saveGSTR1(period, txn, payload, portalConfig);
 
         if (result?.error === true) {
           return NextResponse.json({ error: result.message || 'Failed to save GSTR-1 to portal' }, { status: 500 });
@@ -623,7 +1196,6 @@ export async function POST(req: NextRequest) {
           }, { status: 409 });
         }
 
-        // Update return status
         await supabase.from('gst_returns').update({
           status: 'submitted',
           api_reference_id: result.reference_id || result.ref_id,
@@ -632,6 +1204,76 @@ export async function POST(req: NextRequest) {
         }).eq('id', returnId);
 
         return NextResponse.json(result);
+      }
+
+      // ============ SUBMIT GSTR1 TO PORTAL ============
+      case 'submit-gstr1': {
+        const { returnId, period } = body;
+        const portalConfig = getPortalFilerConfig();
+        const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
+
+        if (!txn) {
+          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
+        }
+
+        const result = await submitGSTR1(period, txn, portalConfig);
+
+        if (result?.error === true) {
+          return NextResponse.json({ error: result.message || 'Failed to submit GSTR-1' }, { status: 500 });
+        }
+
+        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+          return NextResponse.json({
+            error: getPortalErrorMessage(result?.error, 'Failed to submit GSTR-1'),
+          }, { status: 409 });
+        }
+
+        await supabase.from('gst_returns').update({
+          status: 'submitted',
+          api_reference_id: result.reference_id || result.ref_id,
+          api_response: result,
+        }).eq('id', returnId);
+
+        return NextResponse.json({ success: true, ...result });
+      }
+
+      // ============ FILE GSTR1 WITH EVC ============
+      case 'file-gstr1': {
+        const { returnId, period, pan, evcOtp } = body;
+        if (!pan || !evcOtp) {
+          return NextResponse.json({ error: 'PAN and EVC OTP are required to file' }, { status: 400 });
+        }
+
+        const portalConfig = getPortalFilerConfig();
+        const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
+
+        if (!txn) {
+          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
+        }
+
+        const result = await fileGSTR1(period, txn, pan, evcOtp, portalConfig);
+
+        if (result?.error === true) {
+          return NextResponse.json({ error: result.message || 'Failed to file GSTR-1' }, { status: 500 });
+        }
+
+        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+          return NextResponse.json({
+            error: getPortalErrorMessage(result?.error, 'Failed to file GSTR-1'),
+          }, { status: 409 });
+        }
+
+        const arn = result.arn || result.data?.arn || result.reference_id;
+
+        await supabase.from('gst_returns').update({
+          status: 'filed',
+          arn: arn || null,
+          filed_date: new Date().toISOString(),
+          filed_by: user.email || 'System',
+          api_response: result,
+        }).eq('id', returnId).eq('user_id', user.id);
+
+        return NextResponse.json({ success: true, arn, ...result });
       }
 
       // ============ SAVE GSTR3B TO PORTAL ============ 
@@ -684,10 +1326,53 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result);
       }
 
+      // ============ LOAD SANDBOX GSTR2B SAMPLE (no portal auth) ============
+      case 'load-sandbox-gstr2b': {
+        if (!isMasterGstSandboxEnv()) {
+          return NextResponse.json({ error: 'Sandbox sample data is only available in sandbox mode.' }, { status: 400 });
+        }
+        const loadPeriod = (body.period as string) || SANDBOX_GSTR2B_PERIOD;
+        try {
+          return await loadSandboxGstr2bFallback(supabase, user.id, loadPeriod, getPortalFilerConfig(), {
+            code: 'SANDBOX_SAMPLE',
+            message: 'Loaded sandbox sample GSTR-2B (no portal fetch).',
+          });
+        } catch (err: unknown) {
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : 'Failed to load sandbox sample' },
+            { status: 500 }
+          );
+        }
+      }
+
       // ============ FETCH GSTR2B FROM PORTAL ============
       case 'fetch-gstr2b': {
-        const { period } = body;
-        
+        const { period, useSandboxFallback } = body;
+        if (!period) return NextResponse.json({ error: 'Missing period' }, { status: 400 });
+
+        const periodCheck = checkGstr2bPeriodFetchable(period);
+        if (periodCheck.blocked) {
+          if (shouldUseSandboxGstr2bFallback(periodCheck.code, useSandboxFallback)) {
+            return loadSandboxGstr2bFallback(
+              supabase,
+              user.id,
+              period,
+              getPortalFilerConfig(),
+              { code: periodCheck.code, message: periodCheck.message || 'Period not yet available' }
+            );
+          }
+          return NextResponse.json(
+            {
+              error: periodCheck.message,
+              code: periodCheck.code,
+              availableFrom: periodCheck.availableFrom,
+              suggestedPeriod: periodCheck.suggestedPeriod,
+            },
+            { status: 409 }
+          );
+        }
+
+        const portalConfig = getPortalFilerConfig();
         const { data: tokenData } = await supabase
           .from('mastergst_auth_tokens')
           .select('txn, expires_at')
@@ -699,114 +1384,174 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
         }
 
-        const result = await getGSTR2B(period, tokenData.txn);
-        
-        if (result.error === true) {
-          return NextResponse.json({ error: result.message || 'Failed to fetch GSTR-2B' }, { status: 500 });
-        }
-
-        if (result.status_cd !== '1' && result.status_cd !== 1 && result.status !== 'Success' && result.success !== true) {
-          const errorCode = result.error?.error_cd;
-          const errorMessage = result.error?.message || result.message || 'Failed to fetch GSTR-2B';
-
-          if (errorCode === 'GTR2B-002') {
-            const generationResult = await generateGSTR2BOnDemand(period, tokenData.txn);
-
-            if (generationResult.error === true) {
-              return NextResponse.json({
-                error: generationResult.message || 'Failed to request GSTR-2B generation',
-              }, { status: 500 });
-            }
-
-            if (generationResult.status_cd === '1' || generationResult.status_cd === 1 || generationResult.status === 'Success' || generationResult.success === true) {
-              return NextResponse.json({
-                error: 'GSTR-2B is not available yet. Generation has been requested from the GST portal. Please try again shortly.',
-                code: 'GSTR2B_GENERATING',
-                generationRequested: true,
-                generationResponse: generationResult,
-              }, { status: 409 });
-            }
-
-            return NextResponse.json({
-              error: generationResult.error?.message || generationResult.message || errorMessage,
-              code: generationResult.error?.error_cd || errorCode,
-              generationRequested: false,
-            }, { status: 409 });
+        const fetchOutcome = await fetchGstr2bWithGeneration(period, tokenData.txn, portalConfig);
+        if ('error' in fetchOutcome && fetchOutcome.error) {
+          if (shouldUseSandboxGstr2bFallback(fetchOutcome.code, useSandboxFallback)) {
+            return loadSandboxGstr2bFallback(supabase, user.id, period, portalConfig, {
+              code: fetchOutcome.code,
+              message: fetchOutcome.error,
+            });
           }
-
-          return NextResponse.json({ error: errorMessage, code: errorCode }, { status: 409 });
+          return NextResponse.json(
+            {
+              error: fetchOutcome.error,
+              code: fetchOutcome.code,
+              generationRequested: fetchOutcome.generationRequested,
+              suggestedPeriod: SANDBOX_GSTR2B_PERIOD,
+            },
+            { status: fetchOutcome.status || 409 }
+          );
         }
 
-        // Create/update return record
-        const { month, year } = parseReturnPeriod(period);
-        const fy = getFinancialYear(month, year);
-        
-        const existingReturn = await supabase
+        const result = fetchOutcome.result!;
+        const portalSummary = await getGSTR2BSummary(period, tokenData.txn, portalConfig);
+
+        try {
+          const persisted = await persistGstr2bFetch(
+            supabase,
+            user.id,
+            period,
+            portalConfig,
+            result,
+            {
+              portalSummary,
+              generationRequested: fetchOutcome.generationRequested,
+              source: 'portal',
+            }
+          );
+
+          return NextResponse.json({
+            success: true,
+            returnId: persisted.returnId,
+            totalInvoices: persisted.gstr2bInvoices.length,
+            returnData: persisted.returnData,
+            totals: persisted.totals,
+            generationRequested: fetchOutcome.generationRequested,
+            message:
+              persisted.gstr2bInvoices.length === 0
+                ? 'Portal returned no documents for this period (common in sandbox).'
+                : undefined,
+          });
+        } catch (err: unknown) {
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : 'Failed to save GSTR-2B data' },
+            { status: 500 }
+          );
+        }
+      }
+
+      // ============ RECONCILE GSTR2B WITH PURCHASE REGISTER ============
+      case 'reconcile-gstr2b': {
+        const { returnId, period: bodyPeriod } = body;
+        if (!returnId) return NextResponse.json({ error: 'Missing returnId' }, { status: 400 });
+
+        const { data: returnRow } = await supabase
           .from('gst_returns')
-          .select('id')
+          .select('id, return_period, return_data')
+          .eq('id', returnId)
           .eq('user_id', user.id)
           .eq('return_type', 'GSTR2B')
-          .eq('return_period', period)
           .single();
 
-        let returnId: string;
-        if (existingReturn.data) {
-          returnId = existingReturn.data.id;
-          await supabase.from('gstr2b_data').delete().eq('return_id', returnId);
-        } else {
-          const { data: newReturn, error: createErr } = await supabase
-            .from('gst_returns')
-            .insert({
-              user_id: user.id,
-              gstin: MASTERGST_CONFIG.gstin,
-              return_type: 'GSTR2B',
-              return_period: period,
-              financial_year: fy,
-              status: 'generated',
-            }).select('id').single();
-          if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
-          returnId = newReturn.id;
-        }
+        if (!returnRow) return NextResponse.json({ error: 'GSTR-2B return not found' }, { status: 404 });
 
-        // Parse and store GSTR2B data
-        const gstr2bInvoices = parseGSTR2BResponse(result, returnId, user.id);
-        
-        if (gstr2bInvoices.length > 0) {
-          const { error: insertErr } = await supabase
+        const period = bodyPeriod || returnRow.return_period;
+        const { startDate, endDate } = getReturnPeriodDateRange(period);
+
+        const { data: gstr2bRows } = await supabase
+          .from('gstr2b_data')
+          .select('*')
+          .eq('return_id', returnId);
+
+        const { data: purchaseRows } = await supabase
+          .from('purchase_register')
+          .select('*')
+          .gte('invoice_date', startDate)
+          .lte('invoice_date', endDate);
+
+        const recon = reconcileGstr2bWithPurchase(
+          (gstr2bRows || []) as Parameters<typeof reconcileGstr2bWithPurchase>[0],
+          purchaseRows || []
+        );
+
+        for (const upd of recon.gstr2bUpdates) {
+          await supabase
             .from('gstr2b_data')
-            .insert(gstr2bInvoices);
-          if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+            .update({
+              match_status: upd.match_status,
+              matched_purchase_id: upd.matched_purchase_id,
+            })
+            .eq('id', upd.id);
         }
 
-        // Update totals
-        const totals = gstr2bInvoices.reduce((acc: any, inv: any) => ({
-          taxable: acc.taxable + (inv.taxable_value || 0),
-          igst: acc.igst + (inv.igst_amount || 0),
-          cgst: acc.cgst + (inv.cgst_amount || 0),
-          sgst: acc.sgst + (inv.sgst_amount || 0),
-          cess: acc.cess + (inv.cess_amount || 0),
-          itcIgst: acc.itcIgst + (inv.itc_igst || 0),
-          itcCgst: acc.itcCgst + (inv.itc_cgst || 0),
-          itcSgst: acc.itcSgst + (inv.itc_sgst || 0),
-        }), { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, itcIgst: 0, itcCgst: 0, itcSgst: 0 });
+        const returnData = (returnRow.return_data || {}) as Gstr2bReturnData;
+        returnData.reconciliation = recon.stats;
 
-        await supabase.from('gst_returns').update({
-          status: 'generated',
-          total_taxable_value: totals.taxable,
-          total_igst: totals.igst,
-          total_cgst: totals.cgst,
-          total_sgst: totals.sgst,
-          total_cess: totals.cess,
-          total_tax: totals.igst + totals.cgst + totals.sgst + totals.cess,
-          total_invoices: gstr2bInvoices.length,
-          api_response: result,
-        }).eq('id', returnId);
+        await supabase
+          .from('gst_returns')
+          .update({ return_data: returnData, updated_at: new Date().toISOString() })
+          .eq('id', returnId);
+
+        const purchaseCount = (purchaseRows || []).length;
+        const periodLabel = formatPeriodLabel(period);
+        let hint: string | undefined;
+        if (purchaseCount === 0) {
+          hint = `No purchase invoices in your books for ${periodLabel}. Upload purchase bills for this month, or use "Seed purchase books" if you loaded the sandbox GSTR-2B sample.`;
+        } else if (recon.stats.matched === 0 && recon.stats.partial === 0) {
+          hint = `${purchaseCount} purchase invoice(s) found for ${periodLabel}, but none matched GSTR-2B on GSTIN, invoice number, date, or amounts. Check supplier GSTIN and invoice details.`;
+        }
 
         return NextResponse.json({
           success: true,
-          returnId,
-          totalInvoices: gstr2bInvoices.length,
-          totals,
+          stats: recon.stats,
+          matched: recon.matchedPairs.length,
+          partial: recon.partialMatches.length,
+          missing_in_gstr2b: recon.missingInGstr2b.length,
+          missing_in_books: recon.missingInBooks.length,
+          purchase_in_period: purchaseCount,
+          hint,
+        });
+      }
+
+      case 'seed-purchase-for-gstr2b': {
+        const { returnId } = body;
+        if (!returnId) return NextResponse.json({ error: 'Missing returnId' }, { status: 400 });
+
+        const { data: returnRow } = await supabase
+          .from('gst_returns')
+          .select('id, return_period')
+          .eq('id', returnId)
+          .eq('user_id', user.id)
+          .eq('return_type', 'GSTR2B')
+          .single();
+
+        if (!returnRow) return NextResponse.json({ error: 'GSTR-2B return not found' }, { status: 404 });
+
+        const { data: gstr2bRows } = await supabase
+          .from('gstr2b_data')
+          .select('*')
+          .eq('return_id', returnId);
+
+        if (!gstr2bRows?.length) {
+          return NextResponse.json({ error: 'No GSTR-2B documents to match. Fetch or load sandbox sample first.' }, { status: 400 });
+        }
+
+        const portalConfig = getPortalFilerConfig();
+        const seed = await seedSandboxPurchaseBooks(
+          supabase,
+          gstr2bRows as Parameters<typeof parseGstr2bResponse>,
+          returnRow.return_period,
+          portalConfig.gstin
+        );
+
+        return NextResponse.json({
+          success: true,
+          inserted: seed.inserted,
+          skipped: seed.skipped,
+          message:
+            seed.inserted > 0
+              ? `Added ${seed.inserted} purchase book entries for ${formatPeriodLabel(returnRow.return_period)}. Run reconciliation again.`
+              : `Purchase books already have matching entries for this period (${seed.skipped} skipped). Run reconciliation.`,
         });
       }
 
@@ -844,101 +1589,6 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
-}
-
-// ============ HELPER: Transform invoices to GSTN B2B format ============
-function transformToGSTNFormat(invoices: any[], period: string) {
-  const b2bMap = new Map<string, any[]>();
-  const b2clMap = new Map<string, any[]>();
-  const b2csItems: any[] = [];
-
-  invoices.forEach(inv => {
-    if (inv.section === 'b2b' && inv.counterparty_gstin) {
-      if (!b2bMap.has(inv.counterparty_gstin)) {
-        b2bMap.set(inv.counterparty_gstin, []);
-      }
-      b2bMap.get(inv.counterparty_gstin)!.push(inv);
-    } else if (inv.section === 'b2cl') {
-      const pos = inv.place_of_supply || '33';
-      if (!b2clMap.has(pos)) b2clMap.set(pos, []);
-      b2clMap.get(pos)!.push(inv);
-    } else if (inv.section === 'b2cs') {
-      b2csItems.push(inv);
-    }
-  });
-
-  const b2b = Array.from(b2bMap.entries()).map(([ctin, invs]) => ({
-    ctin,
-    inv: invs.map(inv => ({
-      inum: inv.invoice_number,
-      idt: formatDateForGSTN(inv.invoice_date),
-      val: inv.invoice_value || 0,
-      pos: inv.place_of_supply || '33',
-      rchrg: inv.reverse_charge ? 'Y' : 'N',
-      inv_typ: inv.invoice_type || 'R',
-      itms: [{
-        num: 1,
-        itm_det: {
-          rt: inv.tax_rate || 18,
-          txval: inv.taxable_value || 0,
-          iamt: inv.igst_amount || 0,
-          camt: inv.cgst_amount || 0,
-          samt: inv.sgst_amount || 0,
-          csamt: inv.cess_amount || 0,
-        }
-      }]
-    }))
-  }));
-
-  const b2cl = Array.from(b2clMap.entries()).map(([pos, invs]) => ({
-    pos,
-    inv: invs.map(inv => ({
-      inum: inv.invoice_number,
-      idt: formatDateForGSTN(inv.invoice_date),
-      val: inv.invoice_value || 0,
-      itms: [{
-        num: 1,
-        itm_det: {
-          rt: inv.tax_rate || 18,
-          txval: inv.taxable_value || 0,
-          iamt: inv.igst_amount || 0,
-          csamt: inv.cess_amount || 0,
-        }
-      }]
-    }))
-  }));
-
-  // Aggregate B2CS by POS + rate
-  const b2csAgg = new Map<string, any>();
-  b2csItems.forEach(inv => {
-    const key = `${inv.place_of_supply || '33'}_${inv.tax_rate || 18}_${inv.igst_amount > 0 ? 'INTER' : 'INTRA'}`;
-    if (!b2csAgg.has(key)) {
-      b2csAgg.set(key, {
-        sply_ty: inv.igst_amount > 0 ? 'INTER' : 'INTRA',
-        pos: inv.place_of_supply || '33',
-        rt: inv.tax_rate || 18,
-        txval: 0,
-        iamt: 0,
-        camt: 0,
-        samt: 0,
-        csamt: 0,
-      });
-    }
-    const entry = b2csAgg.get(key)!;
-    entry.txval += inv.taxable_value || 0;
-    entry.iamt += inv.igst_amount || 0;
-    entry.camt += inv.cgst_amount || 0;
-    entry.samt += inv.sgst_amount || 0;
-    entry.csamt += inv.cess_amount || 0;
-  });
-
-  return {
-    gstin: MASTERGST_CONFIG.gstin,
-    fp: period,
-    b2b: b2b.length > 0 ? b2b : undefined,
-    b2cl: b2cl.length > 0 ? b2cl : undefined,
-    b2cs: b2csAgg.size > 0 ? Array.from(b2csAgg.values()) : undefined,
-  };
 }
 
 function transformGSTR3BToGSTNFormat(data: any, period: string) {
@@ -994,90 +1644,3 @@ function transformGSTR3BToGSTNFormat(data: any, period: string) {
   };
 }
 
-function parseGSTR2BResponse(response: any, returnId: string, userId: string): any[] {
-  const invoices: any[] = [];
-  const data = response?.data || response;
-
-  // Parse B2B section
-  if (data?.docdata?.b2b) {
-    data.docdata.b2b.forEach((supplier: any) => {
-      (supplier.inv || []).forEach((inv: any) => {
-        (inv.itms || []).forEach((itm: any) => {
-          const det = itm.itm_det || {};
-          invoices.push({
-            return_id: returnId,
-            user_id: userId,
-            section: 'b2b',
-            supplier_gstin: supplier.ctin,
-            supplier_name: supplier.trdnm || supplier.ctin,
-            invoice_number: inv.inum,
-            invoice_date: parseGSTNDate(inv.idt),
-            invoice_value: inv.val,
-            place_of_supply: inv.pos,
-            taxable_value: det.txval || 0,
-            igst_amount: det.iamt || 0,
-            cgst_amount: det.camt || 0,
-            sgst_amount: det.samt || 0,
-            cess_amount: det.csamt || 0,
-            tax_rate: det.rt || 0,
-            itc_eligible: true,
-            itc_igst: det.iamt || 0,
-            itc_cgst: det.camt || 0,
-            itc_sgst: det.samt || 0,
-            itc_cess: det.csamt || 0,
-          });
-        });
-      });
-    });
-  }
-
-  // Parse CDNR section
-  if (data?.docdata?.cdnr) {
-    data.docdata.cdnr.forEach((supplier: any) => {
-      (supplier.nt || []).forEach((note: any) => {
-        (note.itms || []).forEach((itm: any) => {
-          const det = itm.itm_det || {};
-          invoices.push({
-            return_id: returnId,
-            user_id: userId,
-            section: 'cdnr',
-            supplier_gstin: supplier.ctin,
-            supplier_name: supplier.trdnm || supplier.ctin,
-            invoice_number: note.nt_num,
-            invoice_date: parseGSTNDate(note.nt_dt),
-            invoice_value: note.val,
-            place_of_supply: note.pos,
-            taxable_value: det.txval || 0,
-            igst_amount: det.iamt || 0,
-            cgst_amount: det.camt || 0,
-            sgst_amount: det.samt || 0,
-            cess_amount: det.csamt || 0,
-            tax_rate: det.rt || 0,
-            itc_eligible: true,
-            itc_igst: det.iamt || 0,
-            itc_cgst: det.camt || 0,
-            itc_sgst: det.samt || 0,
-            itc_cess: det.csamt || 0,
-          });
-        });
-      });
-    });
-  }
-
-  return invoices;
-}
-
-function formatDateForGSTN(date: string): string {
-  if (!date) return '';
-  const d = new Date(date);
-  return `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`;
-}
-
-function parseGSTNDate(dateStr: string): string | null {
-  if (!dateStr) return null;
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert DD-MM-YYYY to YYYY-MM-DD
-  }
-  return dateStr;
-}

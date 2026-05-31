@@ -1,41 +1,96 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  CheckCircle2, 
-  Download, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Eye, 
-  MoreVertical, 
-  ArrowUpRight,
+import {
+  CheckCircle2,
+  Download,
+  Search,
+  Calendar,
+  Eye,
+  Loader2,
   ShieldCheck,
   X,
-  FileText
+  FileText,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
+const PERIODS = (() => {
+  const periods: { label: string; value: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    periods.push({
+      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`,
+      value: `${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getFullYear()}`,
+    });
+  }
+  return periods;
+})();
 
-// Mock Data
-const matchedInvoices = [
-  { id: 'INV-001234', date: '18 Nov 2025', vendor: 'ABC Enterprises', gstin: '27ABCDE1234F1Z5', amount: 53808, gstr2bAmount: 53808, type: 'Exact Match', itc: 9685, confidence: 100, status: 'Reviewed' },
-  { id: 'INV-001235', date: '18 Nov 2025', vendor: 'TechSol Solutions', gstin: '29PQRST5678H1Z2', amount: 14160, gstr2bAmount: 14160, type: 'Exact Match', itc: 2160, confidence: 100, status: 'Pending Review' },
-  { id: 'INV-001236', date: '17 Nov 2025', vendor: 'Global Logistics', gstin: '07KLMNO4321J1Z9', amount: 100300, gstr2bAmount: 100295, type: 'Fuzzy Match', itc: 15300, confidence: 95, status: 'Pending Review' },
-  { id: 'INV-001238', date: '16 Nov 2025', vendor: 'Reddy Traders', gstin: '33FGHIJ9876L1Z4', amount: 28320, gstr2bAmount: 28320, type: 'Exact Match', itc: 4320, confidence: 100, status: 'Reviewed' },
-  { id: 'INV-001239', date: '15 Nov 2025', vendor: 'Office Supplies', gstin: '19UVWXY8765K1Z3', amount: 4130, gstr2bAmount: 4130, type: 'HSN Match', itc: 630, confidence: 90, status: 'Pending Review' },
-];
-
-const matchBreakdown = [
-  { name: 'Exact Match', value: 750, color: '#3B82F6' },
-  { name: 'Fuzzy Match', value: 30, color: '#10B981' },
-  { name: 'HSN Match', value: 9, color: '#8B5CF6' },
-];
+interface MatchedRow {
+  id: string;
+  invoice_number: string;
+  date: string;
+  vendor: string;
+  gstin: string;
+  amount: number;
+  gstr2bAmount: number;
+  type: string;
+  itc: number;
+}
 
 export default function MatchedInvoicesPage() {
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const router = useRouter();
+  const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
+  const [returnId, setReturnId] = useState<string | null>(null);
+  const [matchedInvoices, setMatchedInvoices] = useState<MatchedRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState<MatchedRow | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const listRes = await fetch(`/api/returns?action=list&type=GSTR2B&period=${selectedPeriod}`);
+      const listData = await listRes.json();
+      const ret = listData.data?.[0];
+      if (!ret?.id) {
+        setReturnId(null);
+        setMatchedInvoices([]);
+        return;
+      }
+      setReturnId(ret.id);
+      const res = await fetch(`/api/returns?action=reconciliation-results&returnId=${ret.id}&view=matched`);
+      const data = await res.json();
+      const rows: MatchedRow[] = (data.data || []).map(
+        (pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown> }) => {
+          const g = pair.gstr2b;
+          const p = pair.purchase;
+          const gTax = (Number(g.igst_amount) || 0) + (Number(g.cgst_amount) || 0) + (Number(g.sgst_amount) || 0);
+          const pTax = (Number(p.igst_amount) || 0) + (Number(p.cgst_amount) || 0) + (Number(p.sgst_amount) || 0);
+          return {
+            id: String(g.id),
+            invoice_number: String(g.invoice_number || p.invoice_number || ''),
+            date: String(g.invoice_date || p.invoice_date || ''),
+            vendor: String(g.supplier_name || p.supplier_name || ''),
+            gstin: String(g.supplier_gstin || p.supplier_gstin || ''),
+            amount: Number(p.taxable_value || p.total_invoice_value || 0),
+            gstr2bAmount: Number(g.taxable_value || 0),
+            type: Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 'Exact Match' : 'Fuzzy Match',
+            itc: gTax || pTax,
+          };
+        }
+      );
+      setMatchedInvoices(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPeriod]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleRowSelection = (id: string) => {
     setSelectedRows(prev => 
@@ -44,13 +99,38 @@ export default function MatchedInvoicesPage() {
   };
 
   const getMatchTypeStyle = (type: string) => {
-    switch(type) {
+    switch (type) {
       case 'Exact Match': return 'bg-blue-50 text-blue-700 border border-blue-200';
       case 'Fuzzy Match': return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'HSN Match': return 'bg-purple-50 text-purple-700 border border-purple-200';
       default: return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
+
+  const matchBreakdown = [
+    { name: 'Exact Match', value: matchedInvoices.filter((i) => i.type === 'Exact Match').length, color: '#3B82F6' },
+    { name: 'Fuzzy Match', value: matchedInvoices.filter((i) => i.type === 'Fuzzy Match').length, color: '#10B981' },
+  ].filter((x) => x.value > 0);
+
+  const totalItc = matchedInvoices.reduce((s, i) => s + i.itc, 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (!returnId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8">
+        <p className="text-gray-600">No GSTR-2B fetched for this period.</p>
+        <button onClick={() => router.push('/dashboard/sme/returns/gstr2b')} className="btn-primary-custom px-4 py-2 rounded-xl text-sm">
+          Fetch GSTR-2B
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
@@ -82,10 +162,14 @@ export default function MatchedInvoicesPage() {
            <div className="flex flex-wrap items-center gap-3 w-full">
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                <select className="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block w-full pl-10 p-2 appearance-none cursor-pointer hover:bg-gray-50">
-                  <option>Last Run (Nov)</option>
-                  <option>October 2025</option>
-                  <option>Custom Range</option>
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 block w-full pl-10 p-2"
+                >
+                  {PERIODS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -118,12 +202,12 @@ export default function MatchedInvoicesPage() {
            <div className="flex justify-between items-start">
              <div>
                <p className="text-sm text-gray-500">Total Matched</p>
-               <h3 className="text-3xl font-bold text-gray-900 mt-2">789</h3>
-               <p className="text-xs text-gray-500 mt-1">92% of total invoices</p>
+               <h3 className="text-3xl font-bold text-gray-900 mt-2">{matchedInvoices.length}</h3>
+               <p className="text-xs text-gray-500 mt-1">Matched with purchase register</p>
              </div>
              <div className="text-right">
                 <p className="text-sm text-emerald-600 font-bold">ITC Secured</p>
-                <h3 className="text-2xl font-bold text-emerald-600 mt-1">₹ 7,54,230</h3>
+                <h3 className="text-2xl font-bold text-emerald-600 mt-1">₹ {totalItc.toLocaleString('en-IN')}</h3>
              </div>
            </div>
            <div className="mt-4 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -171,7 +255,7 @@ export default function MatchedInvoicesPage() {
       {/* 3. DATA TABLE */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden flex flex-col min-h-[500px]">
          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
-            <span className="text-sm text-gray-900 font-bold">789 Matched Invoices</span>
+            <span className="text-sm text-gray-900 font-bold">{matchedInvoices.length} Matched Invoices</span>
             {selectedRows.length > 0 && (
                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                   <span className="text-sm text-gray-600">{selectedRows.length} selected</span>
@@ -212,7 +296,7 @@ export default function MatchedInvoicesPage() {
                        </td>
                        <td className="px-6 py-4">
                           <button onClick={() => setSelectedInvoice(inv)} className="font-bold text-gray-900 hover:text-emerald-600 hover:underline">
-                             {inv.id}
+                             {inv.invoice_number}
                           </button>
                        </td>
                        <td className="px-6 py-4 text-gray-600">{inv.date}</td>
