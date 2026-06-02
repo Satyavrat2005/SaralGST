@@ -28,7 +28,22 @@ function sumLines(itms: unknown[]): LineAgg {
 }
 
 function buildRow(
-  base: Omit<Gstr2bDocumentRow, 'taxable_value' | 'igst_amount' | 'cgst_amount' | 'sgst_amount' | 'cess_amount' | 'tax_rate' | 'itc_igst' | 'itc_cgst' | 'itc_sgst' | 'itc_cess' | 'line_count'>,
+  base: Omit<
+    Gstr2bDocumentRow,
+    | 'taxable_value'
+    | 'igst_amount'
+    | 'cgst_amount'
+    | 'sgst_amount'
+    | 'cess_amount'
+    | 'tax_rate'
+    | 'itc_eligible'
+    | 'itc_igst'
+    | 'itc_cgst'
+    | 'itc_sgst'
+    | 'itc_cess'
+    | 'line_count'
+    | 'match_status'
+  >,
   agg: LineAgg,
   eligible: boolean
 ): Gstr2bDocumentRow {

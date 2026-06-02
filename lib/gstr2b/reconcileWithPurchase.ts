@@ -16,7 +16,7 @@ function parseDate(d: string | null | undefined): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-function daysDiff(a: string | null, b: string | null): number {
+function daysDiff(a: string | null | undefined, b: string | null | undefined): number {
   const ta = parseDate(a);
   const tb = parseDate(b);
   if (ta == null || tb == null) return 999;

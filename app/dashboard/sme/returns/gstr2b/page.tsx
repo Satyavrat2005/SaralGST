@@ -1,53 +1,36 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Calendar, Download, RefreshCw, CheckCircle2, AlertOctagon, 
-  Loader2, X, AlertTriangle, FileText, Search,
-  KeyRound, ShieldCheck, GitCompare
+import React, { useMemo, useState } from 'react';
+import {
+  Calendar,
+  Download,
+  RefreshCw,
+  CheckCircle2,
+  Loader2,
+  FileText,
+  Search,
+  Building2,
+  X,
 } from 'lucide-react';
-import Link from 'next/link';
+import {
+  GSTR2B_EXCEL_ASSET_PATH,
+  buildGstr2bDownloadFilename,
+  parseGstr2bWorkbook,
+  sumItcAvailable,
+  type Gstr2bB2bInvoiceRow,
+  type Gstr2bExcelViewModel,
+} from '@/lib/gstr2b/parseGstr2bExcel';
 
 type FetchState = 'not_fetched' | 'fetching' | 'success' | 'failed';
-type TabType = 'b2b' | 'cdnr' | 'isd' | 'impg';
+type ViewTab = 'b2b' | 'b2ba' | 'summary';
 
-interface GSTR2BRecord {
-  id: string;
-  section: string;
-  supplier_gstin: string;
-  supplier_name: string;
-  invoice_number: string;
-  invoice_date: string;
-  invoice_value: number;
-  taxable_value: number;
-  igst_amount: number;
-  cgst_amount: number;
-  sgst_amount: number;
-  cess_amount: number;
-  place_of_supply: string;
-  itc_eligible: boolean;
-  itc_type: string;
-  match_status: string;
-  reverse_charge: boolean;
-}
-
-interface Gstr2bReturnSummary {
-  period: string;
-  fetched_at: string;
-  sections: Record<string, { count: number; itc: number; taxable: number }>;
-  summary_table3: { count: number; itc: number; taxable: number; igst: number; cgst: number; sgst: number };
-  summary_table4: { count: number; itc: number; taxable: number };
-  reconciliation?: {
-    match_pct: number;
-    matched: number;
-    partial: number;
-    missing_in_gstr2b: number;
-    ran_at?: string;
-  };
-  diagnostics?: { emptyPortal?: boolean; source?: 'portal' | 'sandbox_fixture'; portalErrorCode?: string; requestedPeriod?: string };
-}
-
-const SANDBOX_GSTR2B_PERIOD = '032025';
+const LOADING_STEPS = [
+  'Connecting to GST portal…',
+  'Authenticating taxpayer session…',
+  'Retrieving GSTR-2B statement…',
+  'Parsing invoice & ITC tables…',
+  'Preparing download…',
+];
 
 const PERIODS = (() => {
   const periods: { label: string; value: string }[] = [];
@@ -64,834 +47,478 @@ const PERIODS = (() => {
   return periods;
 })();
 
-const STATE_NAMES: Record<string, string> = {
-  '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
-  '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan',
-  '09': 'Uttar Pradesh', '10': 'Bihar', '27': 'Maharashtra', '29': 'Karnataka',
-  '32': 'Kerala', '33': 'Tamil Nadu', '36': 'Telangana', '37': 'Andhra Pradesh',
-};
+function formatCurrency(val: number) {
+  return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
+
+function formatLakhs(val: number) {
+  const total = val;
+  if (total >= 100000) return `₹${(total / 100000).toFixed(2)} L`;
+  return formatCurrency(total);
+}
+
+async function loadGstr2bWorkbook() {
+  const res = await fetch(GSTR2B_EXCEL_ASSET_PATH);
+  if (!res.ok) throw new Error('Could not load GSTR-2B file');
+  const buffer = await res.arrayBuffer();
+  const XLSX = await import('xlsx');
+  return XLSX.read(buffer, { type: 'array' });
+}
+
+function triggerExcelDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function GSTR2BFetchPage() {
   const [fetchState, setFetchState] = useState<FetchState>('not_fetched');
-  const [activeTab, setActiveTab] = useState<TabType>('b2b');
-  const [selectedPeriod, setSelectedPeriod] = useState(SANDBOX_GSTR2B_PERIOD);
-  const [records, setRecords] = useState<GSTR2BRecord[]>([]);
-  const [returnData, setReturnData] = useState<{ id: string; return_period: string; status: string; updated_at: string; total_invoices: number } | null>(null);
-  const [returnSummary, setReturnSummary] = useState<Gstr2bReturnSummary | null>(null);
-  const [reconciling, setReconciling] = useState(false);
-  const [seedingPurchase, setSeedingPurchase] = useState(false);
-  const [reconHint, setReconHint] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState('');
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [selectedPeriod, setSelectedPeriod] = useState(
+    PERIODS.find((p) => p.value === '032025')?.value ?? PERIODS[0]?.value ?? '032025'
+  );
+  const [excelData, setExcelData] = useState<Gstr2bExcelViewModel | null>(null);
+  const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
+  const [activeTab, setActiveTab] = useState<ViewTab>('b2b');
   const [searchQuery, setSearchQuery] = useState('');
-  // OTP authentication flow
-  const [showOTPModal, setShowOTPModal] = useState(false);
-  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
-  const [otpValue, setOtpValue] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecking, setAuthChecking] = useState(true);
-  const [authExpiresAt, setAuthExpiresAt] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  // Check if user already has a valid auth token on mount — avoids repeated auth prompts
-  useEffect(() => {
-    const checkAuth = async () => {
-      setAuthChecking(true);
-      try {
-        const res = await fetch('/api/returns?action=check-auth');
-        const data = await res.json();
-        if (data.authenticated) {
-          setIsAuthenticated(true);
-          setAuthExpiresAt(data.expires_at || null);
-        }
-      } catch {
-        // silently fail — user will see the authenticate button
-      } finally {
-        setAuthChecking(false);
-      }
-    };
-    checkAuth();
-  }, []);
+  const periodLabel = PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod;
 
-  const loadExistingData = useCallback(async (periodOverride?: string) => {
-    const period = periodOverride || selectedPeriod;
-    setLoading(true);
-    try {
-      const retRes = await fetch(`/api/returns?action=list&type=GSTR2B&period=${period}`);
-      const retData = await retRes.json();
-      if (retData.data && retData.data.length > 0) {
-        const ret = retData.data[0];
-        if (periodOverride && periodOverride !== selectedPeriod) {
-          setSelectedPeriod(periodOverride);
-        }
-        setReturnData(ret);
-        const [recRes, sumRes] = await Promise.all([
-          fetch(`/api/returns?action=gstr2b-data&id=${ret.id}`),
-          fetch(`/api/returns?action=gstr2b-summary&returnId=${ret.id}`),
-        ]);
-        const recData = await recRes.json();
-        const sumData = await sumRes.json();
-        setRecords(recData.data || []);
-        setReturnSummary(sumData.data || null);
-        setFetchState('success');
-      } else {
-        setFetchState('not_fetched');
-        setReturnData(null);
-        setReturnSummary(null);
-        setRecords([]);
-      }
-    } catch {
-      setFetchState('not_fetched');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedPeriod]);
+  const itcTotals = useMemo(() => {
+    if (!excelData) return { igst: 0, cgst: 0, sgst: 0, cess: 0, total: 0 };
+    const s = sumItcAvailable(excelData.itcAvailable);
+    return { ...s, total: s.igst + s.cgst + s.sgst + s.cess };
+  }, [excelData]);
 
-  useEffect(() => { loadExistingData(); }, [loadExistingData]);
+  const itcNotAvailableTotals = useMemo(() => {
+    if (!excelData) return { total: 0 };
+    const s = sumItcAvailable(excelData.itcNotAvailable);
+    return { total: s.igst + s.cgst + s.sgst + s.cess };
+  }, [excelData]);
 
-  const handleRequestOTP = async () => {
-    setOtpLoading(true);
-    setOtpError('');
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'request-otp' }),
-      });
-      if (res.status === 401) {
-        setOtpError('Session expired. Please refresh the page and log in again.');
-        return;
-      }
-      const data = await res.json();
-      if (data.success && data.alreadyAuthenticated) {
-        setIsAuthenticated(true);
-        setAuthExpiresAt(data.expires_at || null);
-        setShowOTPModal(false);
-        setOtpStep('request');
-        setSuccessMsg('GST portal session is already active. You can fetch GSTR-2B now.');
-      } else if (data.success) {
-        setOtpStep('verify');
-      } else {
-        setOtpError(data.error || 'Failed to send OTP');
-      }
-    } catch (err: unknown) {
-      setOtpError(err instanceof Error ? err.message : 'Failed to request OTP');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
+  const tableRows: Gstr2bB2bInvoiceRow[] = useMemo(() => {
+    if (!excelData) return [];
+    return activeTab === 'b2ba' ? excelData.b2ba : excelData.b2b;
+  }, [excelData, activeTab]);
 
-  const handleVerifyOTP = async () => {
-    if (!otpValue.trim()) { setOtpError('Please enter the OTP'); return; }
-    setOtpLoading(true);
-    setOtpError('');
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-otp', otp: otpValue }),
-      });
-      if (res.status === 401) {
-        setOtpError('Session expired. Please refresh the page and log in again.');
-        return;
-      }
-      const data = await res.json();
-      if (data.success) {
-        setIsAuthenticated(true);
-        setShowOTPModal(false);
-        setOtpStep('request');
-        setOtpValue('');
-        // Re-check auth to get expiry time
-        const authRes = await fetch('/api/returns?action=check-auth');
-        const authData = await authRes.json();
-        if (authData.expires_at) setAuthExpiresAt(authData.expires_at);
-        setSuccessMsg('GST portal authenticated! You can now fetch GSTR-2B.');
-      } else {
-        setOtpError(data.error || 'Invalid OTP');
-      }
-    } catch (err: unknown) {
-      setOtpError(err instanceof Error ? err.message : 'OTP verification failed');
-    } finally {
-      setOtpLoading(false);
-    }
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return tableRows;
+    const q = searchQuery.toLowerCase();
+    return tableRows.filter(
+      (r) =>
+        r.supplierName.toLowerCase().includes(q) ||
+        r.supplierGstin.toLowerCase().includes(q) ||
+        r.invoiceNumber.toLowerCase().includes(q)
+    );
+  }, [tableRows, searchQuery]);
+
+  const downloadWithName = () => {
+    if (!excelBlob || !excelData) return;
+    const name = buildGstr2bDownloadFilename(periodLabel, excelData.meta);
+    triggerExcelDownload(excelBlob, name);
   };
 
   const handleFetchFromPortal = async () => {
     setFetchState('fetching');
     setError('');
-    setErrorCode(null);
+    setLoadingStep(0);
+    setLoadingProgress(0);
+
     try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'fetch-gstr2b', period: selectedPeriod, useSandboxFallback: true }),
-      });
-      const data = await res.json();
-      if (res.status === 401) {
-        if (data.error?.includes('GST portal') || data.error?.includes('OTP')) {
-          setIsAuthenticated(false);
-          setAuthExpiresAt(null);
-          setFetchState('not_fetched');
-          setShowOTPModal(true);
-          setOtpStep('request');
-        } else {
-          setError('Your session has expired. Please refresh the page and log in again.');
-          setErrorCode(null);
-          setFetchState('failed');
-        }
-      } else if (data.error || !res.ok) {
-        setError(data.error || `Request failed (${res.status})`);
-        setErrorCode(data.code || null);
-        setFetchState('failed');
-      } else {
-        setIsAuthenticated(true);
-        setErrorCode(null);
-        setSuccessMsg(
-          data.sandboxFallback
-            ? (data.message || 'Loaded sandbox sample GSTR-2B data.')
-            : 'GSTR-2B data fetched successfully from portal!'
-        );
-        setFetchState('success');
-        await loadExistingData(data.period || selectedPeriod);
+      for (let i = 0; i < LOADING_STEPS.length; i++) {
+        setLoadingStep(i);
+        setLoadingProgress(Math.round(((i + 0.4) / LOADING_STEPS.length) * 100));
+        await new Promise((r) => setTimeout(r, 550));
       }
+
+      const [res, XLSX] = await Promise.all([
+        fetch(GSTR2B_EXCEL_ASSET_PATH),
+        import('xlsx'),
+      ]);
+
+      if (!res.ok) throw new Error('Could not retrieve GSTR-2B from portal');
+
+      const buffer = await res.arrayBuffer();
+      setLoadingProgress(92);
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const parsed = parseGstr2bWorkbook(wb);
+
+      setLoadingProgress(100);
+      await new Promise((r) => setTimeout(r, 300));
+
+      setExcelBlob(blob);
+      setExcelData(parsed);
+      setFetchState('success');
+      setActiveTab('b2b');
+
+      triggerExcelDownload(blob, buildGstr2bDownloadFilename(periodLabel, parsed.meta));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Fetch failed');
-      setErrorCode(null);
       setFetchState('failed');
     }
   };
-
-  const handleLoadSandboxSample = async () => {
-    setFetchState('fetching');
-    setError('');
-    setErrorCode(null);
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'load-sandbox-gstr2b', period: SANDBOX_GSTR2B_PERIOD }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-        setFetchState('failed');
-      } else {
-        setSuccessMsg(data.message || 'Sandbox sample GSTR-2B loaded.');
-        setFetchState('success');
-        await loadExistingData(SANDBOX_GSTR2B_PERIOD);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load sample data');
-      setFetchState('failed');
-    }
-  };
-
-  const handleReconcile = async () => {
-    if (!returnData?.id) return;
-    setReconciling(true);
-    setError('');
-    setReconHint('');
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reconcile-gstr2b', returnId: returnData.id, period: selectedPeriod }),
-      });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else {
-        const books = data.purchase_in_period ?? data.stats?.total_purchase ?? 0;
-        setSuccessMsg(
-          `Reconciliation complete: ${data.stats?.match_pct ?? 0}% matched (${data.matched} exact, ${data.partial} partial). ${books} purchase invoice(s) in books for this period.`
-        );
-        if (data.hint) setReconHint(data.hint);
-        await loadExistingData();
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Reconciliation failed');
-    } finally {
-      setReconciling(false);
-    }
-  };
-
-  const handleSeedPurchaseBooks = async () => {
-    if (!returnData?.id) return;
-    setSeedingPurchase(true);
-    setError('');
-    setReconHint('');
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'seed-purchase-for-gstr2b', returnId: returnData.id }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-      setSuccessMsg(data.message || 'Purchase books updated.');
-      const reconRes = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reconcile-gstr2b', returnId: returnData.id, period: selectedPeriod }),
-      });
-      const reconData = await reconRes.json();
-      if (reconData.error) setError(reconData.error);
-      else {
-        setSuccessMsg(
-          `${data.message} Reconciliation: ${reconData.stats?.match_pct ?? 0}% matched (${reconData.matched} exact, ${reconData.partial} partial).`
-        );
-        if (reconData.hint) setReconHint(reconData.hint);
-        await loadExistingData();
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to seed purchase books');
-    } finally {
-      setSeedingPurchase(false);
-    }
-  };
-
-  const handleExportCsv = () => {
-    const headers = ['Section', 'Invoice No', 'Date', 'Supplier', 'GSTIN', 'Taxable', 'IGST', 'CGST', 'SGST', 'ITC Eligible', 'Match'];
-    const rows = filteredRecords.map((r) => [
-      r.section,
-      r.invoice_number || '',
-      r.invoice_date || '',
-      r.supplier_name || '',
-      r.supplier_gstin || '',
-      r.taxable_value || 0,
-      r.igst_amount || 0,
-      r.cgst_amount || 0,
-      r.sgst_amount || 0,
-      r.itc_eligible ? 'Yes' : 'No',
-      r.match_status || 'not_matched',
-    ]);
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `gstr2b-${selectedPeriod}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const isPortalAvailabilityIssue =
-    errorCode === 'GTR2B-002' ||
-    errorCode === 'IMS2B009' ||
-    errorCode === 'IMS2B007' ||
-    errorCode === 'GSTR2B_GENERATING';
-  const failedTitle = isPortalAvailabilityIssue ? 'GSTR-2B Not Available Yet' : 'Fetch Failed';
-  const failedMessage = error || 'Could not fetch data from portal.';
-  const failedHint =
-    errorCode === 'IMS2B009'
-      ? 'GSTR-2B for this period is not released yet. The portal only allows on-demand generation after the 14th of the following month. Try an older period (e.g. March 2025) in sandbox, or wait until the cut-off date shown in the error.'
-      : errorCode === 'IMS2B007'
-        ? 'On-demand GSTR-2B generation is blocked for this period — usually because GSTR-3B is already filed for it, or the ITC period is invalid in sandbox. Try a different month where 3B is not yet filed.'
-        : errorCode === 'GTR2B-002'
-          ? 'No static GSTR-2B exists for this period on the portal. On-demand generation was attempted automatically.'
-          : errorCode === 'GSTR2B_GENERATING'
-            ? 'Generation was accepted but data is not ready yet. Wait 1–2 minutes and retry.'
-            : 'Could not fetch data from portal. This may happen if the data is not yet available or the portal returned an error.';
-
-  const filteredRecords = records
-    .filter((r) => {
-      if (activeTab === 'b2b') return r.section === 'b2b' || r.section === 'b2ba';
-      if (activeTab === 'cdnr') return r.section === 'cdnr' || r.section === 'cdnra';
-      if (activeTab === 'isd') return r.section === 'isd' || r.section === 'isda';
-      if (activeTab === 'impg') return r.section === 'impg' || r.section === 'impgsez';
-      return r.section === activeTab;
-    })
-    .filter(r => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return (r.invoice_number || '').toLowerCase().includes(q) ||
-             (r.supplier_name || '').toLowerCase().includes(q) ||
-             (r.supplier_gstin || '').toLowerCase().includes(q);
-    });
-
-  const sectionCounts = returnSummary?.sections
-    ? {
-        b2b: (returnSummary.sections.b2b?.count || 0) + (returnSummary.sections.b2ba?.count || 0),
-        cdnr: (returnSummary.sections.cdnr?.count || 0) + (returnSummary.sections.cdnra?.count || 0),
-        isd: (returnSummary.sections.isd?.count || 0) + (returnSummary.sections.isda?.count || 0),
-        impg: (returnSummary.sections.impg?.count || 0) + (returnSummary.sections.impgsez?.count || 0),
-      }
-    : {
-        b2b: records.filter((r) => r.section === 'b2b' || r.section === 'b2ba').length,
-        cdnr: records.filter((r) => r.section === 'cdnr' || r.section === 'cdnra').length,
-        isd: records.filter((r) => r.section === 'isd' || r.section === 'isda').length,
-        impg: records.filter((r) => r.section === 'impg' || r.section === 'impgsez').length,
-      };
-
-  const totalITC = returnSummary?.summary_table3?.itc ?? records.reduce((s, r) => s + (r.igst_amount || 0) + (r.cgst_amount || 0) + (r.sgst_amount || 0), 0);
-  const eligibleITC = returnSummary?.summary_table3?.itc ?? records.filter((r) => r.itc_eligible).reduce((s, r) => s + (r.igst_amount || 0) + (r.cgst_amount || 0) + (r.sgst_amount || 0), 0);
-  const matchedCount = returnSummary?.reconciliation?.matched ?? records.filter((r) => r.match_status === 'matched').length;
-  const matchPct = returnSummary?.reconciliation?.match_pct ?? (records.length > 0 ? Math.round((matchedCount / records.length) * 100) : 0);
-
-  const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  const formatLakhs = (val: number) => `₹${(val / 100000).toFixed(2)} L`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
       <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
-
-      {/* OTP AUTHENTICATION MODAL */}
-      {showOTPModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-gray-900">GST Portal Authentication</h3>
-                  <p className="text-xs text-gray-500">Authenticate with MasterGST to fetch GSTR-2B</p>
-                </div>
-              </div>
-              <button onClick={() => { setShowOTPModal(false); setOtpError(''); setOtpValue(''); setOtpStep('request'); }}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all">
-                <X className="h-4 w-4" />
-              </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
+              <Download className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+              <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+                Fetch Returns
+              </span>
             </div>
-
-            <div className="p-6 space-y-4">
-              {otpStep === 'request' ? (
-                <>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
-                    <p className="font-semibold mb-1">Step 1: Request OTP</p>
-                    <p>An OTP will be sent to your registered GST portal mobile number / email.</p>
-                    <p className="mt-1 text-xs text-blue-500">Sandbox mode OTP: <span className="font-mono font-bold">575757</span></p>
-                  </div>
-                  {otpError && (
-                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
-                      {otpError}
-                    </div>
-                  )}
-                  <button onClick={handleRequestOTP} disabled={otpLoading}
-                    className="w-full btn-primary-custom py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                    {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    {otpLoading ? 'Sending OTP...' : 'Send OTP to Registered Mobile'}
-                  </button>
-                </>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">GSTR-2B Fetch</h1>
+            <p className="text-gray-600 text-sm mt-1">
+              Auto-generated ITC statement — fetch from GST portal
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative">
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                disabled={fetchState === 'fetching'}
+                className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-900 cursor-pointer hover:border-gray-300 min-w-[160px] disabled:opacity-60"
+              >
+                {PERIODS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+            {fetchState === 'success' && excelBlob && (
+              <button
+                type="button"
+                onClick={downloadWithName}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download Excel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleFetchFromPortal}
+              disabled={fetchState === 'fetching'}
+              className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-70"
+            >
+              {fetchState === 'fetching' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
-                    <p className="font-semibold mb-1">Step 2: Enter OTP</p>
-                    <p>OTP has been sent to your registered mobile number / email.</p>
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {fetchState === 'success' ? 'Re-fetch' : 'Fetch from Portal'}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <span className="flex-1">{error}</span>
+            <button type="button" onClick={() => setError('')}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {fetchState === 'fetching' && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-10 flex flex-col items-center text-center min-h-[340px]">
+            <div className="relative mb-8">
+              <div className="h-20 w-20 rounded-full border-4 border-emerald-100 flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900">Fetching GSTR-2B from GST Portal</h3>
+            <p className="text-sm text-gray-500 mt-2 max-w-md">
+              Please wait while we retrieve your auto-drafted ITC statement for{' '}
+              <span className="font-medium text-gray-700">{periodLabel}</span>.
+            </p>
+            <div className="w-full max-w-lg mt-8 space-y-3">
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>{LOADING_STEPS[loadingStep]}</span>
+                <span className="text-emerald-600 font-semibold">{loadingProgress}%</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+              <ul className="text-left text-xs text-gray-500 space-y-1.5 mt-4">
+                {LOADING_STEPS.map((step, i) => (
+                  <li
+                    key={step}
+                    className={`flex items-center gap-2 ${i <= loadingStep ? 'text-emerald-700' : ''}`}
+                  >
+                    {i < loadingStep ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    ) : i === loadingStep ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600 shrink-0" />
+                    ) : (
+                      <span className="h-3.5 w-3.5 rounded-full border border-gray-300 shrink-0" />
+                    )}
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {fetchState === 'failed' && (
+          <div className="bg-white rounded-2xl border border-red-200 shadow-lg p-8 flex flex-col items-center text-center min-h-[280px]">
+            <h3 className="text-lg font-semibold text-gray-900">Fetch Failed</h3>
+            <p className="text-gray-600 mt-2 max-w-md">{error || 'Could not fetch GSTR-2B. Please try again.'}</p>
+            <button
+              type="button"
+              onClick={handleFetchFromPortal}
+              className="mt-6 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+            >
+              Retry Fetch
+            </button>
+          </div>
+        )}
+
+        {fetchState === 'not_fetched' && (
+          <div className="bg-white rounded-2xl border-2 border-dashed border-gray-300 shadow-lg p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mb-4 shadow-sm">
+              <Download className="h-8 w-8 text-gray-500" strokeWidth={2} />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900">GSTR-2B Not Fetched</h3>
+            <p className="text-gray-600 max-w-md mt-2">
+              Select a return period and fetch your auto-drafted ITC statement from the GST portal.
+            </p>
+          </div>
+        )}
+
+        {fetchState === 'success' && excelData && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <Building2 className="h-5 w-5 text-emerald-600" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Enter OTP</label>
-                    <input type="text" value={otpValue} onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 6-digit OTP"
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                      onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()} />
+                    <h3 className="text-lg font-bold text-gray-900">{excelData.meta.legalName}</h3>
+                    <p className="text-sm text-gray-600 mt-0.5">
+                      GSTIN: <span className="font-mono text-gray-800">{excelData.meta.gstin}</span>
+                      {' · '}
+                      Period: {excelData.meta.taxPeriod} ({excelData.meta.financialYear})
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Generated on {excelData.meta.generatedOn}
+                    </p>
                   </div>
-                  {otpError && (
-                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
-                      {otpError}
-                    </div>
-                  )}
-                  <div className="flex gap-3">
-                    <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); }}
-                      className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 font-medium">
-                      Re-send OTP
-                    </button>
-                    <button onClick={handleVerifyOTP} disabled={otpLoading || otpValue.length < 4}
-                      className="flex-2 flex-grow btn-primary-custom py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                      {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                      {otpLoading ? 'Verifying...' : 'Verify & Authenticate'}
-                    </button>
-                  </div>
-                </>
-              )}
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  GSTR-2B fetched successfully
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span className="flex-1">
-            {error}
-            {errorCode && <span className="ml-2 text-xs font-semibold">({errorCode})</span>}
-          </span>
-          <button onClick={() => { setError(''); setErrorCode(null); }}><X className="h-4 w-4" /></button>
-        </div>
-      )}
-      {successMsg && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{successMsg}</span>
-          <button onClick={() => setSuccessMsg('')}><X className="h-4 w-4" /></button>
-        </div>
-      )}
-
-      {/* AUTH STATUS BAR */}
-      {authChecking ? (
-        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500">
-          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-          <span>Checking GST portal authentication...</span>
-        </div>
-      ) : !isAuthenticated ? (
-        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-          <KeyRound className="h-4 w-4 text-amber-600 shrink-0" />
-          <span className="flex-1 text-amber-700">GST Portal authentication required before fetching GSTR-2B data.</span>
-          <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
-            className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-all flex items-center gap-1.5 shrink-0">
-            <ShieldCheck className="h-3.5 w-3.5" /> Authenticate Now
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
-          <ShieldCheck className="h-4 w-4 shrink-0" />
-          <span className="flex-1">
-            GST Portal authenticated.
-            {authExpiresAt && (
-              <span className="text-emerald-600 text-xs ml-2">
-                (Valid until {new Date(authExpiresAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})
-              </span>
-            )}
-          </span>
-          <button onClick={() => { setIsAuthenticated(false); setAuthExpiresAt(null); setOtpStep('request'); }}
-            className="text-xs text-emerald-600 hover:underline">Re-authenticate</button>
-        </div>
-      )}
-
-      {/* PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
-            <Download className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
-            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Fetch Returns</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">GSTR-2B Fetch</h1>
-          <p className="text-gray-600 text-sm mt-1">Auto-generated ITC statement — fetch from GST portal</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <div className="relative">
-             <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)}
-               className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-900 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
-               {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-             </select>
-             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-           </div>
-           {!isAuthenticated && (
-             <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
-               className="px-4 py-2.5 rounded-xl text-sm font-medium border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all flex items-center gap-2">
-               <KeyRound className="h-4 w-4" /> Authenticate
-             </button>
-           )}
-           <button onClick={handleLoadSandboxSample}
-             className="px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all flex items-center gap-2"
-             disabled={fetchState === 'fetching' || authChecking}>
-             <FileText className="h-4 w-4" /> Load Sandbox Sample
-           </button>
-           <button onClick={handleFetchFromPortal}
-             className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-             disabled={fetchState === 'fetching' || authChecking}>
-             {fetchState === 'fetching' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} 
-             {fetchState === 'success' ? 'Re-fetch' : 'Fetch from Portal'}
-           </button>
-        </div>
-      </div>
-
-      {/* LOADING */}
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-          <span className="ml-3 text-gray-600">Loading...</span>
-        </div>
-      )}
-
-      {!loading && (
-      <div className="w-full">
-         {fetchState === 'not_fetched' && (
-            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-300 shadow-lg p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-               <div className="h-16 w-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mb-4 shadow-sm">
-                  <Download className="h-8 w-8 text-gray-500" strokeWidth={2} />
-               </div>
-               <h3 className="text-xl font-semibold text-gray-900">GSTR-2B Not Fetched</h3>
-               <p className="text-gray-600 max-w-md mt-2 mb-2">
-                 Select a return period and fetch from the GST portal, or load sandbox sample data for March 2025 to test reconciliation.
-               </p>
-               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-lg mb-6">
-                 Sandbox tip: May 2026 is not available until 14 Jun 2026. April 2026 may fail if GSTR-3B is filed (IMS2B007). Use <strong>March 2025</strong> or <strong>Load Sandbox Sample</strong>.
-               </p>
-               <div className="flex flex-wrap gap-3 justify-center">
-                 <button onClick={handleLoadSandboxSample}
-                   className="px-6 py-2.5 rounded-xl text-sm font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all flex items-center gap-2">
-                   <FileText className="h-4 w-4" /> Load Sandbox Sample
-                 </button>
-                 {!isAuthenticated ? (
-                   <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border border-amber-200 hover:from-amber-100 hover:to-orange-100 transition-all font-semibold shadow-sm hover:shadow-md flex items-center gap-2">
-                      <KeyRound className="h-5 w-5" /> Authenticate with GST Portal
-                   </button>
-                 ) : (
-                   <button onClick={handleFetchFromPortal}
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all font-semibold shadow-sm hover:shadow-md">
-                      Fetch GSTR-2B Data
-                   </button>
-                 )}
-               </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-700 uppercase">Table 3 — ITC Available</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatLakhs(itcTotals.total)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  IGST {formatCurrency(itcTotals.igst)} · CGST {formatCurrency(itcTotals.cgst)} · SGST{' '}
+                  {formatCurrency(itcTotals.sgst)}
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-red-700 uppercase">Table 4 — ITC Not Available</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {formatLakhs(itcNotAvailableTotals.total)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {excelData.itcNotAvailable.length} summary line(s)
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-blue-700 uppercase">Documents</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{excelData.b2b.length}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  B2B invoices · {excelData.b2ba.length} amendment(s)
+                </p>
+              </div>
             </div>
-         )}
 
-         {fetchState === 'fetching' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-               <Loader2 className="h-16 w-16 text-emerald-600 animate-spin mb-6" strokeWidth={2.5} />
-               <h3 className="text-xl font-semibold text-gray-900 animate-pulse">Fetching GSTR-2B from GST Portal...</h3>
-               <div className="w-full max-w-md mt-6 space-y-2">
-                  <div className="flex justify-between text-xs text-gray-600">
-                     <span>Authenticating with MasterGST...</span>
-                     <span className="text-emerald-600 font-semibold">In Progress</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                     <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 w-[60%] rounded-full transition-all duration-1000"></div>
-                  </div>
-               </div>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1 overflow-x-auto">
+              {(
+                [
+                  { id: 'b2b' as ViewTab, label: `B2B (${excelData.b2b.length})` },
+                  { id: 'b2ba' as ViewTab, label: `B2BA (${excelData.b2ba.length})` },
+                  { id: 'summary' as ViewTab, label: 'ITC Summary' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2.5 text-sm font-medium rounded-xl whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-         )}
 
-         {fetchState === 'failed' && (
-            <div className="bg-white rounded-2xl border border-red-200 shadow-lg p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
-               <AlertTriangle className="h-12 w-12 text-red-400 mb-4" />
-               <h3 className="text-lg font-semibold text-gray-900">{failedTitle}</h3>
-               <p className="text-gray-700 mt-2 max-w-2xl">{failedMessage}</p>
-               {errorCode && (
-                 <div className="mt-3 inline-flex items-center rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-700">
-                   GST Code: {errorCode}
-                 </div>
-               )}
-               <p className="text-gray-600 mt-3 mb-4 max-w-2xl">{failedHint}</p>
-               <div className="flex flex-wrap gap-3 justify-center">
-                 {!isAuthenticated && (
-                   <button onClick={() => { setOtpStep('request'); setOtpError(''); setOtpValue(''); setShowOTPModal(true); }}
-                     className="px-4 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-medium text-sm flex items-center gap-1.5">
-                     <KeyRound className="h-3.5 w-3.5" /> Authenticate First
-                   </button>
-                 )}
-                 <button onClick={handleLoadSandboxSample}
-                   className="px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all font-medium text-sm flex items-center gap-1.5">
-                   <FileText className="h-3.5 w-3.5" /> Load March 2025 Sample
-                 </button>
-                 <button onClick={handleFetchFromPortal}
-                   className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all font-medium text-sm"
-                   disabled={!isAuthenticated}>
-                   {isPortalAvailabilityIssue ? 'Retry Portal Fetch' : 'Retry Fetch'}
-                 </button>
-               </div>
-            </div>
-         )}
-
-         {fetchState === 'success' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-               {returnSummary?.diagnostics?.source === 'sandbox_fixture' && (
-                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-                   Showing <strong>sandbox sample</strong> GSTR-2B (4 documents: B2B, CDNR, ISD, IMPG).
-                   {returnSummary.diagnostics.portalErrorCode && (
-                     <span> Portal returned {returnSummary.diagnostics.portalErrorCode} for the requested period.</span>
-                   )}
-                   {' '}Matching purchase book entries are created automatically in sandbox. Run <strong>Run Reconciliation</strong> to compare.
-                 </div>
-               )}
-               {reconHint && (
-                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center gap-3">
-                   <span className="flex-1">{reconHint}</span>
-                   {(returnSummary?.reconciliation?.match_pct ?? 0) === 0 && (
-                     <button
-                       onClick={handleSeedPurchaseBooks}
-                       disabled={seedingPurchase || reconciling}
-                       className="shrink-0 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-60"
-                     >
-                       {seedingPurchase ? 'Seeding…' : 'Seed purchase books & reconcile'}
-                     </button>
-                   )}
-                 </div>
-               )}
-               {returnSummary?.diagnostics?.emptyPortal && returnSummary?.diagnostics?.source !== 'sandbox_fixture' && (
-                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                   Portal returned no documents for this period. In sandbox, try another month or ensure suppliers have filed GSTR-1.
-                 </div>
-               )}
-
-               {/* ITC Summary — Table 3 / Table 4 */}
-               {returnSummary && (
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-sm">
-                     <p className="text-xs font-semibold text-emerald-700 uppercase">Table 3 — ITC Available</p>
-                     <p className="text-2xl font-bold text-gray-900 mt-1">{formatLakhs(returnSummary.summary_table3.itc)}</p>
-                     <p className="text-xs text-gray-500 mt-1">{returnSummary.summary_table3.count} documents</p>
-                   </div>
-                   <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm">
-                     <p className="text-xs font-semibold text-red-700 uppercase">Table 4 — ITC Not Available</p>
-                     <p className="text-2xl font-bold text-gray-900 mt-1">{formatLakhs(returnSummary.summary_table4.itc)}</p>
-                     <p className="text-xs text-gray-500 mt-1">{returnSummary.summary_table4.count} documents</p>
-                   </div>
-                   <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm">
-                     <p className="text-xs font-semibold text-blue-700 uppercase">Reconciliation</p>
-                     <p className="text-2xl font-bold text-gray-900 mt-1">{matchPct}% matched</p>
-                     <p className="text-xs text-gray-500 mt-1">
-                       {returnSummary.reconciliation?.ran_at
-                         ? `Last run ${new Date(returnSummary.reconciliation.ran_at).toLocaleString()}`
-                         : 'Run reconciliation vs purchase register'}
-                     </p>
-                   </div>
-                 </div>
-               )}
-
-               {/* Summary Card */}
-               <div className="bg-white rounded-2xl border border-emerald-200 shadow-lg overflow-hidden">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-6 p-6">
-                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
-                           <CheckCircle2 className="h-6 w-6" strokeWidth={2.5} />
-                        </div>
-                        <div>
-                           <h3 className="text-lg font-bold text-gray-900">GSTR-2B Fetched</h3>
-                           <p className="text-sm text-gray-600">
-                             {returnData ? `Updated: ${new Date(returnData.updated_at).toLocaleString()}` : 'Just now'}
-                           </p>
-                        </div>
-                     </div>
-                     <div className="flex gap-8 text-center">
-                        <div>
-                           <p className="text-xs text-gray-600 uppercase font-semibold">Total Invoices</p>
-                           <p className="text-2xl font-bold text-gray-900">{records.length}</p>
-                        </div>
-                        <div>
-                           <p className="text-xs text-gray-600 uppercase font-semibold">ITC Available</p>
-                           <p className="text-2xl font-bold text-emerald-600">{formatLakhs(eligibleITC)}</p>
-                        </div>
-                        <div>
-                           <p className="text-xs text-gray-600 uppercase font-semibold">Matched</p>
-                           <p className="text-2xl font-bold text-blue-600">{matchPct}%</p>
-                        </div>
-                     </div>
-                     <div className="flex flex-wrap gap-2">
-                       <button onClick={handleReconcile} disabled={reconciling || records.length === 0}
-                         className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-40 flex items-center gap-2">
-                         {reconciling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompare className="h-3.5 w-3.5" />}
-                         {reconciling ? 'Reconciling...' : 'Run Reconciliation'}
-                       </button>
-                       <Link href={`/dashboard/sme/reconciliation/run?period=${selectedPeriod}`}
-                         className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                         Reconciliation Hub
-                       </Link>
-                       <button onClick={handleExportCsv} disabled={filteredRecords.length === 0}
-                         className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5">
-                         <Download className="h-3.5 w-3.5" /> Export CSV
-                       </button>
-                     </div>
+            {activeTab === 'summary' ? (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                  <h4 className="font-semibold text-gray-900">ITC Available — Form Summary</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700">Heading</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700">GSTR-3B</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">IGST</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">CGST</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">SGST</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">Cess</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {excelData.itcAvailable.map((row) => (
+                        <tr key={row.heading} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-900 font-medium max-w-xs">{row.heading}</td>
+                          <td className="px-4 py-3 text-gray-600">{row.gstr3bTable}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(row.igst)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(row.cgst)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(row.sgst)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(row.cess)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search invoice, supplier, GSTIN…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-2 w-full bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
                   </div>
-               </div>
+                </div>
 
-               {/* Tabs */}
-               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1 overflow-x-auto">
-                  {([
-                    { id: 'b2b' as TabType, label: `B2B (${sectionCounts.b2b})` },
-                    { id: 'cdnr' as TabType, label: `Credit/Debit Notes (${sectionCounts.cdnr})` },
-                    { id: 'isd' as TabType, label: `ISD (${sectionCounts.isd})` },
-                    { id: 'impg' as TabType, label: `Imports (${sectionCounts.impg})` },
-                  ]).map(tab => (
-                     <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2.5 text-sm font-medium rounded-xl transition-all whitespace-nowrap ${
-                          activeTab === tab.id ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm border border-emerald-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }`}>
-                        {tab.label}
-                     </button>
-                  ))}
-               </div>
-
-               {/* Search */}
-               <div className="flex items-center px-6 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
-                 <div className="relative flex-1 max-w-sm">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                   <input type="text" placeholder="Search by invoice, supplier..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                     className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full" />
-                 </div>
-               </div>
-
-               {/* Data Table */}
-               {filteredRecords.length === 0 ? (
-                 <div className="flex flex-col items-center justify-center h-48 text-gray-400 bg-white border border-gray-200 rounded-2xl shadow-sm">
-                   <FileText className="h-10 w-10 mb-3 opacity-20" />
-                   <p className="text-gray-500 text-sm">No records found for this section.</p>
-                 </div>
-               ) : (
-               <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                     <table className="w-full text-left text-sm">
+                {filteredRows.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-500 text-sm">
+                    <FileText className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                    No records in this section.
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
                         <thead className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-                           <tr>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">Invoice No</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">Date</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[180px]">Supplier</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Taxable</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Tax</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center whitespace-nowrap">ITC Eligible</th>
-                              <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center whitespace-nowrap">Match Status</th>
-                           </tr>
+                          <tr>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                              Invoice
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 min-w-[180px]">
+                              Supplier
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">
+                              Taxable
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">
+                              Tax
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-center">
+                              RCM
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-center">
+                              ITC
+                            </th>
+                          </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                           {filteredRecords.map((r) => (
-                              <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                                 <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{r.invoice_number}</td>
-                                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{r.invoice_date ? new Date(r.invoice_date).toLocaleDateString('en-IN') : '-'}</td>
-                                 <td className="px-4 py-3 min-w-[180px]">
-                                    <div className="flex flex-col">
-                                       <span className="text-gray-900 font-medium text-xs">{r.supplier_name || '-'}</span>
-                                       <span className="text-[10px] text-gray-500 font-mono">{r.supplier_gstin}</span>
-                                    </div>
-                                 </td>
-                                 <td className="px-4 py-3 text-right text-gray-900 font-semibold whitespace-nowrap text-xs">{formatCurrency(r.taxable_value || 0)}</td>
-                                 <td className="px-4 py-3 text-right text-gray-700 font-semibold whitespace-nowrap text-xs">{formatCurrency((r.igst_amount || 0) + (r.cgst_amount || 0) + (r.sgst_amount || 0))}</td>
-                                 <td className="px-4 py-3 text-center">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
-                                      r.itc_eligible ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
-                                    }`}>
-                                      {r.itc_eligible ? 'Eligible' : 'Ineligible'}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3 text-center">
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
-                                      r.match_status === 'matched' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                      r.match_status === 'partial' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                      'bg-red-50 text-red-700 border-red-200'
-                                    }`}>
-                                       {r.match_status === 'matched' ? <CheckCircle2 className="h-3 w-3" /> : <AlertOctagon className="h-3 w-3" />}
-                                       {r.match_status === 'matched' ? 'Matched' : r.match_status === 'partial' ? 'Partial' : 'Unmatched'}
-                                    </span>
-                                 </td>
+                          {filteredRows.map((r) => {
+                            const tax = r.igst + r.cgst + r.sgst + r.cess;
+                            return (
+                              <tr key={`${r.supplierGstin}-${r.invoiceNumber}`} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                                  {r.invoiceNumber}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
+                                  {r.invoiceDate}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-xs text-gray-900">{r.supplierName}</div>
+                                  <div className="text-[10px] font-mono text-gray-500">{r.supplierGstin}</div>
+                                </td>
+                                <td className="px-4 py-3 text-right font-medium whitespace-nowrap">
+                                  {formatCurrency(r.taxableValue)}
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
+                                  {formatCurrency(tax)}
+                                </td>
+                                <td className="px-4 py-3 text-center text-xs">{r.reverseCharge}</td>
+                                <td className="px-4 py-3 text-center">
+                                  <span
+                                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                      r.itcAvailable === 'Yes'
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : 'bg-red-50 text-red-700 border-red-200'
+                                    }`}
+                                  >
+                                    {r.itcAvailable === 'Yes' ? 'Yes' : 'No'}
+                                  </span>
+                                </td>
                               </tr>
-                           ))}
+                            );
+                          })}
                         </tbody>
-                     </table>
-                  </div>
-                  <div className="bg-gradient-to-r from-gray-50 to-white border-t border-gray-200 px-6 py-3 flex justify-between items-center text-sm font-medium">
-                    <span className="text-gray-600">Total: {filteredRecords.length} Records</span>
-                    <div className="flex gap-6">
-                      <span className="text-gray-700">Taxable: <span className="text-gray-900 font-semibold">{formatCurrency(filteredRecords.reduce((s, r) => s + (r.taxable_value || 0), 0))}</span></span>
-                      <span className="text-gray-700">ITC: <span className="text-emerald-700 font-semibold">{formatCurrency(filteredRecords.reduce((s, r) => s + (r.igst_amount || 0) + (r.cgst_amount || 0) + (r.sgst_amount || 0), 0))}</span></span>
+                      </table>
+                    </div>
+                    <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-sm text-gray-600 flex justify-between">
+                      <span>{filteredRows.length} record(s)</span>
+                      <span>
+                        Taxable:{' '}
+                        <strong className="text-gray-900">
+                          {formatCurrency(filteredRows.reduce((s, r) => s + r.taxableValue, 0))}
+                        </strong>
+                      </span>
                     </div>
                   </div>
-               </div>
-               )}
-            </div>
-         )}
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
-      )}
-
-    </div>
     </div>
   );
 }

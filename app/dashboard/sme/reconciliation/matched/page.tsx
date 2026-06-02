@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   X,
   FileText,
+  MoreVertical,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -38,6 +39,8 @@ interface MatchedRow {
   gstr2bAmount: number;
   type: string;
   itc: number;
+  status: 'Reviewed' | 'Pending';
+  confidence: number;
 }
 
 export default function MatchedInvoicesPage() {
@@ -79,6 +82,10 @@ export default function MatchedInvoicesPage() {
             gstr2bAmount: Number(g.taxable_value || 0),
             type: Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 'Exact Match' : 'Fuzzy Match',
             itc: gTax || pTax,
+            status:
+              Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 'Reviewed' : 'Pending',
+            confidence:
+              Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 100 : 92,
           };
         }
       );

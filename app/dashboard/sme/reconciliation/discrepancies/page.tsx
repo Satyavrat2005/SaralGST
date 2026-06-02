@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Phone,
   Plus,
+  X,
 } from 'lucide-react';
 
 const PERIODS = (() => {
@@ -30,15 +31,40 @@ const PERIODS = (() => {
   return periods;
 })();
 
+interface DiscrepancyInvoiceRow {
+  id: string;
+  date: string;
+  vendor: string;
+  gstin: string;
+  amount: number;
+  gst: number;
+  reason?: string;
+  status?: string;
+  daysPending: number;
+  filingStatus?: string;
+  lastReminder?: string;
+}
+
+interface ValueMismatchRow {
+  id: string;
+  date: string;
+  vendor: string;
+  bookAmount: number;
+  gstr2bAmount: number;
+  diff: number;
+  type: string;
+  withinTolerance: boolean;
+}
+
 export default function DiscrepanciesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'books' | 'gstr2b' | 'value'>('books');
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
   const [loading, setLoading] = useState(true);
   const [returnId, setReturnId] = useState<string | null>(null);
-  const [missingInBooks, setMissingInBooks] = useState<Array<Record<string, unknown>>>([]);
-  const [missingInGSTR2B, setMissingInGSTR2B] = useState<Array<Record<string, unknown>>>([]);
-  const [valueMismatches, setValueMismatches] = useState<Array<Record<string, unknown>>>([]);
+  const [missingInBooks, setMissingInBooks] = useState<DiscrepancyInvoiceRow[]>([]);
+  const [missingInGSTR2B, setMissingInGSTR2B] = useState<DiscrepancyInvoiceRow[]>([]);
+  const [valueMismatches, setValueMismatches] = useState<ValueMismatchRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
@@ -59,36 +85,41 @@ export default function DiscrepanciesPage() {
       const res = await fetch(`/api/returns?action=reconciliation-results&returnId=${ret.id}`);
       const data = await res.json();
       setMissingInBooks((data.missing_in_books || []).map((g: Record<string, unknown>) => ({
-        id: g.invoice_number || g.id,
-        date: g.invoice_date,
-        vendor: g.supplier_name,
-        gstin: g.supplier_gstin,
-        amount: g.taxable_value,
+        id: String(g.invoice_number || g.id || ''),
+        date: String(g.invoice_date || ''),
+        vendor: String(g.supplier_name || ''),
+        gstin: String(g.supplier_gstin || ''),
+        amount: Number(g.taxable_value) || 0,
         gst: (Number(g.igst_amount) || 0) + (Number(g.cgst_amount) || 0) + (Number(g.sgst_amount) || 0),
         reason: 'In GSTR-2B only',
         status: 'Active',
       })));
       setMissingInGSTR2B((data.missing_in_gstr2b || []).map((p: Record<string, unknown>) => ({
-        id: p.invoice_number || p.id,
-        date: p.invoice_date,
-        vendor: p.supplier_name,
-        gstin: p.supplier_gstin,
-        amount: p.taxable_value || p.total_invoice_value,
+        id: String(p.invoice_number || p.id || ''),
+        date: String(p.invoice_date || ''),
+        vendor: String(p.supplier_name || ''),
+        gstin: String(p.supplier_gstin || ''),
+        amount: Number(p.taxable_value || p.total_invoice_value) || 0,
         gst: (Number(p.igst_amount) || 0) + (Number(p.cgst_amount) || 0) + (Number(p.sgst_amount) || 0),
         daysPending: 0,
         filingStatus: 'Not in GSTR-2B',
         lastReminder: '—',
       })));
-      setValueMismatches((data.partial || []).map((pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown>; diff: { taxable: number; tax: number } }) => ({
-        id: pair.gstr2b.invoice_number || pair.gstr2b.id,
-        date: pair.gstr2b.invoice_date,
-        vendor: pair.gstr2b.supplier_name,
-        bookAmount: pair.purchase.taxable_value,
-        gstr2bAmount: pair.gstr2b.taxable_value,
-        diff: pair.diff?.taxable ?? pair.diff?.tax ?? 0,
-        type: Math.abs(pair.diff?.taxable || 0) <= 1 ? 'Rounding' : 'Value/GST',
-        withinTolerance: Math.abs(pair.diff?.taxable || 0) <= 1,
-      })));
+      setValueMismatches((data.partial || []).map((pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown>; diff: { taxable: number; tax: number } }) => {
+        const bookAmount = Number(pair.purchase.taxable_value) || 0;
+        const gstr2bAmount = Number(pair.gstr2b.taxable_value) || 0;
+        const diffVal = pair.diff?.taxable ?? pair.diff?.tax ?? 0;
+        return {
+          id: String(pair.gstr2b.invoice_number || pair.gstr2b.id || ''),
+          date: String(pair.gstr2b.invoice_date || ''),
+          vendor: String(pair.gstr2b.supplier_name || ''),
+          bookAmount,
+          gstr2bAmount,
+          diff: diffVal,
+          type: Math.abs(pair.diff?.taxable || 0) <= 1 ? 'Rounding' : 'Value/GST',
+          withinTolerance: Math.abs(pair.diff?.taxable || 0) <= 1,
+        };
+      }));
     } finally {
       setLoading(false);
     }

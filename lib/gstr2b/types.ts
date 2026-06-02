@@ -68,7 +68,7 @@ export interface Gstr2bReturnData {
     recordsParsed: number;
     generationRequested?: boolean;
     emptyPortal?: boolean;
-    source?: 'portal' | 'sandbox_fixture';
+    source?: 'portal';
     portalErrorCode?: string;
     portalErrorMessage?: string;
     requestedPeriod?: string;
