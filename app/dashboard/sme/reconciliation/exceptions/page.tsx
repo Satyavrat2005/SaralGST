@@ -19,19 +19,9 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { buildReconciliationPeriodOptions } from '@/lib/reconciliation/periodOptions';
 
-const PERIODS = (() => {
-  const periods: { label: string; value: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    periods.push({
-      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`,
-      value: `${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getFullYear()}`,
-    });
-  }
-  return periods;
-})();
+const PERIODS = buildReconciliationPeriodOptions();
 
 export default function ExceptionDashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
