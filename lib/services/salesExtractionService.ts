@@ -10,20 +10,35 @@ export interface SalesInvoiceData {
   customer_gstin: string;         // Buyer/customer GSTIN
   invoice_number: string;
   invoice_date: string;
+  voucher_type: string;
   place_of_supply: string;
   invoice_type: string;
   hsn_or_sac: string;
+  hsn_sac_code?: string;
   description: string;
   quantity: string;
   unit: string;
+  uqc?: string;
   rate: number;
+  local_sales_taxable_18?: number | null;
+  local_sales_taxable_12?: number | null;
+  oms_sales_taxable_12?: number | null;
   taxable_value: number;
   cgst: number;
   sgst: number;
   igst: number;
   cess: number;
   total_invoice_value: number;
+  cgst_amount?: number | null;
+  sgst_amount?: number | null;
+  igst_amount?: number | null;
+  tcs_cess?: number | null;
+  round_off?: number | null;
+  gross_total?: number | null;
   is_reverse_charge: boolean;
+  reverse_charge?: boolean;
+  eway_bill_number?: string | null;
+  irn?: string | null;
   confidence: {
     seller_gstin: number;
     customer_gstin: number;
@@ -59,9 +74,10 @@ export async function extractSalesInvoiceData(ocrText: string): Promise<{
     const geminiApiKey = process.env.GEMINI_API_KEY;
     
     if (!geminiApiKey) {
+      const parsed = parseSalesInvoiceFromText(ocrText);
       return {
-        data: null,
-        error: 'Gemini API key not configured',
+        data: parsed,
+        error: null,
       };
     }
 
@@ -207,4 +223,194 @@ CRITICAL INSTRUCTIONS:
       error: error.message,
     };
   }
+}
+
+function parseSalesInvoiceFromText(ocrText: string): SalesInvoiceData {
+  const normalized = ocrText
+    .replace(/\r/g, '\n')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+  const joined = lines.join(' \n ');
+
+  const invoiceNumber = firstMatch(joined, [
+    /invoice\s*(?:no\.?|number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\/-]{2,})/i,
+    /tax\s*invoice\s*(?:no\.?|number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\/-]{2,})/i,
+    /bill\s*(?:no\.?|number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\/-]{2,})/i,
+  ]) || null;
+
+  const invoiceDateRaw = firstMatch(joined, [
+    /invoice\s*date\s*[:\-]?\s*([0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4})/i,
+    /date\s*[:\-]?\s*([0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4})/i,
+  ]) || null;
+
+  const customerGstin = firstMatch(joined, [
+    /(?:buyer|customer|bill\s*to|sold\s*to|ship\s*to).*?(\d{2}[A-Z0-9]{13})/i,
+    /gstin\s*[:\-]?\s*(\d{2}[A-Z0-9]{13})/i,
+  ]) || null;
+
+  const customerName = firstMatch(joined, [
+    /(?:buyer|customer|bill\s*to|sold\s*to)\s*[:\-]?\s*([A-Za-z0-9&().,'\/\- ]{3,})/i,
+    /name\s*[:\-]?\s*([A-Za-z0-9&().,'\/\- ]{3,})/i,
+  ]) || null;
+
+  const placeOfSupply = firstMatch(joined, [
+    /place\s*of\s*supply\s*[:\-]?\s*([0-9]{2}\s*[-:]\s*[A-Za-z ]+)/i,
+    /place\s*of\s*supply\s*[:\-]?\s*([A-Za-z ]+)/i,
+  ]) || null;
+
+  const hsnSacCode = firstMatch(joined, [
+    /hsn\/?sac\s*(?:code)?\s*[:\-]?\s*([0-9A-Z]{4,8})/i,
+    /sac\s*(?:code)?\s*[:\-]?\s*([0-9A-Z]{4,8})/i,
+  ]) || null;
+
+  const taxableValue = parseMoney(firstMatch(joined, [
+    /taxable\s*value\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+    /taxable\s*amount\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+  ]));
+
+  const localSales18 = parseMoney(firstMatch(joined, [
+    /local\s*sales\s*@?\s*18%\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+  ]));
+  const localSales12 = parseMoney(firstMatch(joined, [
+    /local\s*sales\s*@?\s*12%\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+  ]));
+  const omsSales12 = parseMoney(firstMatch(joined, [
+    /(?:oms|inter[- ]?state)\s*@?\s*12%\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+  ]));
+
+  const cgstAmount = parseMoney(firstMatch(joined, [/cgst\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+  const sgstAmount = parseMoney(firstMatch(joined, [/sgst\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+  const igstAmount = parseMoney(firstMatch(joined, [/igst\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+  const cessAmount = parseMoney(firstMatch(joined, [/(?:tcs|cess)\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+  const roundOff = parseMoney(firstMatch(joined, [/round\s*off\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+  const grossTotal = parseMoney(firstMatch(joined, [
+    /(?:gross\s*total|invoice\s*total|total\s*invoice\s*value|grand\s*total)\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+  ]));
+
+  const quantity = parseNumber(firstMatch(joined, [
+    /quantity\s*[:\-]?\s*([0-9]+(?:\.[0-9]+)?)/i,
+  ]));
+  const rate = parseMoney(firstMatch(joined, [/rate\s*[:\-]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i]));
+
+  const ewayBillNumber = firstMatch(joined, [/e-?way\s*bill\s*(?:no\.?|number)?\s*[:\-]?\s*([0-9]{8,20})/i]) || null;
+  const irn = firstMatch(joined, [/\birn\b\s*[:\-]?\s*([A-Z0-9]{30,80})/i]) || null;
+  const reverseCharge = /reverse\s*charge/i.test(joined);
+
+  const invoiceType = customerGstin ? 'B2B' : inferB2CType(grossTotal ?? taxableValue ?? 0);
+
+  const result: SalesInvoiceData = {
+    seller_name: extractSellerName(lines) || 'Unknown',
+    seller_gstin: extractSellerGstin(lines) || 'Unknown',
+    customer_name: customerName || 'Unknown',
+    customer_gstin: customerGstin || 'Unknown',
+    invoice_number: invoiceNumber || 'Unknown',
+    invoice_date: invoiceDateRaw ? normalizeDate(invoiceDateRaw) : '1970-01-01',
+    voucher_type: /credit\s*note/i.test(joined)
+      ? 'Credit Note'
+      : /debit\s*note/i.test(joined)
+      ? 'Debit Note'
+      : 'Sales',
+    place_of_supply: placeOfSupply || 'Unknown',
+    invoice_type: invoiceType,
+    hsn_or_sac: hsnSacCode || 'Unknown',
+    hsn_sac_code: hsnSacCode || 'Unknown',
+    description: extractDescription(lines) || 'Unknown',
+    quantity: quantity > 0 ? String(quantity) : '1',
+    unit: extractUnit(lines) || 'NOS',
+    uqc: extractUnit(lines) || 'NOS',
+    rate: rate || 0,
+    local_sales_taxable_18: localSales18,
+    local_sales_taxable_12: localSales12,
+    oms_sales_taxable_12: omsSales12,
+    taxable_value: taxableValue || 0,
+    cgst: cgstAmount || 0,
+    sgst: sgstAmount || 0,
+    igst: igstAmount || 0,
+    cess: cessAmount || 0,
+    total_invoice_value: grossTotal || (taxableValue || 0) + (cgstAmount || 0) + (sgstAmount || 0) + (igstAmount || 0) + (cessAmount || 0),
+    cgst_amount: cgstAmount || 0,
+    sgst_amount: sgstAmount || 0,
+    igst_amount: igstAmount || 0,
+    tcs_cess: cessAmount || 0,
+    round_off: roundOff || 0,
+    gross_total: grossTotal || (taxableValue || 0) + (cgstAmount || 0) + (sgstAmount || 0) + (igstAmount || 0) + (cessAmount || 0),
+    is_reverse_charge: reverseCharge,
+    reverse_charge: reverseCharge,
+    eway_bill_number: ewayBillNumber,
+    irn,
+    confidence: {
+      seller_gstin: extractSellerGstin(lines) ? 0.8 : 0.3,
+      customer_gstin: customerGstin ? 0.8 : 0.2,
+      invoice_number: invoiceNumber ? 0.9 : 0.3,
+      tax_values: taxableValue || cgstAmount || sgstAmount || igstAmount ? 0.7 : 0.2,
+    },
+  };
+
+  return result;
+}
+
+function firstMatch(text: string, patterns: RegExp[]): string | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+function parseMoney(value: string | null): number | null {
+  if (!value) return null;
+  const normalized = value.replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value.replace(/,/g, '').trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDate(value: string): string {
+  const cleaned = value.replace(/[.]/g, '/').trim();
+  const parts = cleaned.split('/').map((part) => part.trim());
+  if (parts.length === 3) {
+    const [first, second, third] = parts;
+    const day = first.padStart(2, '0');
+    const month = second.padStart(2, '0');
+    const year = third.length === 2 ? `20${third}` : third;
+    return `${year}-${month}-${day}`;
+  }
+  return cleaned;
+}
+
+function inferB2CType(amount: number): string {
+  return amount >= 250000 ? 'B2C Large' : 'B2C Small';
+}
+
+function extractSellerName(lines: string[]): string | null {
+  return lines[0] || null;
+}
+
+function extractSellerGstin(lines: string[]): string | null {
+  for (const line of lines.slice(0, 20)) {
+    const match = line.match(/\b(\d{2}[A-Z0-9]{13})\b/i);
+    if (match?.[1]) return match[1].toUpperCase();
+  }
+  return null;
+}
+
+function extractDescription(lines: string[]): string | null {
+  const candidate = lines.find((line) => /description|goods|services|item/i.test(line));
+  return candidate || lines[lines.length - 1] || null;
+}
+
+function extractUnit(lines: string[]): string | null {
+  const candidate = lines.find((line) => /\b(NOS|PCS|KGS|MTR|LTR|BOX|BAG|DZN|GMS)\b/i.test(line));
+  const match = candidate?.match(/\b(NOS|PCS|KGS|MTR|LTR|BOX|BAG|DZN|GMS)\b/i);
+  return match?.[1]?.toUpperCase() || null;
 }

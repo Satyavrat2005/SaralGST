@@ -251,7 +251,7 @@ async function seedSandboxPurchaseBooks(
   const { startDate, endDate } = getReturnPeriodDateRange(period);
   const { data: existing } = await supabase
     .from('purchase_register')
-    .select('supplier_gstin, invoice_number, invoice_date')
+    .select('supplier_name, supplier_gstin, invoice_number, invoice_date')
     .gte('invoice_date', startDate)
     .lte('invoice_date', endDate);
 
@@ -259,6 +259,7 @@ async function seedSandboxPurchaseBooks(
     (existing || []).map((p) =>
       purchaseSeedKey({
         source: 'manual',
+        supplier_name: p.supplier_name ?? null,
         supplier_gstin: p.supplier_gstin,
         invoice_number: p.invoice_number,
         invoice_date: p.invoice_date ? String(p.invoice_date).slice(0, 10) : null,
@@ -1539,7 +1540,7 @@ export async function POST(req: NextRequest) {
         const portalConfig = getPortalFilerConfig();
         const seed = await seedSandboxPurchaseBooks(
           supabase,
-          gstr2bRows as Parameters<typeof parseGstr2bResponse>,
+          gstr2bRows as any,
           returnRow.return_period,
           portalConfig.gstin
         );

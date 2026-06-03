@@ -64,12 +64,30 @@ export async function extractTextFromInvoice(
  */
 async function extractFromPDF(base64File: string): Promise<OCRResult> {
   try {
-    // Use Google Cloud Vision API for document text detection
+    const pdfBuffer = Buffer.from(base64File, 'base64');
+
+    try {
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+      const parsed = await pdfParse(pdfBuffer);
+      const text = String(parsed?.text || '').trim();
+
+      if (text) {
+        return {
+          rawText: text,
+          confidence: 0.85,
+          success: true,
+        };
+      }
+    } catch (parseError) {
+      console.warn('PDF text extraction fallback failed, trying vision/gemini fallback:', parseError);
+    }
+
+    // If text extraction fails, try the Gemini fallback when configured.
     const visionApiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
-    
-    // Always use fallback for PDFs since Vision API requires special setup
-    // and Gemini Vision works better for documents
-    return await fallbackTextExtraction(base64File, 'application/pdf');
+    if (visionApiKey) {
+      return await fallbackTextExtraction(base64File, 'application/pdf');
+    }
 
     const response = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
@@ -119,12 +137,16 @@ async function extractFromPDF(base64File: string): Promise<OCRResult> {
       rawText: '',
       confidence: 0,
       success: false,
-      error: 'No text detected in document',
+      error: 'No text detected in PDF',
     };
   } catch (error: any) {
     console.error('Error extracting from PDF:', error);
-    // Fallback to basic extraction
-    return await fallbackTextExtraction(base64File, 'application/pdf');
+    return {
+      rawText: '',
+      confidence: 0,
+      success: false,
+      error: error.message,
+    };
   }
 }
 

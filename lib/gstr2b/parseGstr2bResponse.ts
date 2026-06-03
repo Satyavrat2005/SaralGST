@@ -89,6 +89,7 @@ function parseB2bLike(
             invoice_value: inv.val || 0,
             place_of_supply: inv.pos || null,
             reverse_charge: isReverseCharge(inv),
+            itc_eligible: eligible,
           },
           agg,
           eligible
@@ -136,6 +137,7 @@ function parseCdnrLike(
             place_of_supply: note.pos || null,
             note_type: note.ntty || null,
             reverse_charge: isReverseCharge(note),
+            itc_eligible: eligible,
           },
           agg,
           eligible
@@ -188,6 +190,7 @@ function parseIsdLike(
           invoice_date: parseGstnDate(entry.docdt),
           invoice_value: agg.igst + agg.cgst + agg.sgst + agg.cess,
           place_of_supply: null,
+            itc_eligible: eligible,
         },
         agg,
         eligible
@@ -236,6 +239,7 @@ function parseImpgLike(
           invoice_date: parseGstnDate(entry.boedt),
           invoice_value: (entry.txval || 0) + (entry.igst || 0) + (entry.cess || 0),
           place_of_supply: entry.portcode || null,
+            itc_eligible: true,
         },
         agg,
         true

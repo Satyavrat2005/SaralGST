@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   uploadSalesInvoice,
   createNewSalesInvoice,
@@ -8,25 +7,20 @@ import {
   SalesInvoice,
 } from '@/lib/services/salesInvoiceService';
 import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtractionService';
-import { isValidGstin, normalizeGstin } from '@/lib/gstr1/utils';
 
 /**
  * POST /api/invoice/sales/process
- * Upload PDF/image → Gemini extracts structured data → save to sales_invoices table
+ * Upload PDF/image → Gemini reads the file natively → structured JSON → save to sales_invoices
+ *
+ * NOTE: No OCR step — Gemini receives the raw file bytes directly.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // Validate file type
@@ -57,11 +51,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 2: Create a placeholder record so we have an ID immediately ─────
     const { data: placeholder, error: createError } = await createNewSalesInvoice(
-      {
-        user_id: user?.id,
-        invoice_file_url: uploadData.url,
-        extraction_status: 'pending',
-      },
+      { invoice_file_url: uploadData.url, extraction_status: 'pending' },
       true
     );
 
@@ -74,76 +64,72 @@ export async function POST(request: NextRequest) {
 
     const invoiceId = placeholder.id!;
 
-    // ── Step 3: Convert file to Buffer and call Gemini ────────────────────────
+    // ── Step 3: Send file directly to Gemini for structured extraction ────────
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const { data: extracted, error: geminiError } = await extractSalesInvoiceWithGemini(
+    const { data: extracted, error: extractionError } = await extractSalesInvoiceWithGemini(
       fileBuffer,
       file.type
     );
 
-    if (geminiError || !extracted) {
-      // Update status so user sees it needs manual review
+    if (extractionError || !extracted) {
+      console.error('[ProcessRoute] Gemini extraction failed:', extractionError);
       await updateNewSalesInvoice(invoiceId, { extraction_status: 'needs_review' }, true);
       return NextResponse.json({
         success: true,
         invoiceId,
-        message: 'Invoice uploaded but AI extraction failed. Please fill in the details manually.',
+        message: extractionError?.includes('API key')
+          ? 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env.local file.'
+          : 'Invoice uploaded but extraction failed. Please fill in the details manually.',
         invoice: placeholder,
+        extractionError,
       });
     }
 
-    // ── Step 4: Map extracted data → SalesInvoice row ────────────────────────
-    const customerGstin = normalizeGstin(extracted.customer_gstin);
-    let invoiceType = extracted.invoice_type;
-    if (invoiceType === 'B2B' && !isValidGstin(customerGstin)) {
-      invoiceType = 'B2C Small';
-    }
-
+    // ── Step 4: Map GeminiSalesData → SalesInvoice DB row ────────────────────
     const invoiceData: Partial<SalesInvoice> = {
-      user_id: user?.id,
-      // Basic Invoice Information
-      invoice_date: extracted.invoice_date,
-      voucher_type: extracted.voucher_type,
+      // 1. Basic Invoice Information
+      invoice_date:   extracted.invoice_date,
+      voucher_type:   extracted.voucher_type,
       invoice_number: extracted.invoice_number,
-      invoice_type: invoiceType,
+      invoice_type:   extracted.invoice_type,
 
-      // Customer Details
-      customer_name: extracted.customer_name,
-      customer_gstin: customerGstin,
+      // 2. Customer Details
+      customer_name:   extracted.customer_name,
+      customer_gstin:  extracted.customer_gstin,
       place_of_supply: extracted.place_of_supply,
 
-      // Product & Pricing
+      // 3. Product & Pricing
       hsn_sac_code: extracted.hsn_sac_code,
-      quantity: extracted.quantity,
-      uqc: extracted.uqc,
-      rate: extracted.rate,
+      quantity:     extracted.quantity,       // already a number | null
+      uqc:          extracted.uqc,
+      rate:         extracted.rate,
 
-      // Financial & Tax Breakdown
+      // 4. Financial & Tax Breakdown
       local_sales_taxable_18: extracted.local_sales_taxable_18,
       local_sales_taxable_12: extracted.local_sales_taxable_12,
-      oms_sales_taxable_12: extracted.oms_sales_taxable_12,
-      taxable_value: extracted.taxable_value,
-      cgst_amount: extracted.cgst_amount,
-      sgst_amount: extracted.sgst_amount,
-      igst_amount: extracted.igst_amount,
-      tcs_cess: extracted.tcs_cess,
-      round_off: extracted.round_off,
-      gross_total: extracted.gross_total,
+      oms_sales_taxable_12:   extracted.oms_sales_taxable_12,
+      taxable_value:          extracted.taxable_value,
+      cgst_amount:            extracted.cgst_amount,
+      sgst_amount:            extracted.sgst_amount,
+      igst_amount:            extracted.igst_amount,
+      tcs_cess:               extracted.tcs_cess,
+      round_off:              extracted.round_off,
+      gross_total:            extracted.gross_total,
 
-      // Advanced Compliance
-      reverse_charge: extracted.reverse_charge,
+      // 5. Advanced Compliance
+      reverse_charge:   extracted.reverse_charge,
       eway_bill_number: extracted.eway_bill_number,
-      irn: extracted.irn,
+      irn:              extracted.irn,
 
       // Processing metadata
-      invoice_file_url: uploadData.url,
-      gemini_raw_json: extracted,
+      invoice_file_url:  uploadData.url,
+      gemini_raw_json:   extracted,
       extraction_status: determineExtractionStatus(extracted),
     };
 
     const validation = validateSalesInvoice(invoiceData);
 
-    // ── Step 5: Update the placeholder record with extracted data ─────────────
+    // ── Step 5: Persist extracted data ───────────────────────────────────────
     const { data: updatedInvoice, error: updateError } = await updateNewSalesInvoice(
       invoiceId,
       invoiceData,
@@ -151,8 +137,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (updateError) {
-      console.error('[ProcessRoute] Update failed:', updateError);
-      // Return partial success — data extracted but DB update failed
+      console.error('[ProcessRoute] DB update failed:', updateError);
       return NextResponse.json({
         success: true,
         invoiceId,
@@ -179,10 +164,9 @@ export async function POST(request: NextRequest) {
         warnings: validation.warnings,
         missingFields: getMissingSalesFields(invoiceData),
       },
-      message:
-        validation.isValid
-          ? `Invoice processed: ${invoiceData.invoice_number || invoiceId}`
-          : 'Invoice uploaded with some missing fields. Please review.',
+      message: validation.isValid
+        ? `Invoice processed successfully: ${invoiceData.invoice_number || invoiceId}`
+        : 'Invoice uploaded with some missing fields. Please review.',
     });
   } catch (error: any) {
     console.error('[ProcessRoute] Unhandled error:', error);

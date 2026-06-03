@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Phone,
   Plus,
+   X,
 } from 'lucide-react';
 
 const PERIODS = (() => {
@@ -30,15 +31,35 @@ const PERIODS = (() => {
   return periods;
 })();
 
+interface DiscrepancyRow {
+   id: string;
+   date?: string;
+   vendor?: string;
+   gstin?: string;
+   amount?: number;
+   gst?: number;
+   reason?: string;
+   status?: string;
+   daysPending?: number;
+   filingStatus?: string;
+   lastReminder?: string;
+   bookAmount?: number;
+   gstr2bAmount?: number;
+   diff?: number;
+   type?: string;
+   withinTolerance?: boolean;
+   action?: string;
+}
+
 export default function DiscrepanciesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'books' | 'gstr2b' | 'value'>('books');
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
   const [loading, setLoading] = useState(true);
   const [returnId, setReturnId] = useState<string | null>(null);
-  const [missingInBooks, setMissingInBooks] = useState<Array<Record<string, unknown>>>([]);
-  const [missingInGSTR2B, setMissingInGSTR2B] = useState<Array<Record<string, unknown>>>([]);
-  const [valueMismatches, setValueMismatches] = useState<Array<Record<string, unknown>>>([]);
+   const [missingInBooks, setMissingInBooks] = useState<DiscrepancyRow[]>([]);
+   const [missingInGSTR2B, setMissingInGSTR2B] = useState<DiscrepancyRow[]>([]);
+   const [valueMismatches, setValueMismatches] = useState<DiscrepancyRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
@@ -58,7 +79,7 @@ export default function DiscrepanciesPage() {
       setReturnId(ret.id);
       const res = await fetch(`/api/returns?action=reconciliation-results&returnId=${ret.id}`);
       const data = await res.json();
-      setMissingInBooks((data.missing_in_books || []).map((g: Record<string, unknown>) => ({
+         setMissingInBooks((data.missing_in_books || []).map((g: Record<string, unknown>) => ({
         id: g.invoice_number || g.id,
         date: g.invoice_date,
         vendor: g.supplier_name,
@@ -68,7 +89,7 @@ export default function DiscrepanciesPage() {
         reason: 'In GSTR-2B only',
         status: 'Active',
       })));
-      setMissingInGSTR2B((data.missing_in_gstr2b || []).map((p: Record<string, unknown>) => ({
+         setMissingInGSTR2B((data.missing_in_gstr2b || []).map((p: Record<string, unknown>) => ({
         id: p.invoice_number || p.id,
         date: p.invoice_date,
         vendor: p.supplier_name,
@@ -79,7 +100,7 @@ export default function DiscrepanciesPage() {
         filingStatus: 'Not in GSTR-2B',
         lastReminder: '—',
       })));
-      setValueMismatches((data.partial || []).map((pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown>; diff: { taxable: number; tax: number } }) => ({
+         setValueMismatches((data.partial || []).map((pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown>; diff: { taxable: number; tax: number } }) => ({
         id: pair.gstr2b.invoice_number || pair.gstr2b.id,
         date: pair.gstr2b.invoice_date,
         vendor: pair.gstr2b.supplier_name,
@@ -274,11 +295,11 @@ export default function DiscrepanciesPage() {
                         </div>
                         <div className="flex items-center gap-8">
                            <div className="text-right">
-                              <p className="text-sm font-bold text-gray-900">₹{inv.amount.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-gray-900">₹{(inv.amount ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">GSTR-2B Amount</p>
                            </div>
                            <div className="text-right">
-                              <p className="text-sm font-bold text-orange-600">₹{inv.gst.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-orange-600">₹{(inv.gst ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">ITC at Risk</p>
                            </div>
                            <span className="px-2 py-1 rounded bg-orange-50 text-orange-700 text-xs border border-orange-200">
@@ -295,11 +316,11 @@ export default function DiscrepanciesPage() {
                                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                                     <div className="flex justify-between w-64">
                                        <span className="text-gray-600">Taxable Value</span>
-                                       <span className="text-gray-900 font-medium">₹{(inv.amount - inv.gst).toLocaleString()}</span>
+                                       <span className="text-gray-900 font-medium">₹{((inv.amount ?? 0) - (inv.gst ?? 0)).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between w-64">
                                        <span className="text-gray-600">Tax Amount</span>
-                                       <span className="text-gray-900 font-medium">₹{inv.gst.toLocaleString()}</span>
+                                       <span className="text-gray-900 font-medium">₹{(inv.gst ?? 0).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between w-64">
                                        <span className="text-gray-600">Place of Supply</span>
@@ -364,16 +385,16 @@ export default function DiscrepanciesPage() {
                         </div>
                         <div className="flex items-center gap-8">
                            <div className="text-right">
-                              <p className="text-sm font-bold text-gray-900">₹{inv.amount.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-gray-900">₹{(inv.amount ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">Your Amount</p>
                            </div>
                            <div className="text-right">
-                              <p className="text-sm font-bold text-red-600">₹{inv.gst.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-red-600">₹{(inv.gst ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">ITC at Risk</p>
                            </div>
                            <div className="text-right">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${inv.daysPending > 15 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                 {inv.daysPending} Days
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${(inv.daysPending ?? 0) > 15 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                 {(inv.daysPending ?? 0)} Days
                               </span>
                               <p className="text-[10px] text-gray-500 mt-0.5">Pending</p>
                            </div>
@@ -474,16 +495,16 @@ export default function DiscrepanciesPage() {
                         </div>
                         <div className="flex items-center gap-8">
                            <div className="text-right">
-                              <p className="text-sm font-bold text-blue-600">₹{inv.bookAmount.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-blue-600">₹{(inv.bookAmount ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">Your Books</p>
                            </div>
                            <div className="text-right">
-                              <p className="text-sm font-bold text-orange-600">₹{inv.gstr2bAmount.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-orange-600">₹{(inv.gstr2bAmount ?? 0).toLocaleString()}</p>
                               <p className="text-[10px] text-gray-500">GSTR-2B</p>
                            </div>
                            <div className="text-right min-w-[80px]">
                               <p className={`text-sm font-bold ${inv.withinTolerance ? 'text-yellow-600' : 'text-red-600'}`}>
-                                 {inv.bookAmount > inv.gstr2bAmount ? '+' : '-'}₹{Math.abs(inv.diff)}
+                                 {(inv.bookAmount ?? 0) > (inv.gstr2bAmount ?? 0) ? '+' : '-'}₹{Math.abs(inv.diff ?? 0)}
                               </p>
                               <p className="text-[10px] text-gray-500">{inv.type}</p>
                            </div>
@@ -515,16 +536,16 @@ export default function DiscrepanciesPage() {
                            <div className="flex gap-4 items-center justify-center p-4 bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
                               <div className="text-center">
                                  <p className="text-xs text-gray-500 mb-1">Your Value</p>
-                                 <p className="text-xl font-bold text-blue-600">₹{inv.bookAmount}</p>
+                                 <p className="text-xl font-bold text-blue-600">₹{(inv.bookAmount ?? 0).toLocaleString()}</p>
                               </div>
                               <ArrowRight className="h-5 w-5 text-gray-400" />
                               <div className="text-center">
                                  <p className="text-xs text-gray-500 mb-1">GSTR-2B Value</p>
-                                 <p className="text-xl font-bold text-orange-600">₹{inv.gstr2bAmount}</p>
+                                 <p className="text-xl font-bold text-orange-600">₹{(inv.gstr2bAmount ?? 0).toLocaleString()}</p>
                               </div>
                               <div className="ml-8 pl-8 border-l border-gray-200 text-left">
                                  <p className="text-xs text-gray-500 mb-1">Difference</p>
-                                 <p className={`text-xl font-bold ${inv.withinTolerance ? 'text-yellow-600' : 'text-red-600'}`}>₹{inv.diff}</p>
+                                 <p className={`text-xl font-bold ${inv.withinTolerance ? 'text-yellow-600' : 'text-red-600'}`}>₹{(inv.diff ?? 0).toLocaleString()}</p>
                               </div>
                            </div>
 

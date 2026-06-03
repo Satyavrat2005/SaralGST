@@ -25,10 +25,10 @@ function daysDiff(a: string | null, b: string | null): number {
 
 function purchaseTax(p: PurchaseRegisterRow): number {
   return taxTotal({
-    igst_amount: p.igst_amount,
-    cgst_amount: p.cgst_amount,
-    sgst_amount: p.sgst_amount,
-    cess_amount: p.cess_amount,
+    igst_amount: p.igst_amount ?? 0,
+    cgst_amount: p.cgst_amount ?? 0,
+    sgst_amount: p.sgst_amount ?? 0,
+    cess_amount: p.cess_amount ?? 0,
   });
 }
 
@@ -58,7 +58,7 @@ function isExactMatch(g: Gstr2bDocumentRow, p: PurchaseRegisterRow): boolean {
 function isFuzzyMatch(g: Gstr2bDocumentRow, p: PurchaseRegisterRow): boolean {
   if (normalizeGstin(g.supplier_gstin) !== normalizeGstin(p.supplier_gstin)) return false;
   if (normalizeDocNumber(g.invoice_number) !== normalizeDocNumber(p.invoice_number)) return false;
-  if (daysDiff(g.invoice_date, p.invoice_date) > DATE_TOLERANCE_DAYS) return false;
+  if (daysDiff(g.invoice_date, p.invoice_date ?? null) > DATE_TOLERANCE_DAYS) return false;
   const bookVal = p.taxable_value || p.total_invoice_value || 0;
   const gVal = g.taxable_value || 0;
   if (bookVal > 0 && Math.abs(gVal - bookVal) / bookVal > AMOUNT_TOLERANCE_PCT) return false;
