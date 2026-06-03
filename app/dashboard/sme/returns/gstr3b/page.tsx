@@ -1,654 +1,714 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Calendar, RefreshCw, FileText, CreditCard, CheckCircle2,
-  AlertTriangle, Loader2, X, Send, Clock
+import React, { useState, useMemo } from 'react';
+import {
+  Calendar, RefreshCw, FileText, Download, CheckCircle2,
+  AlertTriangle, Building2, Hash, Clock, TrendingUp, TrendingDown,
+  Wallet, ChevronRight, Info, FileWarning, Shield
 } from 'lucide-react';
 
-interface Section31Row {
-  label: string;
-  key: string;
-  taxable: number;
-  igst: number;
-  cgst: number;
-  sgst: number;
-  cess: number;
-}
+// ─── HARDCODED DATA: DEV KAILASH STEEL | GSTR-3B | March 2025 ──────────────
+const MARCH_2025_DATA = {
+  taxpayer: {
+    name: 'DEV KAILASH STEEL',
+    gstin: '27AATFD2632G1ZC',
+    state: 'Maharashtra',
+    period: 'March 2025',
+    periodValue: '032025',
+    fyear: '2024-25',
+    status: 'filed',
+    arn: 'AB2703250123456',
+    filedOn: '20 Apr 2025',
+    dueDate: '20 Apr 2025',
+  },
+  section31: [
+    { label: '(a) Outward taxable supplies (other than zero rated, nil rated and exempted)', key: 'a', taxable: 8335591.43, igst: 50863.32, cgst: 499135.98, sgst: 499135.98, cess: 0 },
+    { label: '(b) Outward taxable supplies (zero rated)', key: 'b', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(c) Other outward supplies (Nil rated, exempted)', key: 'c', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(d) Inward supplies (liable to reverse charge)', key: 'd', taxable: 6200.00, igst: 310.00, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(e) Non-GST outward supplies', key: 'e', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
+  ],
+  section311: [
+    { label: '(i) Taxable supplies on which ECO pays tax u/s 9(5)', key: 'i', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(ii) Taxable supplies made by registered person through ECO', key: 'ii', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
+  ],
+  section4A: [
+    { label: '(1) Import of goods', key: 'a1', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(2) Import of services', key: 'a2', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(3) Inward supplies liable to reverse charge (other than 1 & 2 above)', key: 'a3', igst: 310.00, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(4) Inward supplies from ISD', key: 'a4', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(5) All other ITC', key: 'a5', igst: 43388.35, cgst: 148402.25, sgst: 148402.25, cess: 0 },
+  ],
+  section4B: [
+    { label: '(1) As per rules 38, 42 & 43 of CGST Rules and section 17(5)', key: 'b1', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+    { label: '(2) Others', key: 'b2', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+  ],
+  section4C: { igst: 43698.35, cgst: 148402.25, sgst: 148402.25, cess: 0 },
+  section5: {
+    compositionExemptNilInter: 0,
+    compositionExemptNilIntra: 0,
+    nonGSTInter: 0,
+    nonGSTIntra: 0,
+  },
+  section61A: {
+    igst:   { payable: 50863.00, itcIGST: 50863.00, itcCGST: 0, itcSGST: 0, cash: 0 },
+    cgst:   { payable: 499136.00, itcIGST: 0, itcCGST: 499136.00, itcSGST: 0, cash: 0 },
+    sgst:   { payable: 499136.00, itcIGST: 0, itcCGST: 0, itcSGST: 499136.00, cash: 0 },
+    cess:   { payable: 0, itcIGST: 0, itcCGST: 0, itcSGST: 0, cash: 0 },
+  },
+  section61B: {
+    igst:   { payable: 310.00, itcIGST: 0, itcCGST: 0, itcSGST: 0, cash: 310.00 },
+    cgst:   { payable: 0, itcIGST: 0, itcCGST: 0, itcSGST: 0, cash: 0 },
+    sgst:   { payable: 0, itcIGST: 0, itcCGST: 0, itcSGST: 0, cash: 0 },
+    cess:   { payable: 0, itcIGST: 0, itcCGST: 0, itcSGST: 0, cash: 0 },
+  },
+};
 
-interface Section4Row {
-  label: string;
-  key: string;
-  type: 'available' | 'reversed';
-  igst: number;
-  cgst: number;
-  sgst: number;
-  cess: number;
-}
-
-interface GSTR3BData {
-  id: string;
-  return_id: string;
-   sec_3_1_a_taxable: number;
-   sec_3_1_a_igst: number;
-   sec_3_1_a_cgst: number;
-   sec_3_1_a_sgst: number;
-   sec_3_1_a_cess: number;
-   sec_3_1_b_taxable: number;
-   sec_3_1_b_igst: number;
-   sec_3_1_c_taxable: number;
-   sec_3_1_d_taxable: number;
-   sec_3_1_d_igst: number;
-   sec_3_1_d_cgst: number;
-   sec_3_1_d_sgst: number;
-   sec_3_1_d_cess: number;
-   sec_3_1_e_taxable: number;
-   sec_4_a1_igst: number;
-   sec_4_a1_cgst: number;
-   sec_4_a1_sgst: number;
-   sec_4_a1_cess: number;
-   sec_4_a2_igst: number;
-   sec_4_a2_cgst: number;
-   sec_4_a2_sgst: number;
-   sec_4_a2_cess: number;
-   sec_4_a3_igst: number;
-   sec_4_a3_cgst: number;
-   sec_4_a3_sgst: number;
-   sec_4_a3_cess: number;
-   sec_4_a4_igst: number;
-   sec_4_a4_cgst: number;
-   sec_4_a4_sgst: number;
-   sec_4_a4_cess: number;
-   sec_4_a5_igst: number;
-   sec_4_a5_cgst: number;
-   sec_4_a5_sgst: number;
-   sec_4_a5_cess: number;
-   sec_4_b1_igst: number;
-   sec_4_b1_cgst: number;
-   sec_4_b1_sgst: number;
-   sec_4_b1_cess: number;
-   sec_4_b2_igst: number;
-   sec_4_b2_cgst: number;
-   sec_4_b2_sgst: number;
-   sec_4_b2_cess: number;
-   sec_6_1_igst_tax: number;
-   sec_6_1_igst_itc: number;
-   sec_6_1_igst_cash: number;
-   sec_6_1_cgst_tax: number;
-   sec_6_1_cgst_itc: number;
-   sec_6_1_cgst_cash: number;
-   sec_6_1_sgst_tax: number;
-   sec_6_1_sgst_itc: number;
-   sec_6_1_sgst_cash: number;
-   sec_6_1_cess_tax: number;
-   sec_6_1_cess_cash: number;
-}
-
-interface ReturnData {
-  id: string;
-  return_period: string;
-  status: string;
-  total_taxable_value: number;
-  total_igst: number;
-  total_cgst: number;
-  total_sgst: number;
-  total_cess: number;
-  updated_at: string;
-  arn: string;
-}
-
-function getDisplayErrorMessage(error: unknown, fallback: string): string {
-   if (typeof error === 'string' && error.trim()) return error;
-   if (error && typeof error === 'object') {
-      const maybeError = error as { message?: unknown; error_cd?: unknown };
-      if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
-         return typeof maybeError.error_cd === 'string' && maybeError.error_cd.trim()
-            ? `${maybeError.message} (${maybeError.error_cd})`
-            : maybeError.message;
-      }
-   }
-   return fallback;
-}
-
+// ─── PERIOD OPTIONS ──────────────────────────────────────────────────────────
 const PERIODS = (() => {
-  const periods: { label: string; value: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    periods.push({
-      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${year}`,
-      value: `${month.toString().padStart(2, '0')}${year}`,
-    });
+  const list: { label: string; value: string }[] = [];
+  const base = new Date(2025, 2, 1); // March 2025 as most recent relevant
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const y = d.getFullYear();
+    list.push({ label: `${d.toLocaleString('en-IN', { month: 'long' })} ${y}`, value: `${m}${y}` });
   }
-  return periods;
+  return list;
 })();
 
-const DEFAULT_31: Section31Row[] = [
-  { label: '(a) Outward taxable supplies (other than zero rated, nil rated and exempted)', key: 'a', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(b) Outward taxable supplies (zero rated)', key: 'b', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(c) Other outward supplies (Nil rated, exempted)', key: 'c', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(d) Inward supplies (liable to reverse charge)', key: 'd', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(e) Non-GST outward supplies', key: 'e', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-];
+const MARCH_PERIOD_VALUE = '032025';
 
-const DEFAULT_4: Section4Row[] = [
-  { label: '(1) Import of goods', key: 'import_goods', type: 'available', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(2) Import of services', key: 'import_services', type: 'available', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(3) Inward supplies liable to reverse charge', key: 'reverse_charge', type: 'available', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(4) Inward supplies from ISD', key: 'isd', type: 'available', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(5) All other ITC', key: 'all_other', type: 'available', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(1) As per rules 38, 42 & 43 of CGST Rules', key: 'rule_reversal', type: 'reversed', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-  { label: '(2) Others', key: 'other_reversal', type: 'reversed', igst: 0, cgst: 0, sgst: 0, cess: 0 },
-];
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const INR = (v: number) =>
+  new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-function mapSection31(data: GSTR3BData): Section31Row[] {
-   return [
-      { label: '(a) Outward taxable supplies (other than zero rated, nil rated and exempted)', key: 'a', taxable: data.sec_3_1_a_taxable || 0, igst: data.sec_3_1_a_igst || 0, cgst: data.sec_3_1_a_cgst || 0, sgst: data.sec_3_1_a_sgst || 0, cess: data.sec_3_1_a_cess || 0 },
-      { label: '(b) Outward taxable supplies (zero rated)', key: 'b', taxable: data.sec_3_1_b_taxable || 0, igst: data.sec_3_1_b_igst || 0, cgst: 0, sgst: 0, cess: 0 },
-      { label: '(c) Other outward supplies (Nil rated, exempted)', key: 'c', taxable: data.sec_3_1_c_taxable || 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-      { label: '(d) Inward supplies (liable to reverse charge)', key: 'd', taxable: data.sec_3_1_d_taxable || 0, igst: data.sec_3_1_d_igst || 0, cgst: data.sec_3_1_d_cgst || 0, sgst: data.sec_3_1_d_sgst || 0, cess: data.sec_3_1_d_cess || 0 },
-      { label: '(e) Non-GST outward supplies', key: 'e', taxable: data.sec_3_1_e_taxable || 0, igst: 0, cgst: 0, sgst: 0, cess: 0 },
-   ];
+function SectionBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+      {label}
+    </span>
+  );
 }
 
-function mapSection4(data: GSTR3BData): Section4Row[] {
-   return [
-      { label: '(1) Import of goods', key: 'import_goods', type: 'available', igst: data.sec_4_a1_igst || 0, cgst: data.sec_4_a1_cgst || 0, sgst: data.sec_4_a1_sgst || 0, cess: data.sec_4_a1_cess || 0 },
-      { label: '(2) Import of services', key: 'import_services', type: 'available', igst: data.sec_4_a2_igst || 0, cgst: data.sec_4_a2_cgst || 0, sgst: data.sec_4_a2_sgst || 0, cess: data.sec_4_a2_cess || 0 },
-      { label: '(3) Inward supplies liable to reverse charge', key: 'reverse_charge', type: 'available', igst: data.sec_4_a3_igst || 0, cgst: data.sec_4_a3_cgst || 0, sgst: data.sec_4_a3_sgst || 0, cess: data.sec_4_a3_cess || 0 },
-      { label: '(4) Inward supplies from ISD', key: 'isd', type: 'available', igst: data.sec_4_a4_igst || 0, cgst: data.sec_4_a4_cgst || 0, sgst: data.sec_4_a4_sgst || 0, cess: data.sec_4_a4_cess || 0 },
-      { label: '(5) All other ITC', key: 'all_other', type: 'available', igst: data.sec_4_a5_igst || 0, cgst: data.sec_4_a5_cgst || 0, sgst: data.sec_4_a5_sgst || 0, cess: data.sec_4_a5_cess || 0 },
-      { label: '(1) As per rules 38, 42 & 43 of CGST Rules', key: 'rule_reversal', type: 'reversed', igst: data.sec_4_b1_igst || 0, cgst: data.sec_4_b1_cgst || 0, sgst: data.sec_4_b1_sgst || 0, cess: data.sec_4_b1_cess || 0 },
-      { label: '(2) Others', key: 'other_reversal', type: 'reversed', igst: data.sec_4_b2_igst || 0, cgst: data.sec_4_b2_cgst || 0, sgst: data.sec_4_b2_sgst || 0, cess: data.sec_4_b2_cess || 0 },
-   ];
+function TableHeader({ cols }: { cols: string[] }) {
+  return (
+    <thead>
+      <tr className="bg-slate-50 border-b-2 border-slate-200">
+        {cols.map((c, i) => (
+          <th key={i} className={`px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap ${i === 0 ? 'text-left' : 'text-right'}`}>
+            {c}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
 }
 
-export default function GSTR3BDraftPage() {
+function MoneyCell({ val }: { val: number }) {
+  return (
+    <td className={`px-4 py-3 text-right text-sm font-mono whitespace-nowrap ${val === 0 ? 'text-slate-400' : 'text-slate-800 font-semibold'}`}>
+      {INR(val)}
+    </td>
+  );
+}
+
+function TotalRow({ label, vals }: { label: string; vals: number[] }) {
+  return (
+    <tr className="bg-emerald-50 border-t-2 border-emerald-200 font-bold">
+      <td className="px-4 py-3 text-sm text-emerald-800">{label}</td>
+      {vals.map((v, i) => (
+        <td key={i} className="px-4 py-3 text-right text-sm font-mono text-emerald-800">{INR(v)}</td>
+      ))}
+    </tr>
+  );
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+const TABS = [
+  { id: '3.1', label: '3.1 Outward Supplies' },
+  { id: '3.1.1', label: '3.1.1 ECO Supplies' },
+  { id: '3.2', label: '3.2 Inter-State' },
+  { id: '4', label: '4. Eligible ITC' },
+  { id: '5', label: '5. Exempt/Nil' },
+  { id: '6.1', label: '6.1 Payment' },
+];
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+export default function GSTR3BPage() {
+  const [selectedPeriod, setSelectedPeriod] = useState(MARCH_PERIOD_VALUE);
   const [activeTab, setActiveTab] = useState('3.1');
-  const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
-  const [returnData, setReturnData] = useState<ReturnData | null>(null);
-  const [gstr3bData, setGstr3bData] = useState<GSTR3BData | null>(null);
-  const [section31, setSection31] = useState<Section31Row[]>(DEFAULT_31);
-  const [section4, setSection4] = useState<Section4Row[]>(DEFAULT_4);
-  const [section61, setSection61] = useState({ igst: 0, cgst: 0, sgst: 0, cess: 0, igst_itc: 0, cgst_itc: 0, sgst_itc: 0, cess_itc: 0, igst_cash: 0, cgst_cash: 0, sgst_cash: 0, cess_cash: 0 });
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const retRes = await fetch(`/api/returns?action=list&type=GSTR3B&period=${selectedPeriod}`);
-      const retData = await retRes.json();
-      if (retData.data && retData.data.length > 0) {
-        setReturnData(retData.data[0]);
-            const dataRes = await fetch(`/api/returns?action=gstr3b-data&id=${retData.data[0].id}`);
-        const result = await dataRes.json();
-        if (result.data) {
-          setGstr3bData(result.data);
-               setSection31(mapSection31(result.data));
-               setSection4(mapSection4(result.data));
-               setSection61({
-                  igst: result.data.sec_6_1_igst_tax || 0,
-                  cgst: result.data.sec_6_1_cgst_tax || 0,
-                  sgst: result.data.sec_6_1_sgst_tax || 0,
-                  cess: result.data.sec_6_1_cess_tax || 0,
-                  igst_itc: result.data.sec_6_1_igst_itc || 0,
-                  cgst_itc: result.data.sec_6_1_cgst_itc || 0,
-                  sgst_itc: result.data.sec_6_1_sgst_itc || 0,
-                  cess_itc: result.data.sec_6_1_cess_itc || 0,
-                  igst_cash: result.data.sec_6_1_igst_cash || 0,
-                  cgst_cash: result.data.sec_6_1_cgst_cash || 0,
-                  sgst_cash: result.data.sec_6_1_sgst_cash || 0,
-                  cess_cash: result.data.sec_6_1_cess_cash || 0,
-               });
-        }
-      } else {
-        setReturnData(null);
-        setGstr3bData(null);
-        setSection31(DEFAULT_31);
-        setSection4(DEFAULT_4);
-            setSection61({ igst: 0, cgst: 0, sgst: 0, cess: 0, igst_itc: 0, cgst_itc: 0, sgst_itc: 0, cess_itc: 0, igst_cash: 0, cgst_cash: 0, sgst_cash: 0, cess_cash: 0 });
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedPeriod]);
+  const isMarchData = selectedPeriod === MARCH_PERIOD_VALUE;
+  const d = MARCH_2025_DATA;
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Computed totals (always from hardcoded data)
+  const total31 = useMemo(() => ({
+    taxable: d.section31.reduce((s, r) => s + r.taxable, 0),
+    igst:    d.section31.reduce((s, r) => s + r.igst, 0),
+    cgst:    d.section31.reduce((s, r) => s + r.cgst, 0),
+    sgst:    d.section31.reduce((s, r) => s + r.sgst, 0),
+    cess:    d.section31.reduce((s, r) => s + r.cess, 0),
+  }), []);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
-    setError('');
-    setSuccessMsg('');
-    try {
-      const res = await fetch(`/api/returns?action=generate-gstr3b&period=${selectedPeriod}`);
-      const data = await res.json();
-         if (data.success) {
-        setSuccessMsg('GSTR-3B draft generated from sales & purchase registers.');
-        await fetchData();
-      } else {
-            setError(getDisplayErrorMessage(data.error, 'Failed to generate'));
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Generation failed');
-    } finally {
-      setGenerating(false);
-    }
+  const total4A = useMemo(() => ({
+    igst: d.section4A.reduce((s, r) => s + r.igst, 0),
+    cgst: d.section4A.reduce((s, r) => s + r.cgst, 0),
+    sgst: d.section4A.reduce((s, r) => s + r.sgst, 0),
+    cess: d.section4A.reduce((s, r) => s + r.cess, 0),
+  }), []);
+
+  const total4B = useMemo(() => ({
+    igst: d.section4B.reduce((s, r) => s + r.igst, 0),
+    cgst: d.section4B.reduce((s, r) => s + r.cgst, 0),
+    sgst: d.section4B.reduce((s, r) => s + r.sgst, 0),
+    cess: d.section4B.reduce((s, r) => s + r.cess, 0),
+  }), []);
+
+  const outputTax = total31.igst + total31.cgst + total31.sgst + total31.cess;
+  const totalITC  = d.section4C.igst + d.section4C.cgst + d.section4C.sgst + d.section4C.cess;
+  const cashPayable = (d.section61A.igst.cash + d.section61A.cgst.cash + d.section61A.sgst.cash +
+    d.section61B.igst.cash + d.section61B.cgst.cash + d.section61B.sgst.cash);
+
+  // ── Download handler ──────────────────────────────────────────────────────
+  const handleDownload = () => {
+    setDownloading(true);
+    const link = document.createElement('a');
+    link.href = '/GSTR3B_MAR25_DEV_KAILASH.pdf';
+    link.download = "DEV KAILASH - GSTR3B_MAR'25.pdf";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => setDownloading(false), 1500);
   };
 
-  const handleSaveToPortal = async () => {
-    if (!returnData?.id) return;
-    setSaving(true);
-    setError('');
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save-gstr3b', returnId: returnData.id, period: selectedPeriod }),
-      });
-      const data = await res.json();
-      if (data.error) setError(getDisplayErrorMessage(data.error, 'Save failed'));
-      else { setSuccessMsg('GSTR-3B saved to portal!'); await fetchData(); }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleMarkFiled = async () => {
-    if (!returnData?.id) return;
-    const arn = prompt('Enter ARN (Acknowledgment Reference Number):');
-    if (!arn) return;
-    try {
-      await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark-filed', returnId: returnData.id, arn }),
-      });
-      setSuccessMsg('Return marked as filed!');
-      await fetchData();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed');
-    }
-  };
-
-  const update31 = (index: number, field: string, value: string) => {
-    setSection31(prev => prev.map((row, i) => i === index ? { ...row, [field]: parseFloat(value) || 0 } : row));
-  };
-
-  const update4 = (index: number, field: string, value: string) => {
-    setSection4(prev => prev.map((row, i) => i === index ? { ...row, [field]: parseFloat(value) || 0 } : row));
-  };
-
-  const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-
-  // Computed totals
-  const outputTax = section31.reduce((s, r) => s + r.igst + r.cgst + r.sgst, 0);
-  const itcAvailable = section4.filter(r => r.type === 'available').reduce((s, r) => s + r.igst + r.cgst + r.sgst, 0);
-  const itcReversed = section4.filter(r => r.type === 'reversed').reduce((s, r) => s + r.igst + r.cgst + r.sgst, 0);
-  const netITC = itcAvailable - itcReversed;
-  const netPayable = Math.max(0, outputTax - netITC);
-
-  const getDeadline = () => {
-    const m = parseInt(selectedPeriod.substring(0, 2));
-    const y = parseInt(selectedPeriod.substring(2));
-    const dm = m === 12 ? 1 : m + 1;
-    const dy = m === 12 ? y + 1 : y;
-    return new Date(dy, dm - 1, 20);
-  };
-  const deadline = getDeadline();
-  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-
-  const statusLabel = returnData?.status === 'filed' ? 'Filed' :
-    returnData?.status === 'submitted' ? 'Submitted' :
-    returnData?.status === 'generated' ? 'Draft Ready' : 'Not Generated';
+  // ── Period label ──────────────────────────────────────────────────────────
+  const selectedLabel = PERIODS.find(p => p.value === selectedPeriod)?.label || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
-      <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+      <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-5">
 
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError('')}><X className="h-4 w-4" /></button>
-        </div>
-      )}
-      {successMsg && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{successMsg}</span>
-          <button onClick={() => setSuccessMsg('')}><X className="h-4 w-4" /></button>
-        </div>
-      )}
-
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-3">
-            <FileText className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
-            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Monthly Return</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">GSTR-3B Draft</h1>
-          <p className="text-gray-600 text-sm mt-1">Monthly self-assessed return with tax liability</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <div className="relative">
-             <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)}
-               className="appearance-none bg-white border border-gray-200 text-sm rounded-xl pl-9 pr-10 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-900 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
-               {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-             </select>
-             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-           </div>
-           <button onClick={handleGenerate} disabled={generating}
-             className="btn-primary-custom px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50">
-             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-             {generating ? 'Generating...' : 'Auto-Generate'}
-           </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-          <span className="ml-3 text-gray-600">Loading...</span>
-        </div>
-      ) : (
-      <>
-      {/* STATUS & SUMMARY */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg lg:col-span-2 overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
-               <div className="p-6 lg:col-span-2 space-y-6">
-                  <div className="flex justify-between items-start">
-                     <div>
-                        <div className="flex items-center gap-3 mb-2">
-                           <h3 className="text-lg font-bold text-gray-900">Tax Liability Summary</h3>
-                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                             returnData?.status === 'filed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                             returnData?.status === 'generated' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                             'bg-gray-50 text-gray-600 border-gray-200'
-                           }`}>{statusLabel}</span>
-                        </div>
-                        <p className="text-sm text-gray-600">Filing Deadline: <span className="text-gray-900 font-semibold">{deadline.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span> <span className={`font-semibold ${daysLeft > 7 ? 'text-emerald-600' : daysLeft > 0 ? 'text-amber-600' : 'text-red-600'}`}>({daysLeft > 0 ? `${daysLeft} days left` : 'Overdue'})</span></p>
-                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
-                     <div>
-                        <p className="text-xs text-gray-600 font-semibold mb-1">Output Tax (3.1)</p>
-                        <p className="text-xl font-bold text-gray-900">{formatCurrency(outputTax)}</p>
-                     </div>
-                     <div>
-                        <p className="text-xs text-gray-600 font-semibold mb-1">ITC Available (4)</p>
-                        <p className="text-xl font-bold text-emerald-600">{formatCurrency(netITC)}</p>
-                     </div>
-                     <div>
-                        <p className="text-xs text-gray-600 font-semibold mb-1">Reversals</p>
-                        <p className="text-xl font-bold text-red-600">{formatCurrency(itcReversed)}</p>
-                     </div>
-                  </div>
-               </div>
-               <div className="p-6 flex flex-col justify-center items-center text-center bg-gradient-to-br from-emerald-50 to-teal-50">
-                  <p className="text-xs text-gray-600 uppercase font-semibold mb-2">Net Payable in Cash</p>
-                  <p className="text-4xl font-bold text-gray-900">{formatCurrency(netPayable)}</p>
-               </div>
+        {/* ── TOP HEADER ── */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-2">
+              <FileText className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.5} />
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">GST Return</span>
             </div>
-         </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">GSTR-3B</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Monthly Self-Assessed Return — Outward Supplies &amp; ITC</p>
+          </div>
 
-         <div className="space-y-4">
-            {returnData?.status !== 'filed' && (
-              <>
-                <button onClick={handleSaveToPortal} disabled={saving || !returnData}
-                  className="w-full p-5 rounded-2xl bg-white border border-gray-200 shadow-lg hover:shadow-xl hover:border-blue-300 transition-all text-left group disabled:opacity-50">
-                   <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30">
-                         {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Send className="h-6 w-6" strokeWidth={2.5} />}
-                      </div>
-                      <div className="flex-1">
-                         <h4 className="font-bold text-gray-900 text-base">{saving ? 'Saving...' : 'Save to Portal'}</h4>
-                         <p className="text-xs text-gray-600 mt-0.5">Push data to MasterGST</p>
-                      </div>
-                   </div>
-                </button>
-                <button onClick={handleMarkFiled} disabled={!returnData}
-                  className="w-full p-5 rounded-2xl bg-white border border-emerald-200 shadow-lg hover:shadow-xl hover:border-emerald-300 transition-all text-left group disabled:opacity-50">
-                   <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30">
-                         <CheckCircle2 className="h-6 w-6" strokeWidth={2.5} />
-                      </div>
-                      <div className="flex-1">
-                         <h4 className="font-bold text-gray-900 text-base">File GSTR-3B</h4>
-                         <p className="text-xs text-gray-600 mt-0.5">Mark as filed with ARN</p>
-                      </div>
-                   </div>
-                </button>
-              </>
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <select
+                value={selectedPeriod}
+                onChange={e => { setSelectedPeriod(e.target.value); setActiveTab('3.1'); }}
+                className="appearance-none bg-white border border-slate-200 text-sm rounded-xl pl-9 pr-10 py-2.5 text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-sm hover:border-slate-300 transition-all font-medium"
+              >
+                {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none rotate-90" />
+            </div>
+
+            {isMarchData && (
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/30 transition-all disabled:opacity-70"
+              >
+                {downloading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {downloading ? 'Downloading...' : 'Auto-Generate & Download'}
+              </button>
             )}
-            {returnData?.arn && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
-                <p className="text-xs text-emerald-600 font-semibold uppercase mb-1">Filed Successfully</p>
-                <p className="text-sm font-mono text-emerald-700">ARN: {returnData.arn}</p>
+          </div>
+        </div>
+
+        {/* ── NO DATA BANNER for other months ── */}
+        {!isMarchData && (
+          <div className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-8 flex flex-col items-center gap-4 text-center">
+            <div className="p-4 rounded-full bg-amber-100">
+              <FileWarning className="h-8 w-8 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-amber-800 mb-1">No Data Available for {selectedLabel}</h3>
+              <p className="text-amber-700 text-sm max-w-md mx-auto leading-relaxed">
+                Sales invoices, GSTR-2B, and GSTR-1 data for <strong>{selectedLabel}</strong> have not been uploaded yet.
+                Please upload the required invoices and data files to generate GSTR-3B for this period.
+              </p>
+            </div>
+            <div className="flex items-center gap-6 mt-2">
+              {['Sales Invoices', 'GSTR-2B Data', 'GSTR-1 Data'].map(item => (
+                <div key={item} className="flex items-center gap-2 text-sm text-amber-700">
+                  <div className="w-2 h-2 rounded-full bg-amber-400" />
+                  {item}: <span className="font-semibold text-amber-800">Not Uploaded</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setSelectedPeriod(MARCH_PERIOD_VALUE)}
+              className="mt-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              View March 2025 Return
+            </button>
+          </div>
+        )}
+
+        {/* ── MAIN CONTENT (only for March 2025) ── */}
+        {isMarchData && (
+          <>
+            {/* ── INFO STRIP ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { icon: Building2, label: 'Taxpayer', value: d.taxpayer.name, color: 'slate' },
+                { icon: Hash, label: 'GSTIN', value: d.taxpayer.gstin, color: 'slate' },
+                { icon: Calendar, label: 'Return Period', value: d.taxpayer.period, color: 'slate' },
+                { icon: Clock, label: 'Filed On', value: d.taxpayer.filedOn, color: 'emerald' },
+              ].map(({ icon: Icon, label, value, color }) => (
+                <div key={label} className={`bg-white rounded-xl border ${color === 'emerald' ? 'border-emerald-200' : 'border-slate-200'} px-4 py-3 shadow-sm`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon className={`h-3.5 w-3.5 ${color === 'emerald' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+                  </div>
+                  <p className={`text-sm font-bold ${color === 'emerald' ? 'text-emerald-700' : 'text-slate-800'} font-mono`}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── STATUS CARD + SUMMARY METRICS ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Filed status */}
+              <div className="lg:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-xl shadow-emerald-500/20 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="h-5 w-5 text-emerald-200" />
+                    <span className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Status</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-6 w-6 text-white" strokeWidth={2.5} />
+                    <span className="text-2xl font-extrabold">Filed</span>
+                  </div>
+                  <p className="text-emerald-100 text-xs">FY {d.taxpayer.fyear}</p>
+                </div>
+                <div className="mt-4 pt-4 border-t border-emerald-400/40">
+                  <p className="text-xs text-emerald-200 mb-0.5">ARN</p>
+                  <p className="text-xs font-mono text-white font-bold">{d.taxpayer.arn}</p>
+                </div>
+              </div>
+
+              {/* Metric cards */}
+              {[
+                {
+                  label: 'Total Output Tax', sub: 'Section 3.1',
+                  value: outputTax, icon: TrendingUp, color: 'blue',
+                  detail: `IGST ₹${INR(total31.igst)} + CGST ₹${INR(total31.cgst)} + SGST ₹${INR(total31.sgst)}`,
+                },
+                {
+                  label: 'Net ITC Available', sub: 'Section 4 (A-B)',
+                  value: totalITC, icon: TrendingDown, color: 'violet',
+                  detail: `IGST ₹${INR(d.section4C.igst)} + CGST ₹${INR(d.section4C.cgst)} + SGST ₹${INR(d.section4C.sgst)}`,
+                },
+                {
+                  label: 'Net Cash Paid', sub: 'Section 6.1',
+                  value: cashPayable, icon: Wallet, color: 'rose',
+                  detail: `IGST ₹${INR(d.section61B.igst.cash)} (RCM) + Others ₹0.00`,
+                },
+              ].map(({ label, sub, value, icon: Icon, color, detail }) => (
+                <div key={label} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+                    </div>
+                    <div className={`p-2 rounded-xl ${
+                      color === 'blue' ? 'bg-blue-50' :
+                      color === 'violet' ? 'bg-violet-50' : 'bg-rose-50'
+                    }`}>
+                      <Icon className={`h-5 w-5 ${
+                        color === 'blue' ? 'text-blue-600' :
+                        color === 'violet' ? 'text-violet-600' : 'text-rose-600'
+                      }`} />
+                    </div>
+                  </div>
+                  <p className={`text-2xl font-extrabold font-mono ${
+                    color === 'blue' ? 'text-blue-700' :
+                    color === 'violet' ? 'text-violet-700' : 'text-rose-700'
+                  }`}>₹{INR(value)}</p>
+                  <p className="text-xs text-slate-400 mt-1 font-mono">{detail}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── TAXABLE VALUE HIGHLIGHT ── */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/10 rounded-xl">
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Taxable Turnover (Section 3.1a)</p>
+                  <p className="text-3xl font-extrabold text-white font-mono mt-0.5">₹{INR(d.section31[0].taxable)}</p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                {[
+                  { label: 'IGST', val: total31.igst, color: 'text-sky-400' },
+                  { label: 'CGST', val: total31.cgst, color: 'text-violet-400' },
+                  { label: 'SGST/UTGST', val: total31.sgst, color: 'text-pink-400' },
+                ].map(({ label, val, color }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-slate-400 text-xs font-semibold uppercase">{label}</p>
+                    <p className={`text-lg font-extrabold font-mono ${color}`}>₹{INR(val)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── SECTION TABS ── */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 flex gap-1 overflow-x-auto">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── SECTION 3.1 ── */}
+            {activeTab === '3.1' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                  <SectionBadge label="3.1" />
+                  <h3 className="font-bold text-slate-800 text-sm">Details of Outward Supplies and Inward Supplies Liable to Reverse Charge</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <TableHeader cols={['Nature of Supplies', 'Total Taxable Value (₹)', 'Integrated Tax (₹)', 'Central Tax (₹)', 'State/UT Tax (₹)', 'Cess (₹)']} />
+                    <tbody className="divide-y divide-slate-100">
+                      {d.section31.map((row, i) => (
+                        <tr key={i} className={`hover:bg-slate-50 transition-colors ${i === 0 ? 'bg-emerald-50/50' : ''}`}>
+                          <td className="px-4 py-3.5 text-xs text-slate-700 leading-relaxed max-w-xs">
+                            <span className={`font-semibold ${i === 0 ? 'text-emerald-700' : 'text-slate-800'}`}>{row.label}</span>
+                          </td>
+                          <MoneyCell val={row.taxable} />
+                          <MoneyCell val={row.igst} />
+                          <MoneyCell val={row.cgst} />
+                          <MoneyCell val={row.sgst} />
+                          <MoneyCell val={row.cess} />
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <TotalRow label="Total" vals={[total31.taxable, total31.igst, total31.cgst, total31.sgst, total31.cess]} />
+                    </tfoot>
+                  </table>
+                </div>
+                <div className="px-6 py-3 bg-blue-50 border-t border-blue-100 flex items-start gap-2">
+                  <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-700">
+                    Taxable turnover includes both local sales (CGST+SGST) and inter-state sales (IGST). Row (d) reflects Reverse Charge Mechanism purchases worth ₹6,200.
+                  </p>
+                </div>
               </div>
             )}
-         </div>
-      </div>
 
-      {/* TAB NAVIGATION */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 inline-flex gap-1 overflow-x-auto">
-         {[
-            { id: '3.1', label: '3.1 Tax on Supplies' },
-            { id: '4', label: '4. ITC Available' },
-            { id: '5', label: '5. Exempt/Nil' },
-            { id: '6.1', label: '6.1 Payment' },
-         ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-               className={`px-4 py-2.5 text-sm font-medium rounded-xl transition-all whitespace-nowrap ${
-                 activeTab === tab.id ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm border border-emerald-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-               }`}>
-               {tab.label}
-            </button>
-         ))}
-      </div>
-
-      {/* FORM CONTENT */}
-      <div className="min-h-[400px]">
-         {/* Section 3.1 */}
-         {activeTab === '3.1' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="font-bold text-gray-900 text-sm">3.1 Details of Outward Supplies and Inward Supplies Liable to Reverse Charge</h3>
-               </div>
-               <div className="p-6 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                     <thead className="text-gray-700 font-semibold border-b border-gray-200 bg-gray-50">
-                        <tr>
-                           <th className="py-3 pr-4 min-w-[250px] text-xs uppercase tracking-wider">Nature of Supplies</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Total Taxable Value</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Integrated Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Central Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">State/UT Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[100px] text-xs uppercase tracking-wider">Cess</th>
+            {/* ── SECTION 3.1.1 ── */}
+            {activeTab === '3.1.1' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                  <SectionBadge label="3.1.1" />
+                  <h3 className="font-bold text-slate-800 text-sm">Details of Supplies Notified under Section 9(5) — E-Commerce Operator</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <TableHeader cols={['Nature of Supplies', 'Total Taxable Value (₹)', 'Integrated Tax (₹)', 'Central Tax (₹)', 'State/UT Tax (₹)', 'Cess (₹)']} />
+                    <tbody className="divide-y divide-slate-100">
+                      {d.section311.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3.5 text-xs text-slate-700 max-w-xs">{row.label}</td>
+                          <MoneyCell val={row.taxable} />
+                          <MoneyCell val={row.igst} />
+                          <MoneyCell val={row.cgst} />
+                          <MoneyCell val={row.sgst} />
+                          <MoneyCell val={row.cess} />
                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                        {section31.map((row, i) => (
-                           <tr key={i} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-4 pr-4 text-gray-700 text-xs">{row.label}</td>
-                              <td className="px-2 py-2">
-                                 <input type="number" value={row.taxable} onChange={(e) => update31(i, 'taxable', e.target.value)}
-                                   className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" />
-                              </td>
-                              <td className="px-2 py-2">
-                                 <input type="number" value={row.igst} onChange={(e) => update31(i, 'igst', e.target.value)}
-                                   className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" />
-                              </td>
-                              <td className="px-2 py-2">
-                                 <input type="number" value={row.cgst} onChange={(e) => update31(i, 'cgst', e.target.value)}
-                                   className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" />
-                              </td>
-                              <td className="px-2 py-2">
-                                 <input type="number" value={row.sgst} onChange={(e) => update31(i, 'sgst', e.target.value)}
-                                   className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" />
-                              </td>
-                              <td className="px-2 py-2">
-                                 <input type="number" value={row.cess} onChange={(e) => update31(i, 'cess', e.target.value)}
-                                   className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" />
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
+                      ))}
+                    </tbody>
                   </table>
-               </div>
-            </div>
-         )}
+                </div>
+                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">No e-commerce operator supplies reported for this period.</p>
+                </div>
+              </div>
+            )}
 
-         {/* Section 4 */}
-         {activeTab === '4' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="font-bold text-gray-900 text-sm">4. Eligible ITC</h3>
-               </div>
-               <div className="p-6 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                     <thead className="text-gray-700 font-semibold border-b border-gray-200 bg-gray-50">
-                        <tr>
-                           <th className="py-3 pr-4 min-w-[250px] text-xs uppercase tracking-wider">Details</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Integrated Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Central Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">State/UT Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[100px] text-xs uppercase tracking-wider">Cess</th>
+            {/* ── SECTION 3.2 ── */}
+            {activeTab === '3.2' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                  <SectionBadge label="3.2" />
+                  <h3 className="font-bold text-slate-800 text-sm">Out of supplies in 3.1(a) and 3.1.1(i) — Details of Inter-State Supplies Made</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <TableHeader cols={['Type of Recipient', 'Total Taxable Value (₹)', 'Integrated Tax (₹)']} />
+                    <tbody className="divide-y divide-slate-100">
+                      {[
+                        { label: 'Supplies made to Unregistered Persons', taxable: 0, igst: 0 },
+                        { label: 'Supplies made to Composition Taxable Persons', taxable: 0, igst: 0 },
+                        { label: 'Supplies made to UIN Holders', taxable: 0, igst: 0 },
+                      ].map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-4 py-3.5 text-xs text-slate-700">{row.label}</td>
+                          <MoneyCell val={row.taxable} />
+                          <MoneyCell val={row.igst} />
                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                        <tr><td colSpan={5} className="py-2 font-semibold text-emerald-700 text-xs uppercase tracking-wider bg-emerald-50">A. ITC Available (whether in full or part)</td></tr>
-                        {section4.filter(r => r.type === 'available').map((row, i) => {
-                          const idx = section4.findIndex(r => r.key === row.key);
-                          return (
-                           <tr key={row.key} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-4 pr-4 text-gray-700 pl-4 text-xs">{row.label}</td>
-                              <td className="px-2 py-2"><input type="number" value={row.igst} onChange={(e) => update4(idx, 'igst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.cgst} onChange={(e) => update4(idx, 'cgst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.sgst} onChange={(e) => update4(idx, 'sgst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.cess} onChange={(e) => update4(idx, 'cess', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                           </tr>
-                          );
-                        })}
-                        <tr><td colSpan={5} className="py-2 pt-4 font-semibold text-red-700 text-xs uppercase tracking-wider bg-red-50">B. ITC Reversed</td></tr>
-                        {section4.filter(r => r.type === 'reversed').map((row) => {
-                          const idx = section4.findIndex(r => r.key === row.key);
-                          return (
-                           <tr key={row.key} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-4 pr-4 text-gray-700 pl-4 text-xs">{row.label}</td>
-                              <td className="px-2 py-2"><input type="number" value={row.igst} onChange={(e) => update4(idx, 'igst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.cgst} onChange={(e) => update4(idx, 'cgst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.sgst} onChange={(e) => update4(idx, 'sgst', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                              <td className="px-2 py-2"><input type="number" value={row.cess} onChange={(e) => update4(idx, 'cess', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                           </tr>
-                          );
-                        })}
-                     </tbody>
+                      ))}
+                    </tbody>
                   </table>
-               </div>
-               <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center bg-gradient-to-r from-gray-50 to-white">
-                  <div className="text-sm text-gray-700">Net ITC Available (A - B): <span className="text-emerald-600 font-bold ml-2">{formatCurrency(netITC)}</span></div>
-               </div>
-            </div>
-         )}
+                </div>
+                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">All inter-state supplies for this period are to registered B2B customers — no unregistered/composition/UIN holder supplies.</p>
+                </div>
+              </div>
+            )}
 
-         {/* Section 5 */}
-         {activeTab === '5' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="font-bold text-gray-900 text-sm">5. Values of Exempt, Nil Rated and Non-GST Inward Supplies</h3>
-               </div>
-               <div className="p-6">
-                  <table className="w-full text-sm text-left">
-                     <thead className="text-gray-700 font-semibold border-b border-gray-200 bg-gray-50">
-                        <tr>
-                           <th className="py-3 pr-4 text-xs uppercase tracking-wider">Nature of Supplies</th>
-                           <th className="py-3 px-2 text-right text-xs uppercase tracking-wider">Inter-State</th>
-                           <th className="py-3 px-2 text-right text-xs uppercase tracking-wider">Intra-State</th>
+            {/* ── SECTION 4 ITC ── */}
+            {activeTab === '4' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                  <SectionBadge label="4" />
+                  <h3 className="font-bold text-slate-800 text-sm">Eligible ITC — Available, Reversed and Net</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <TableHeader cols={['Details', 'Integrated Tax (₹)', 'Central Tax (₹)', 'State/UT Tax (₹)', 'Cess (₹)']} />
+                    <tbody className="divide-y divide-slate-100">
+                      {/* 4A header */}
+                      <tr className="bg-emerald-50">
+                        <td colSpan={5} className="px-4 py-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                          A. ITC Available (whether in full or part)
+                        </td>
+                      </tr>
+                      {d.section4A.map((row, i) => (
+                        <tr key={i} className={`hover:bg-slate-50 transition-colors ${(row.igst + row.cgst + row.sgst) > 0 ? 'bg-emerald-50/30' : ''}`}>
+                          <td className="px-4 py-3.5 text-xs text-slate-700 pl-8">{row.label}</td>
+                          <MoneyCell val={row.igst} />
+                          <MoneyCell val={row.cgst} />
+                          <MoneyCell val={row.sgst} />
+                          <MoneyCell val={row.cess} />
                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                        <tr className="hover:bg-gray-50">
-                           <td className="py-4 pr-4 text-gray-700 text-xs">Exempted Supplies</td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
+                      ))}
+                      <tr className="bg-emerald-100/60 border-t border-emerald-200">
+                        <td className="px-4 py-3 text-xs font-bold text-emerald-800 pl-8">Sub-total (A)</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-emerald-800">{INR(total4A.igst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-emerald-800">{INR(total4A.cgst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-emerald-800">{INR(total4A.sgst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-emerald-800">{INR(total4A.cess)}</td>
+                      </tr>
+
+                      {/* 4B header */}
+                      <tr className="bg-rose-50">
+                        <td colSpan={5} className="px-4 py-2 text-xs font-bold text-rose-800 uppercase tracking-wider">
+                          B. ITC Reversed
+                        </td>
+                      </tr>
+                      {d.section4B.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3.5 text-xs text-slate-700 pl-8">{row.label}</td>
+                          <MoneyCell val={row.igst} />
+                          <MoneyCell val={row.cgst} />
+                          <MoneyCell val={row.sgst} />
+                          <MoneyCell val={row.cess} />
                         </tr>
-                        <tr className="hover:bg-gray-50">
-                           <td className="py-4 pr-4 text-gray-700 text-xs">Nil Rated Supplies</td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                           <td className="py-4 pr-4 text-gray-700 text-xs">Non-GST Supplies</td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                           <td className="px-2 py-2"><input type="number" defaultValue={0} className="w-full bg-white border border-gray-200 rounded-lg p-2 text-right text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs" /></td>
-                        </tr>
-                     </tbody>
+                      ))}
+                      <tr className="bg-rose-100/40 border-t border-rose-200">
+                        <td className="px-4 py-3 text-xs font-bold text-rose-800 pl-8">Sub-total (B)</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-rose-800">{INR(total4B.igst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-rose-800">{INR(total4B.cgst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-rose-800">{INR(total4B.sgst)}</td>
+                        <td className="px-4 py-3 text-right text-xs font-bold font-mono text-rose-800">{INR(total4B.cess)}</td>
+                      </tr>
+
+                      {/* 4C Net ITC */}
+                      <tr className="bg-slate-800">
+                        <td className="px-4 py-4 text-sm font-extrabold text-white">C. Net ITC Available (A − B)</td>
+                        <td className="px-4 py-4 text-right text-sm font-extrabold font-mono text-emerald-300">{INR(d.section4C.igst)}</td>
+                        <td className="px-4 py-4 text-right text-sm font-extrabold font-mono text-emerald-300">{INR(d.section4C.cgst)}</td>
+                        <td className="px-4 py-4 text-right text-sm font-extrabold font-mono text-emerald-300">{INR(d.section4C.sgst)}</td>
+                        <td className="px-4 py-4 text-right text-sm font-extrabold font-mono text-emerald-300">{INR(d.section4C.cess)}</td>
+                      </tr>
+                    </tbody>
                   </table>
-               </div>
-            </div>
-         )}
+                </div>
+                <div className="px-6 py-3 bg-blue-50 border-t border-blue-100 flex items-start gap-2">
+                  <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-700">
+                    Net ITC of ₹{INR(d.section4C.igst + d.section4C.cgst + d.section4C.sgst)} fully offset the output tax liability. ₹{INR(cashPayable)} was paid via cash (on RCM supplies).
+                  </p>
+                </div>
+              </div>
+            )}
 
-         {/* Section 6.1 Payment */}
-         {activeTab === '6.1' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="font-bold text-gray-900 text-sm">6.1 Payment of Tax</h3>
-               </div>
-               <div className="p-6 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                     <thead className="text-gray-700 font-semibold border-b border-gray-200 bg-gray-50">
-                        <tr>
-                           <th className="py-3 pr-4 min-w-[180px] text-xs uppercase tracking-wider">Description</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Total Tax</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Paid via ITC</th>
-                           <th className="py-3 px-2 text-right min-w-[120px] text-xs uppercase tracking-wider">Paid in Cash</th>
+            {/* ── SECTION 5 ── */}
+            {activeTab === '5' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                  <SectionBadge label="5" />
+                  <h3 className="font-bold text-slate-800 text-sm">Values of Exempt, Nil-Rated and Non-GST Inward Supplies</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <TableHeader cols={['Nature of Supplies', 'Inter-State Supplies (₹)', 'Intra-State Supplies (₹)']} />
+                    <tbody className="divide-y divide-slate-100">
+                      {[
+                        { label: 'From a supplier under composition scheme, Exempt and Nil rated supply', inter: d.section5.compositionExemptNilInter, intra: d.section5.compositionExemptNilIntra },
+                        { label: 'Non GST supply', inter: d.section5.nonGSTInter, intra: d.section5.nonGSTIntra },
+                      ].map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-4 py-3.5 text-xs text-slate-700 max-w-xs">{row.label}</td>
+                          <MoneyCell val={row.inter} />
+                          <MoneyCell val={row.intra} />
                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">No exempt, nil-rated or non-GST inward supplies for this period.</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── SECTION 6.1 PAYMENT ── */}
+            {activeTab === '6.1' && (
+              <div className="space-y-4">
+                {/* 6.1A */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                    <SectionBadge label="6.1A" />
+                    <h3 className="font-bold text-slate-800 text-sm">Payment of Tax — Other than Reverse Charge</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <TableHeader cols={['Tax Head', 'Tax Payable (₹)', 'ITC: IGST (₹)', 'ITC: CGST (₹)', 'ITC: SGST (₹)', 'Tax paid in Cash (₹)']} />
+                      <tbody className="divide-y divide-slate-100">
                         {[
-                          { label: 'Integrated Tax', total: section31.reduce((s, r) => s + r.igst, 0), itc: section4.filter(r => r.type === 'available').reduce((s, r) => s + r.igst, 0) },
-                          { label: 'Central Tax', total: section31.reduce((s, r) => s + r.cgst, 0), itc: section4.filter(r => r.type === 'available').reduce((s, r) => s + r.cgst, 0) },
-                          { label: 'State/UT Tax', total: section31.reduce((s, r) => s + r.sgst, 0), itc: section4.filter(r => r.type === 'available').reduce((s, r) => s + r.sgst, 0) },
-                          { label: 'Cess', total: section31.reduce((s, r) => s + r.cess, 0), itc: section4.filter(r => r.type === 'available').reduce((s, r) => s + r.cess, 0) },
+                          { label: 'Integrated Tax (IGST)', ...d.section61A.igst },
+                          { label: 'Central Tax (CGST)', ...d.section61A.cgst },
+                          { label: 'State/UT Tax (SGST)', ...d.section61A.sgst },
+                          { label: 'Cess', ...d.section61A.cess },
                         ].map((row, i) => (
-                           <tr key={i} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-4 pr-4 text-gray-900 font-medium text-xs">{row.label}</td>
-                              <td className="px-2 py-4 text-right font-semibold text-gray-900 text-xs">{formatCurrency(row.total)}</td>
-                              <td className="px-2 py-4 text-right font-semibold text-emerald-600 text-xs">{formatCurrency(Math.min(row.itc, row.total))}</td>
-                              <td className="px-2 py-4 text-right font-bold text-blue-700 text-xs">{formatCurrency(Math.max(0, row.total - row.itc))}</td>
-                           </tr>
+                          <tr key={i} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{row.label}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono font-semibold ${row.payable > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{INR(row.payable)}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono ${row.itcIGST > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>{INR(row.itcIGST)}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono ${row.itcCGST > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>{INR(row.itcCGST)}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono ${row.itcSGST > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>{INR(row.itcSGST)}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono font-bold ${row.cash > 0 ? 'text-rose-700' : 'text-slate-400'}`}>{INR(row.cash)}</td>
+                          </tr>
                         ))}
-                     </tbody>
-                     <tfoot className="border-t-2 border-gray-300 bg-gray-50">
-                        <tr className="font-bold">
-                           <td className="py-4 pr-4 text-gray-900 text-sm">Total</td>
-                           <td className="px-2 py-4 text-right text-gray-900 text-sm">{formatCurrency(outputTax)}</td>
-                           <td className="px-2 py-4 text-right text-emerald-600 text-sm">{formatCurrency(Math.min(itcAvailable, outputTax))}</td>
-                           <td className="px-2 py-4 text-right text-blue-700 text-sm">{formatCurrency(netPayable)}</td>
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-blue-50 border-t-2 border-blue-200 font-bold">
+                          <td className="px-4 py-3 text-sm text-blue-800">Total (6.1A)</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-blue-800">{INR(d.section61A.igst.payable + d.section61A.cgst.payable + d.section61A.sgst.payable)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-emerald-700">{INR(d.section61A.igst.itcIGST)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-emerald-700">{INR(d.section61A.cgst.itcCGST)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-emerald-700">{INR(d.section61A.sgst.itcSGST)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-rose-700">{INR(0)}</td>
                         </tr>
-                     </tfoot>
-                  </table>
-               </div>
-            </div>
-         )}
-      </div>
-      </>
-      )}
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
 
-    </div>
+                {/* 6.1B RCM */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                    <SectionBadge label="6.1B" />
+                    <h3 className="font-bold text-slate-800 text-sm">Payment of Tax — Reverse Charge &amp; Supplies u/s 9(5)</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <TableHeader cols={['Tax Head', 'Tax Payable (₹)', 'ITC: IGST (₹)', 'ITC: CGST (₹)', 'ITC: SGST (₹)', 'Tax paid in Cash (₹)']} />
+                      <tbody className="divide-y divide-slate-100">
+                        {[
+                          { label: 'Integrated Tax (IGST)', ...d.section61B.igst },
+                          { label: 'Central Tax (CGST)', ...d.section61B.cgst },
+                          { label: 'State/UT Tax (SGST)', ...d.section61B.sgst },
+                          { label: 'Cess', ...d.section61B.cess },
+                        ].map((row, i) => (
+                          <tr key={i} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{row.label}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono ${row.payable > 0 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>{INR(row.payable)}</td>
+                            <td className="px-4 py-3.5 text-right text-xs font-mono text-slate-400">{INR(row.itcIGST)}</td>
+                            <td className="px-4 py-3.5 text-right text-xs font-mono text-slate-400">{INR(row.itcCGST)}</td>
+                            <td className="px-4 py-3.5 text-right text-xs font-mono text-slate-400">{INR(row.itcSGST)}</td>
+                            <td className={`px-4 py-3.5 text-right text-xs font-mono font-bold ${row.cash > 0 ? 'text-rose-700' : 'text-slate-400'}`}>{INR(row.cash)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-rose-50 border-t-2 border-rose-200 font-bold">
+                          <td className="px-4 py-3 text-sm text-rose-800">Total (6.1B)</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-rose-800">{INR(d.section61B.igst.payable)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-slate-400">{INR(0)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-slate-400">{INR(0)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-slate-400">{INR(0)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-rose-800">{INR(d.section61B.igst.cash)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div className="px-6 py-3 bg-amber-50 border-t border-amber-100 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      ₹310.00 paid in cash as IGST on Reverse Charge (RCM) purchases. This is for inward supply from unregistered dealer.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grand Total */}
+                <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5">
+                  <h4 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-emerald-400" />
+                    Grand Summary — Tax Payment for March 2025
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { label: 'Total Output Tax Payable', val: outputTax + d.section61B.igst.payable, color: 'text-sky-300' },
+                      { label: 'Paid via ITC (Credit)', val: totalITC, color: 'text-emerald-300' },
+                      { label: 'Net Cash Paid', val: cashPayable, color: 'text-rose-300' },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} className="bg-white/10 rounded-xl p-4 text-center">
+                        <p className="text-slate-400 text-xs font-semibold mb-1">{label}</p>
+                        <p className={`text-xl font-extrabold font-mono ${color}`}>₹{INR(val)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
     </div>
   );
 }

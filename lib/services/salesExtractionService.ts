@@ -318,7 +318,7 @@ function parseSalesInvoiceFromText(ocrText: string): SalesInvoiceData {
     hsn_or_sac: hsnSacCode || 'Unknown',
     hsn_sac_code: hsnSacCode || 'Unknown',
     description: extractDescription(lines) || 'Unknown',
-    quantity: quantity > 0 ? String(quantity) : '1',
+    quantity: (quantity ?? 0) > 0 ? String(quantity) : '1',
     unit: extractUnit(lines) || 'NOS',
     uqc: extractUnit(lines) || 'NOS',
     rate: rate || 0,
