@@ -41,10 +41,10 @@ export function normalizeGstin(gstin: string | null | undefined): string {
 }
 
 export function taxTotal(row: {
-  igst_amount?: number;
-  cgst_amount?: number;
-  sgst_amount?: number;
-  cess_amount?: number;
+  igst_amount?: number | null;
+  cgst_amount?: number | null;
+  sgst_amount?: number | null;
+  cess_amount?: number | null;
 }): number {
   return (row.igst_amount || 0) + (row.cgst_amount || 0) + (row.sgst_amount || 0) + (row.cess_amount || 0);
 }

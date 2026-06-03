@@ -4,6 +4,7 @@ export * from './parseGstr2bResponse';
 export * from './buildSummaries';
 export * from './reconcileWithPurchase';
 export * from './periodValidation';
+export * from './staticPortalPayload';
 export * from './sandboxFixture';
 export * from './dbRow';
 export * from './sandboxPurchaseSeed';

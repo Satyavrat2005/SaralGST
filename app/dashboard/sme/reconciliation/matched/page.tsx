@@ -12,22 +12,17 @@ import {
   ShieldCheck,
   X,
   FileText,
-   MoreVertical,
+  MoreVertical,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { InsightPanel } from '@/components/reconciliation/InsightPanel';
+import { DksSourceBanner } from '@/components/reconciliation/DksSourceBanner';
+import { fetchReconciliationPayload } from '@/lib/reconciliation/clientFetch';
+import { buildReconciliationPeriodOptions } from '@/lib/reconciliation/periodOptions';
+import { DKS_MARCH_PERIOD } from '@/lib/reconciliation/dksMarchConstants';
+import type { InsightInvoicePayload, InsightPurchasePayload } from '@/lib/reconciliation/insightTypes';
 
-const PERIODS = (() => {
-  const periods: { label: string; value: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    periods.push({
-      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`,
-      value: `${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getFullYear()}`,
-    });
-  }
-  return periods;
-})();
+const PERIODS = buildReconciliationPeriodOptions();
 
 interface MatchedRow {
   id: string;
@@ -39,14 +34,28 @@ interface MatchedRow {
   gstr2bAmount: number;
   type: string;
   itc: number;
-   status: string;
-   confidence: number;
+  status: 'Reviewed' | 'Pending';
+  confidence: number;
+  gstr2b?: InsightInvoicePayload | null;
+  purchase?: InsightPurchasePayload | null;
+  matchKind: 'exact' | 'fuzzy';
 }
 
 export default function MatchedInvoicesPage() {
   const router = useRouter();
-  const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0].value);
+  const defaultPeriod =
+    PERIODS.find((p) => p.value === DKS_MARCH_PERIOD)?.value ?? PERIODS[0].value;
+  const [selectedPeriod, setSelectedPeriod] = useState(defaultPeriod);
   const [returnId, setReturnId] = useState<string | null>(null);
+  const [dksSources, setDksSources] = useState<{ gstr2bFile: string; gstr1File: string } | null>(
+    null
+  );
+  const [gstr1Meta, setGstr1Meta] = useState<{
+    legalName?: string;
+    gstin?: string;
+    arn?: string;
+    b2bInvoiceCount?: number;
+  } | null>(null);
   const [matchedInvoices, setMatchedInvoices] = useState<MatchedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<MatchedRow | null>(null);
@@ -55,38 +64,76 @@ export default function MatchedInvoicesPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const listRes = await fetch(`/api/returns?action=list&type=GSTR2B&period=${selectedPeriod}`);
-      const listData = await listRes.json();
-      const ret = listData.data?.[0];
-      if (!ret?.id) {
+      const { payload: data, returnId: rid, isDks } = await fetchReconciliationPayload(
+        selectedPeriod,
+        { view: 'matched' }
+      );
+      if (!data || !rid) {
         setReturnId(null);
+        setDksSources(null);
+        setGstr1Meta(null);
         setMatchedInvoices([]);
         return;
       }
-      setReturnId(ret.id);
-      const res = await fetch(`/api/returns?action=reconciliation-results&returnId=${ret.id}&view=matched`);
-      const data = await res.json();
-      const rows: MatchedRow[] = (data.data || []).map(
-        (pair: { gstr2b: Record<string, unknown>; purchase: Record<string, unknown> }) => {
-          const g = pair.gstr2b;
-          const p = pair.purchase;
-          const gTax = (Number(g.igst_amount) || 0) + (Number(g.cgst_amount) || 0) + (Number(g.sgst_amount) || 0);
-          const pTax = (Number(p.igst_amount) || 0) + (Number(p.cgst_amount) || 0) + (Number(p.sgst_amount) || 0);
-          return {
-            id: String(g.id),
-            invoice_number: String(g.invoice_number || p.invoice_number || ''),
-            date: String(g.invoice_date || p.invoice_date || ''),
-            vendor: String(g.supplier_name || p.supplier_name || ''),
-            gstin: String(g.supplier_gstin || p.supplier_gstin || ''),
-            amount: Number(p.taxable_value || p.total_invoice_value || 0),
-            gstr2bAmount: Number(g.taxable_value || 0),
-                  type: Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 'Exact Match' : 'Fuzzy Match',
-            itc: gTax || pTax,
-                  status: 'Reviewed',
-                  confidence: Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1 ? 100 : 85,
-          };
-        }
-      );
+      setReturnId(rid);
+      if (isDks && data.sources) {
+        setDksSources(data.sources);
+        setGstr1Meta((data.gstr1Meta as typeof gstr1Meta) || null);
+      } else {
+        setDksSources(null);
+        setGstr1Meta(null);
+      }
+      const pairs = (data.data || data.matched || []) as Array<{
+        gstr2b: Record<string, unknown>;
+        purchase: Record<string, unknown>;
+      }>;
+      const rows: MatchedRow[] = pairs.map((pair) => {
+        const g = pair.gstr2b;
+        const p = pair.purchase;
+        const gTax =
+          (Number(g.igst_amount) || 0) +
+          (Number(g.cgst_amount) || 0) +
+          (Number(g.sgst_amount) || 0);
+        const pTax =
+          (Number(p.igst_amount) || 0) +
+          (Number(p.cgst_amount) || 0) +
+          (Number(p.sgst_amount) || 0);
+        const exact = Math.abs(Number(g.taxable_value) - Number(p.taxable_value)) <= 1;
+        return {
+          id: String(g.id || p.id || g.invoice_number),
+          invoice_number: String(g.invoice_number || p.invoice_number || ''),
+          date: String(g.invoice_date || p.invoice_date || ''),
+          vendor: String(g.supplier_name || p.supplier_name || ''),
+          gstin: String(g.supplier_gstin || p.supplier_gstin || ''),
+          amount: Number(p.taxable_value || p.total_invoice_value || 0),
+          gstr2bAmount: Number(g.taxable_value || 0),
+          type: exact ? 'Exact Match' : 'Fuzzy Match',
+          itc: gTax || pTax,
+          status: exact ? 'Reviewed' : 'Pending',
+          confidence: exact ? 100 : 92,
+          matchKind: exact ? 'exact' : 'fuzzy',
+          gstr2b: {
+            invoice_number: String(g.invoice_number || ''),
+            invoice_date: String(g.invoice_date || ''),
+            supplier_gstin: String(g.supplier_gstin || ''),
+            supplier_name: String(g.supplier_name || ''),
+            taxable_value: Number(g.taxable_value) || 0,
+            igst_amount: Number(g.igst_amount) || 0,
+            cgst_amount: Number(g.cgst_amount) || 0,
+            sgst_amount: Number(g.sgst_amount) || 0,
+          },
+          purchase: {
+            invoice_number: String(p.invoice_number || ''),
+            invoice_date: String(p.invoice_date || ''),
+            supplier_gstin: String(p.supplier_gstin || ''),
+            supplier_name: String(p.supplier_name || ''),
+            taxable_value: Number(p.taxable_value) || 0,
+            igst_amount: Number(p.igst_amount) || 0,
+            cgst_amount: Number(p.cgst_amount) || 0,
+            sgst_amount: Number(p.sgst_amount) || 0,
+          },
+        };
+      });
       setMatchedInvoices(rows);
     } finally {
       setLoading(false);
@@ -129,10 +176,19 @@ export default function MatchedInvoicesPage() {
   if (!returnId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8">
-        <p className="text-gray-600">No GSTR-2B fetched for this period.</p>
-        <button onClick={() => router.push('/dashboard/sme/returns/gstr2b')} className="btn-primary-custom px-4 py-2 rounded-xl text-sm">
-          Fetch GSTR-2B
-        </button>
+        <p className="text-gray-600 text-center max-w-md">
+          {selectedPeriod === DKS_MARCH_PERIOD
+            ? 'DKS March files not found. Add DKS - GSTR-2B_MAR\'25 - FINAL.xlsx and DKS - GSTR1_MAR\'25 - OK.pdf to the project root or public folder.'
+            : 'No GSTR-2B fetched for this period.'}
+        </p>
+        {selectedPeriod !== DKS_MARCH_PERIOD && (
+          <button
+            onClick={() => router.push('/dashboard/sme/returns/gstr2b')}
+            className="btn-primary-custom px-4 py-2 rounded-xl text-sm"
+          >
+            Fetch GSTR-2B
+          </button>
+        )}
       </div>
     );
   }
@@ -200,6 +256,8 @@ export default function MatchedInvoicesPage() {
            </div>
         </div>
       </div>
+
+      {dksSources && <DksSourceBanner sources={dksSources} gstr1Meta={gstr1Meta} />}
 
       {/* 2. SUMMARY STATS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -345,17 +403,8 @@ export default function MatchedInvoicesPage() {
            </table>
          </div>
 
-         {/* Pagination */}
-         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-white">
-           <div className="text-xs text-gray-600">Showing 1-5 of 789</div>
-           <div className="flex items-center gap-2">
-              <div className="flex gap-1">
-                 <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-400 text-xs hover:bg-gray-50" disabled>Previous</button>
-                 <button className="px-3 py-1.5 rounded-lg btn-primary-custom text-white text-xs font-medium shadow-sm">1</button>
-                 <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-xs hover:bg-gray-50">2</button>
-                 <button className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-xs hover:bg-gray-50">Next</button>
-              </div>
-           </div>
+         <div className="px-6 py-4 border-t border-gray-200 bg-white text-xs text-gray-600">
+           Showing {matchedInvoices.length} matched invoice{matchedInvoices.length === 1 ? '' : 's'}
          </div>
       </div>
 
@@ -483,6 +532,17 @@ export default function MatchedInvoicesPage() {
                         </div>
                      </div>
                   </div>
+
+                  <InsightPanel
+                    returnId={returnId}
+                    discrepancyType="matched"
+                    period={selectedPeriod}
+                    dksMarch={selectedPeriod === DKS_MARCH_PERIOD}
+                    gstr2b={selectedInvoice.gstr2b}
+                    purchase={selectedInvoice.purchase}
+                    matchType={selectedInvoice.matchKind}
+                    enabled={Boolean(selectedInvoice)}
+                  />
                </div>
 
                {/* Footer */}

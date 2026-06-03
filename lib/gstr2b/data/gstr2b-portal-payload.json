@@ -1,0 +1,310 @@
+{
+  "status_cd": "1",
+  "data": {
+    "docdata": {
+      "b2b": [
+        {
+          "ctin": "24AAACB2894G1ZT",
+          "trdnm": "BHARTI AIRTEL LTD.",
+          "inv": [
+            {
+              "inum": "INV/2025-26/AT-8841",
+              "idt": "03-03-2025",
+              "val": 352.82,
+              "pos": "24",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 299, "iamt": 0, "camt": 26.91, "samt": 26.91, "csamt": 0 } }]
+            },
+            {
+              "inum": "INV/2025-26/AT-9102",
+              "idt": "18-03-2025",
+              "val": 1180,
+              "pos": "24",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 1000, "iamt": 0, "camt": 90, "samt": 90, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "29AAHCD5090M1Z3",
+          "trdnm": "DIGITAP.AI ENTERPRISE SOLUTIONS PRIVATE LIMITED",
+          "inv": [
+            {
+              "inum": "DAI/25-26/00412",
+              "idt": "07-03-2025",
+              "val": 26741.63,
+              "pos": "29",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 22662.4, "iamt": 4079.23, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "24AAACU6278M1ZV",
+          "trdnm": "UNICORN INFOSOLUTIONS PRIVATE LIMITED",
+          "inv": [
+            {
+              "inum": "UIS/INV/2025/1187",
+              "idt": "10-03-2025",
+              "val": 142700,
+              "pos": "24",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 120932.18, "iamt": 0, "camt": 10883.91, "samt": 10883.91, "csamt": 0 } }]
+            },
+            {
+              "inum": "UIS/INV/2025/1204",
+              "idt": "22-03-2025",
+              "val": 47200,
+              "pos": "24",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 40000, "iamt": 0, "camt": 3600, "samt": 3600, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "27AAGCG4576J1Z6",
+          "trdnm": "Google Cloud India Private Limited",
+          "inv": [
+            {
+              "inum": "GCP-IN-7823401",
+              "idt": "11-03-2025",
+              "val": 29.65,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 25, "iamt": 4.65, "camt": 0, "samt": 0, "csamt": 0 } }]
+            },
+            {
+              "inum": "GCP-IN-7824108",
+              "idt": "25-03-2025",
+              "val": 2518.4,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 2134.24, "iamt": 384.16, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "27AAACG0527D1Z5",
+          "trdnm": "GOOGLE INDIA PVT LTD",
+          "inv": [
+            {
+              "inum": "GIN-2025-03-44102",
+              "idt": "12-03-2025",
+              "val": 2518.4,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 2134.24, "iamt": 384.16, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "29AAJCA1234A1ZL",
+          "trdnm": "AMAZON WEB SERVICES INDIA PRIVATE LIMITED",
+          "inv": [
+            {
+              "inum": "AWS-IN-202503-00891",
+              "idt": "14-03-2025",
+              "val": 481750.64,
+              "pos": "29",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 408050.62, "iamt": 73449.12, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "27AABCU9603R1ZM",
+          "trdnm": "Blue Dart Express Ltd",
+          "inv": [
+            {
+              "inum": "BD/25-26/088241",
+              "idt": "06-03-2025",
+              "val": 14160,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 12, "txval": 12000, "iamt": 0, "camt": 720, "samt": 720, "csamt": 0 } }]
+            },
+            {
+              "inum": "BD/25-26/089102",
+              "idt": "19-03-2025",
+              "val": 22400,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 12, "txval": 20000, "iamt": 0, "camt": 1200, "samt": 1200, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "27AAACR1718E1ZN",
+          "trdnm": "Reliance Retail Ltd",
+          "inv": [
+            {
+              "inum": "RR/INV/25-26/33018",
+              "idt": "08-03-2025",
+              "val": 59000,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 50000, "iamt": 0, "camt": 4500, "samt": 4500, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "06AAACT2727Q1ZW",
+          "trdnm": "Tata Consultancy Services Limited",
+          "inv": [
+            {
+              "inum": "TCS/SAAS/2025/0312",
+              "idt": "15-03-2025",
+              "val": 236000,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 200000, "iamt": 36000, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "19AABCS1429B1ZP",
+          "trdnm": "SHREE GANESH PACKAGING INDUSTRIES",
+          "inv": [
+            {
+              "inum": "SGP/25/1847",
+              "idt": "21-03-2025",
+              "val": 8260,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 5, "txval": 7000, "iamt": 630, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        }
+      ],
+      "cdnr": [
+        {
+          "ctin": "27AABCU9603R1ZM",
+          "trdnm": "Blue Dart Express Ltd",
+          "nt": [
+            {
+              "nt_num": "CN/25-26/0041",
+              "nt_dt": "24-03-2025",
+              "ntty": "C",
+              "val": 1120,
+              "pos": "27",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 12, "txval": 1000, "iamt": 0, "camt": 60, "samt": 60, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "24AAACU6278M1ZV",
+          "trdnm": "UNICORN INFOSOLUTIONS PRIVATE LIMITED",
+          "nt": [
+            {
+              "nt_num": "DN/25-26/0092",
+              "nt_dt": "26-03-2025",
+              "ntty": "D",
+              "val": 2360,
+              "pos": "24",
+              "itc_avl": "Y",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 2000, "iamt": 0, "camt": 180, "samt": 180, "csamt": 0 } }]
+            }
+          ]
+        }
+      ],
+      "isd": [
+        {
+          "ctin": "27AAECS1234F1Z5",
+          "trdnm": "TATA STEEL ISD DIVISION",
+          "docnum": "ISD/25-26/0088",
+          "docdt": "09-03-2025",
+          "igst": 4200,
+          "cgst": 0,
+          "sgst": 0,
+          "cess": 0,
+          "itc_avl": "Y"
+        },
+        {
+          "ctin": "24AAECS5678G1Z2",
+          "trdnm": "ADANI PORTS ISD UNIT",
+          "docnum": "ISD/25-26/0112",
+          "docdt": "17-03-2025",
+          "igst": 0,
+          "cgst": 1850,
+          "sgst": 1850,
+          "cess": 0,
+          "itc_avl": "Y"
+        }
+      ],
+      "impg": [
+        {
+          "boenum": "BOE/2025/NSA/18472",
+          "boedt": "04-03-2025",
+          "portcode": "INNSA1",
+          "txval": 185000,
+          "igst": 33300,
+          "cess": 0
+        },
+        {
+          "boenum": "BOE/2025/MAA/09241",
+          "boedt": "20-03-2025",
+          "portcode": "INMAA1",
+          "txval": 72000,
+          "igst": 12960,
+          "cess": 0
+        }
+      ],
+      "b2b_table4": [
+        {
+          "ctin": "27AAAAA0000A1Z5",
+          "trdnm": "Metro Cash & Carry India Pvt Ltd",
+          "inv": [
+            {
+              "inum": "MCC/25/INV-9021",
+              "idt": "13-03-2025",
+              "val": 11800,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "N",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 10000, "iamt": 0, "camt": 900, "samt": 900, "csamt": 0 } }]
+            },
+            {
+              "inum": "MCC/25/INV-9044",
+              "idt": "27-03-2025",
+              "val": 4720,
+              "pos": "27",
+              "rchrg": "Y",
+              "itc_avl": "N",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 4000, "iamt": 0, "camt": 360, "samt": 360, "csamt": 0 } }]
+            }
+          ]
+        },
+        {
+          "ctin": "09AAACW1234F1Z5",
+          "trdnm": "Pioneer Office Supplies",
+          "inv": [
+            {
+              "inum": "POS/25-26/3310",
+              "idt": "16-03-2025",
+              "val": 5900,
+              "pos": "27",
+              "rchrg": "N",
+              "itc_avl": "N",
+              "itms": [{ "num": 1, "itm_det": { "rt": 18, "txval": 5000, "iamt": 900, "camt": 0, "samt": 0, "csamt": 0 } }]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

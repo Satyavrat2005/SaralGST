@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Play,
@@ -11,28 +11,21 @@ import {
   ArrowRight,
   ShieldCheck,
 } from 'lucide-react';
+import { buildReconciliationPeriodOptions } from '@/lib/reconciliation/periodOptions';
+import { DKS_MARCH_PERIOD } from '@/lib/reconciliation/dksMarchConstants';
+import { DksSourceBanner } from '@/components/reconciliation/DksSourceBanner';
 
 type RunState = 'idle' | 'running' | 'completed' | 'failed';
 
-const PERIODS = (() => {
-  const periods: { label: string; value: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    periods.push({
-      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${year}`,
-      value: `${month.toString().padStart(2, '0')}${year}`,
-    });
-  }
-  return periods;
-})();
+const PERIODS = buildReconciliationPeriodOptions();
 
-export default function RunReconciliationPage() {
+function RunReconciliationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialPeriod = searchParams.get('period') || PERIODS[0].value;
+  const initialPeriod =
+    searchParams.get('period') ||
+    PERIODS.find((p) => p.value === DKS_MARCH_PERIOD)?.value ||
+    PERIODS[0].value;
 
   const [runState, setRunState] = useState<RunState>('idle');
   const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
@@ -46,8 +39,26 @@ export default function RunReconciliationPage() {
     total_gstr2b: number;
   } | null>(null);
   const [lastRun, setLastRun] = useState<{ ran_at: string; match_pct: number } | null>(null);
+  const [dksSources, setDksSources] = useState<{ gstr2bFile: string; gstr1File: string } | null>(
+    null
+  );
 
   const loadGstr2bReturn = useCallback(async () => {
+    if (selectedPeriod === DKS_MARCH_PERIOD) {
+      const res = await fetch('/api/reconciliation/dks-march');
+      const data = await res.json();
+      if (data.stats) {
+        setReturnId('dks-mar25');
+        setDksSources(data.sources || null);
+        setLastRun({ ran_at: data.stats.ran_at, match_pct: data.stats.match_pct });
+      } else {
+        setReturnId(null);
+        setDksSources(null);
+        setLastRun(null);
+      }
+      return;
+    }
+    setDksSources(null);
     const res = await fetch(`/api/returns?action=list&type=GSTR2B&period=${selectedPeriod}`);
     const data = await res.json();
     if (data.data?.[0]) {
@@ -68,7 +79,11 @@ export default function RunReconciliationPage() {
 
   const startReconciliation = async () => {
     if (!returnId) {
-      setError('Fetch GSTR-2B for this period first (Returns → GSTR-2B).');
+      setError(
+        selectedPeriod === DKS_MARCH_PERIOD
+          ? 'DKS March files not found in project. Add the GSTR-1 PDF and GSTR-2B Excel to the repo.'
+          : 'Fetch GSTR-2B for this period first (Returns → GSTR-2B).'
+      );
       setRunState('failed');
       return;
     }
@@ -76,6 +91,20 @@ export default function RunReconciliationPage() {
     setError('');
     setStats(null);
     try {
+      if (selectedPeriod === DKS_MARCH_PERIOD) {
+        const res = await fetch('/api/reconciliation/dks-march');
+        const data = await res.json();
+        if (data.error) {
+          setError(data.error);
+          setRunState('failed');
+        } else {
+          setStats(data.stats);
+          setDksSources(data.sources || null);
+          setLastRun({ ran_at: data.stats.ran_at, match_pct: data.stats.match_pct });
+          setRunState('completed');
+        }
+        return;
+      }
       const res = await fetch('/api/returns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +139,9 @@ export default function RunReconciliationPage() {
               <span className="text-emerald-700 font-bold text-sm uppercase tracking-wide">Run Reconciliation</span>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Reconciliation Engine</h1>
-            <p className="text-gray-600 text-sm mt-1">Match purchase register with GSTR-2B for ITC validation</p>
+            <p className="text-gray-600 text-sm mt-1">
+              Match purchase register (GSTR-1 / books) with GSTR-2B for ITC validation
+            </p>
           </div>
           <select
             value={selectedPeriod}
@@ -123,6 +154,8 @@ export default function RunReconciliationPage() {
           </select>
         </div>
 
+        {dksSources && <DksSourceBanner sources={dksSources} />}
+
         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 md:p-12 flex flex-col items-center text-center min-h-[360px] justify-center">
           {runState === 'idle' && (
             <div className="space-y-6 max-w-lg">
@@ -132,8 +165,12 @@ export default function RunReconciliationPage() {
               <h2 className="text-xl font-bold text-gray-900">Ready to reconcile</h2>
               <p className="text-gray-600 text-sm">
                 {returnId
-                  ? 'GSTR-2B is loaded for this period. Click below to match against your purchase register.'
-                  : 'No GSTR-2B data for this period. Fetch from the GSTR-2B page first.'}
+                  ? selectedPeriod === DKS_MARCH_PERIOD
+                    ? 'DKS March 2025 files are loaded. Reconciliation uses only the GSTR-1 PDF and GSTR-2B Excel.'
+                    : 'GSTR-2B is loaded for this period. Click below to match against your purchase register.'
+                  : selectedPeriod === DKS_MARCH_PERIOD
+                    ? 'Place DKS March files in the project to run reconciliation.'
+                    : 'No GSTR-2B data for this period. Fetch from the GSTR-2B page first.'}
               </p>
               {lastRun && (
                 <p className="text-xs text-gray-500">
@@ -201,5 +238,19 @@ export default function RunReconciliationPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RunReconciliationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        </div>
+      }
+    >
+      <RunReconciliationContent />
+    </Suspense>
   );
 }

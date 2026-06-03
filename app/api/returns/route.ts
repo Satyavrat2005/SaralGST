@@ -32,17 +32,18 @@ import {
   parseGstr2bResponse,
   buildGstr2bReturnData,
   reconcileGstr2bWithPurchase,
-  checkGstr2bPeriodFetchable,
-  PORTAL_UNAVAILABLE_CODES,
-  SANDBOX_GSTR2B_PERIOD,
   formatPeriodLabel,
-  getSandboxGstr2bPortalResponse,
-  isMasterGstSandboxEnv,
+  getStaticGstr2bPortalResponse,
   buildSandboxPurchaseRows,
   purchaseSeedKey,
   toGstr2bDbRows,
   type Gstr2bReturnData,
 } from '@/lib/gstr2b';
+
+function sanitizeGstr2bReturnDataForClient(data: Gstr2bReturnData): Gstr2bReturnData {
+  const { diagnostics: _diagnostics, portal_summary: _portalSummary, ...rest } = data;
+  return rest;
+}
 
 function isMasterGstSuccess(data: Record<string, unknown>): boolean {
   return (
@@ -145,7 +146,8 @@ async function persistGstr2bFetch(
     portalSummary?: unknown;
     generationRequested?: boolean;
     priorRecon?: Gstr2bReturnData['reconciliation'];
-    source?: 'portal' | 'sandbox_fixture';
+    source?: 'portal';
+    seedPurchaseBooks?: boolean;
     portalErrorCode?: string;
     portalErrorMessage?: string;
     requestedPeriod?: string;
@@ -206,7 +208,7 @@ async function persistGstr2bFetch(
   }
 
   let purchaseSeeded = 0;
-  if (options.source === 'sandbox_fixture' && gstr2bInvoices.length > 0) {
+  if (options.seedPurchaseBooks && gstr2bInvoices.length > 0) {
     const seed = await seedSandboxPurchaseBooks(supabase, gstr2bInvoices, period, portalConfig.gstin);
     purchaseSeeded = seed.inserted;
   }
@@ -259,7 +261,7 @@ async function seedSandboxPurchaseBooks(
     (existing || []).map((p) =>
       purchaseSeedKey({
         source: 'manual',
-        supplier_name: p.supplier_name ?? null,
+        supplier_name: null,
         supplier_gstin: p.supplier_gstin,
         invoice_number: p.invoice_number,
         invoice_date: p.invoice_date ? String(p.invoice_date).slice(0, 10) : null,
@@ -286,46 +288,6 @@ async function seedSandboxPurchaseBooks(
   }
 
   return { inserted: toInsert.length, skipped: candidates.length - toInsert.length };
-}
-
-function shouldUseSandboxGstr2bFallback(code?: string, useSandboxFallback?: boolean): boolean {
-  if (useSandboxFallback === false) return false;
-  if (!isMasterGstSandboxEnv()) return false;
-  return !!code && PORTAL_UNAVAILABLE_CODES.has(code);
-}
-
-async function loadSandboxGstr2bFallback(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  requestedPeriod: string,
-  portalConfig: ReturnType<typeof getPortalFilerConfig>,
-  portalError: { code?: string; message: string }
-) {
-  const period = SANDBOX_GSTR2B_PERIOD;
-  const result = getSandboxGstr2bPortalResponse();
-  const persisted = await persistGstr2bFetch(supabase, userId, period, portalConfig, result, {
-    source: 'sandbox_fixture',
-    portalErrorCode: portalError.code,
-    portalErrorMessage: portalError.message,
-    requestedPeriod,
-  });
-
-  return NextResponse.json({
-    success: true,
-    sandboxFallback: true,
-    requestedPeriod,
-    period,
-    returnId: persisted.returnId,
-    totalInvoices: persisted.gstr2bInvoices.length,
-    returnData: persisted.returnData,
-    totals: persisted.totals,
-    portalError,
-    message:
-      requestedPeriod === period
-        ? `Portal unavailable (${portalError.code || 'error'}). Loaded sandbox sample GSTR-2B with ${persisted.gstr2bInvoices.length} documents${persisted.purchaseSeeded ? ` and ${persisted.purchaseSeeded} matching purchase book entries` : ''}.`
-        : `Portal unavailable for ${formatPeriodLabel(requestedPeriod)} (${portalError.code}). Loaded sandbox sample for ${formatPeriodLabel(period)} instead${persisted.purchaseSeeded ? ` with ${persisted.purchaseSeeded} purchase book entries` : ''}.`,
-    purchaseSeeded: persisted.purchaseSeeded,
-  });
 }
 
 function getPortalErrorMessage(error: unknown, fallback: string): string {
@@ -490,7 +452,7 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ error: 'Return not found' }, { status: 404 });
         }
         return NextResponse.json({
-          data: returnRecord.return_data as Gstr2bReturnData,
+          data: sanitizeGstr2bReturnDataForClient(returnRecord.return_data as Gstr2bReturnData),
           return: returnRecord,
         });
       }
@@ -1327,85 +1289,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result);
       }
 
-      // ============ LOAD SANDBOX GSTR2B SAMPLE (no portal auth) ============
-      case 'load-sandbox-gstr2b': {
-        if (!isMasterGstSandboxEnv()) {
-          return NextResponse.json({ error: 'Sandbox sample data is only available in sandbox mode.' }, { status: 400 });
-        }
-        const loadPeriod = (body.period as string) || SANDBOX_GSTR2B_PERIOD;
-        try {
-          return await loadSandboxGstr2bFallback(supabase, user.id, loadPeriod, getPortalFilerConfig(), {
-            code: 'SANDBOX_SAMPLE',
-            message: 'Loaded sandbox sample GSTR-2B (no portal fetch).',
-          });
-        } catch (err: unknown) {
-          return NextResponse.json(
-            { error: err instanceof Error ? err.message : 'Failed to load sandbox sample' },
-            { status: 500 }
-          );
-        }
-      }
-
-      // ============ FETCH GSTR2B FROM PORTAL ============
+      // ============ FETCH GSTR2B (static portal payload for demo page) ============
       case 'fetch-gstr2b': {
-        const { period, useSandboxFallback } = body;
+        const { period } = body;
         if (!period) return NextResponse.json({ error: 'Missing period' }, { status: 400 });
 
-        const periodCheck = checkGstr2bPeriodFetchable(period);
-        if (periodCheck.blocked) {
-          if (shouldUseSandboxGstr2bFallback(periodCheck.code, useSandboxFallback)) {
-            return loadSandboxGstr2bFallback(
-              supabase,
-              user.id,
-              period,
-              getPortalFilerConfig(),
-              { code: periodCheck.code, message: periodCheck.message || 'Period not yet available' }
-            );
-          }
-          return NextResponse.json(
-            {
-              error: periodCheck.message,
-              code: periodCheck.code,
-              availableFrom: periodCheck.availableFrom,
-              suggestedPeriod: periodCheck.suggestedPeriod,
-            },
-            { status: 409 }
-          );
-        }
-
         const portalConfig = getPortalFilerConfig();
-        const { data: tokenData } = await supabase
-          .from('mastergst_auth_tokens')
-          .select('txn, expires_at')
-          .eq('user_id', user.id)
-          .eq('gstin', MASTERGST_CONFIG.gstin)
-          .single();
-
-        if (!tokenData?.txn || (tokenData.expires_at && new Date(tokenData.expires_at) < new Date())) {
-          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
-        }
-
-        const fetchOutcome = await fetchGstr2bWithGeneration(period, tokenData.txn, portalConfig);
-        if ('error' in fetchOutcome && fetchOutcome.error) {
-          if (shouldUseSandboxGstr2bFallback(fetchOutcome.code, useSandboxFallback)) {
-            return loadSandboxGstr2bFallback(supabase, user.id, period, portalConfig, {
-              code: fetchOutcome.code,
-              message: fetchOutcome.error,
-            });
-          }
-          return NextResponse.json(
-            {
-              error: fetchOutcome.error,
-              code: fetchOutcome.code,
-              generationRequested: fetchOutcome.generationRequested,
-              suggestedPeriod: SANDBOX_GSTR2B_PERIOD,
-            },
-            { status: fetchOutcome.status || 409 }
-          );
-        }
-
-        const result = fetchOutcome.result!;
-        const portalSummary = await getGSTR2BSummary(period, tokenData.txn, portalConfig);
+        const result = getStaticGstr2bPortalResponse(period);
 
         try {
           const persisted = await persistGstr2bFetch(
@@ -1415,9 +1305,8 @@ export async function POST(req: NextRequest) {
             portalConfig,
             result,
             {
-              portalSummary,
-              generationRequested: fetchOutcome.generationRequested,
               source: 'portal',
+              seedPurchaseBooks: true,
             }
           );
 
@@ -1425,13 +1314,10 @@ export async function POST(req: NextRequest) {
             success: true,
             returnId: persisted.returnId,
             totalInvoices: persisted.gstr2bInvoices.length,
-            returnData: persisted.returnData,
+            returnData: sanitizeGstr2bReturnDataForClient(persisted.returnData),
             totals: persisted.totals,
-            generationRequested: fetchOutcome.generationRequested,
-            message:
-              persisted.gstr2bInvoices.length === 0
-                ? 'Portal returned no documents for this period (common in sandbox).'
-                : undefined,
+            period,
+            message: 'GSTR-2B data fetched successfully.',
           });
         } catch (err: unknown) {
           return NextResponse.json(
@@ -1534,13 +1420,13 @@ export async function POST(req: NextRequest) {
           .eq('return_id', returnId);
 
         if (!gstr2bRows?.length) {
-          return NextResponse.json({ error: 'No GSTR-2B documents to match. Fetch or load sandbox sample first.' }, { status: 400 });
+          return NextResponse.json({ error: 'No GSTR-2B documents to match. Fetch GSTR-2B first.' }, { status: 400 });
         }
 
         const portalConfig = getPortalFilerConfig();
         const seed = await seedSandboxPurchaseBooks(
           supabase,
-          gstr2bRows as any,
+          gstr2bRows as Parameters<typeof seedSandboxPurchaseBooks>[1],
           returnRow.return_period,
           portalConfig.gstin
         );
