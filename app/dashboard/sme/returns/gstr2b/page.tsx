@@ -21,6 +21,7 @@ import {
   type Gstr2bB2bInvoiceRow,
   type Gstr2bExcelViewModel,
 } from '@/lib/gstr2b/parseGstr2bExcel';
+import { buildReconciliationPeriodOptions } from '@/lib/reconciliation/periodOptions';
 
 type FetchState = 'not_fetched' | 'fetching' | 'success' | 'failed';
 type ViewTab = 'b2b' | 'b2ba' | 'summary';
@@ -35,20 +36,7 @@ const LOADING_STEPS = [
   'Preparing download…',
 ];
 
-const PERIODS = (() => {
-  const periods: { label: string; value: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    periods.push({
-      label: `${d.toLocaleDateString('en-US', { month: 'long' })} ${year}`,
-      value: `${month.toString().padStart(2, '0')}${year}`,
-    });
-  }
-  return periods;
-})();
+const PERIODS = buildReconciliationPeriodOptions();
 
 function formatCurrency(val: number) {
   return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;

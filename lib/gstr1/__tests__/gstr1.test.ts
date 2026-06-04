@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildGstr1ReturnData } from '../buildSummaries';
 import { classifySalesInvoice } from '../classifyInvoice';
-import type { BusinessProfileContext, Gstr1InvoiceInsert } from '../types';
+import { buildDksMarchMockInvoices } from '../dksMarchDemo';
+import {
+  buildGstnPayload,
+  mapHsnRowToGstn,
+  usesBifurcatedHsnFormat,
+} from '../buildGstnPayload';
+import type { BusinessProfileContext } from '../types';
 
 const dksProfile: BusinessProfileContext = {
   gstin: '27AATFD2632G1ZC',
@@ -10,46 +16,6 @@ const dksProfile: BusinessProfileContext = {
   state_cd: '27',
   annual_turnover_range: 'Above 5 Cr',
 };
-
-/** Synthetic 35 B2B invoices matching DKS Mar 2025 PDF aggregate totals */
-function buildDksMockInvoices(): Gstr1InvoiceInsert[] {
-  const perInvoiceTaxable = 8335591.43 / 35;
-  const perIgst = 50863.32 / 35;
-  const perCgst = 499135.98 / 35;
-  const perSgst = 499135.98 / 35;
-  const rows: Gstr1InvoiceInsert[] = [];
-
-  for (let i = 1; i <= 35; i++) {
-    rows.push({
-      return_id: 'test-return',
-      user_id: 'test-user',
-      section: 'b2b',
-      invoice_number: `INV-${1000 + i}`,
-      invoice_date: '2025-03-15',
-      invoice_value: perInvoiceTaxable + perCgst + perSgst + perIgst,
-      place_of_supply: '27',
-      counterparty_gstin: '29AAACW3775F1Z2',
-      counterparty_name: `Customer ${i}`,
-      taxable_value: perInvoiceTaxable,
-      igst_amount: perIgst,
-      cgst_amount: perCgst,
-      sgst_amount: perSgst,
-      cess_amount: 0,
-      tax_rate: 18,
-      invoice_type: 'R',
-      reverse_charge: false,
-      hsn_code: i <= 20 ? '72142090' : '73089090',
-      description: null,
-      uqc: 'MTS',
-      quantity: 1,
-      validation_status: 'valid',
-      validation_errors: null,
-      source: 'sales_register',
-      source_invoice_id: `inv-${i}`,
-    });
-  }
-  return rows;
-}
 
 describe('GSTR-1 DKS Mar 2025 acceptance', () => {
   it('classifies B2B when customer GSTIN is present', () => {
@@ -80,7 +46,7 @@ describe('GSTR-1 DKS Mar 2025 acceptance', () => {
   });
 
   it('summary matches DKS PDF totals for 35 B2B invoices', () => {
-    const invoices = buildDksMockInvoices();
+    const invoices = buildDksMarchMockInvoices('test-return', 'test-user');
     const data = buildGstr1ReturnData(invoices, dksProfile, '2024-25', '032025');
 
     expect(data.sections['4A'].count).toBe(35);
@@ -117,5 +83,87 @@ describe('GSTR-1 DKS Mar 2025 acceptance', () => {
       dksProfile
     );
     expect(section).toBe('b2cl');
+  });
+
+  it('maps intra-state HSN without iamt (CGST+SGST only)', () => {
+    const row = mapHsnRowToGstn(
+      {
+        hsn: '72142090',
+        uqc: 'MTS',
+        qty: 10,
+        rate: 18,
+        taxable: 1000,
+        igst: 0,
+        cgst: 90,
+        sgst: 90,
+        cess: 0,
+        count: 1,
+      },
+      0
+    );
+    expect(row).not.toHaveProperty('iamt');
+    expect(row.camt).toBe(90);
+    expect(row.samt).toBe(90);
+  });
+
+  it('maps inter-state HSN with iamt only (no CGST/SGST)', () => {
+    const row = mapHsnRowToGstn(
+      {
+        hsn: '72142090',
+        uqc: 'MTS',
+        qty: 1,
+        rate: 18,
+        taxable: 1000,
+        igst: 180,
+        cgst: 0,
+        sgst: 0,
+        cess: 0,
+        count: 1,
+      },
+      0
+    );
+    expect(row.iamt).toBe(180);
+    expect(row).not.toHaveProperty('camt');
+    expect(row).not.toHaveProperty('samt');
+  });
+
+  it('uses legacy hsn.data for March 2025 and bifurcated arrays for May 2025', () => {
+    const invoices = buildDksMarchMockInvoices('r', 'u');
+    const data = buildGstr1ReturnData(invoices, dksProfile, '2024-25', '032025');
+    const intraOnly: typeof data = {
+      ...data,
+      hsn_b2b: [
+        {
+          hsn: '72142090',
+          uqc: 'MTS',
+          qty: 20,
+          rate: 18,
+          taxable: 100000,
+          igst: 0,
+          cgst: 9000,
+          sgst: 9000,
+          cess: 0,
+          count: 20,
+        },
+      ],
+      hsn_b2c: [],
+    };
+
+    expect(usesBifurcatedHsnFormat('032025')).toBe(false);
+    expect(usesBifurcatedHsnFormat('052025')).toBe(true);
+
+    const marchPayload = buildGstnPayload(invoices, intraOnly, '032025', dksProfile.gstin);
+    const hsnMarch = marchPayload.hsn as { data?: Record<string, unknown>[]; hsn_b2b?: unknown[] };
+    expect(hsnMarch.data).toHaveLength(1);
+    expect(hsnMarch).not.toHaveProperty('hsn_b2b');
+    expect(hsnMarch.data![0]).not.toHaveProperty('iamt');
+    expect(hsnMarch.data![0].camt).toBe(9000);
+
+    const mayPayload = buildGstnPayload(invoices, intraOnly, '052025', dksProfile.gstin);
+    const hsnMay = mayPayload.hsn as { data?: unknown[]; hsn_b2b?: unknown[]; hsn_b2c?: unknown[] };
+    expect(hsnMay.hsn_b2b).toHaveLength(1);
+    expect(hsnMay.hsn_b2c).toEqual([]);
+    expect(hsnMay).not.toHaveProperty('data');
+    expect(hsnMay.hsn_b2b![0]).not.toHaveProperty('iamt');
   });
 });
