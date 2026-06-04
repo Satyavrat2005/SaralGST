@@ -30,6 +30,45 @@ export interface ExtractedInvoiceData {
   };
 }
 
+const GEMINI_GENERATE_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
+/**
+ * POST to Gemini's generateContent with retry on transient overload (429/500/503).
+ *
+ * Gemini's free tier returns 503 "Service Unavailable" under load; a couple of
+ * spaced retries recover most of these without bothering the vendor. Permanent
+ * errors (4xx other than 429) fail fast.
+ */
+async function geminiGenerateContent(
+  body: Record<string, any>,
+  apiKey: string
+): Promise<any> {
+  const maxAttempts = 3;
+  let lastErr = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(`${GEMINI_GENERATE_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) return response.json();
+
+    const errorData = await response.text();
+    lastErr = `Gemini API error: ${response.status} ${response.statusText} - ${errorData}`;
+
+    const transient = response.status === 429 || response.status === 500 || response.status === 503;
+    if (transient && attempt < maxAttempts) {
+      // Linear backoff: 1.5s, 3s.
+      await new Promise((r) => setTimeout(r, attempt * 1500));
+      continue;
+    }
+    throw new Error(lastErr);
+  }
+  throw new Error(lastErr);
+}
+
 /**
  * Extract structured data from OCR text using LLM
  */
@@ -91,44 +130,35 @@ Important instructions:
 7. place_of_supply should be state name (e.g., "Maharashtra", "Delhi")
 8. CRITICAL: All string values must be on a single line - replace any line breaks with spaces`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+    const data = await geminiGenerateContent(
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 1,
-            maxOutputTokens: 2048,
-            response_mime_type: 'application/json',
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
           },
-        }),
-      }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          topK: 1,
+          topP: 1,
+          // Higher cap + thinking disabled so the full JSON fits in the output
+          // (gemini-2.5-flash otherwise spends output tokens "thinking" and the
+          // JSON gets truncated → "Unterminated string" parse errors).
+          maxOutputTokens: 4096,
+          response_mime_type: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      },
+      geminiApiKey
     );
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Gemini API error: ${response.statusText} - ${errorData}`);
-    }
-
-    const data = await response.json();
-    
     if (data.candidates && data.candidates[0]) {
       const text = data.candidates[0].content?.parts?.[0]?.text || '';
-      
+
       // Robust JSON cleaning function
       let cleanedText = text.trim();
       
@@ -268,47 +298,35 @@ Instructions:
 6. If field not found, use empty string for text, 0 for numbers, false for booleans
 7. CRITICAL: All string values must be on a single line - replace any line breaks with spaces`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+    const data = await geminiGenerateContent(
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image,
                 },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Image,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 1,
-            maxOutputTokens: 2048,
-            response_mime_type: 'application/json',
+              },
+            ],
           },
-        }),
-      }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          topK: 1,
+          topP: 1,
+          maxOutputTokens: 4096,
+          response_mime_type: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      },
+      geminiApiKey
     );
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Gemini API error: ${response.statusText} - ${errorData}`);
-    }
-
-    const data = await response.json();
-    
     if (data.candidates && data.candidates[0]) {
       const text = data.candidates[0].content?.parts?.[0]?.text || '';
       

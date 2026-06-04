@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -429,9 +430,12 @@ export async function upsertWhatsAppIntake(
         .select()
         .single();
     } else {
+      // Generate the id in app code so we don't depend on a DB-side default
+      // (the `uuid_generate_v4()` default needs the uuid-ossp extension, which
+      // isn't always enabled — that caused a not-null violation on `id`).
       result = await supabaseAdmin
         .from('whatsapp_intake')
-        .insert([payload])
+        .insert([{ ...payload, id: payload.id || uuidv4() }])
         .select()
         .single();
     }
