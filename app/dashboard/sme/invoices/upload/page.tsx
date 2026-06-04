@@ -46,7 +46,12 @@ export default function UploadInvoicesPage() {
   const [uploadQueue, setUploadQueue] = useState<UploadedFile[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
-  
+
+  // WhatsApp integration state
+  const [waConfig, setWaConfig] = useState<{ configured: boolean; businessNumber: string | null; webhookConfigured: boolean } | null>(null);
+  const [waQueue, setWaQueue] = useState<any[]>([]);
+  const [loadingWaQueue, setLoadingWaQueue] = useState(false);
+
   // Tab Stats
   const [stats, setStats] = useState({
     whatsapp: 0,
@@ -56,7 +61,47 @@ export default function UploadInvoicesPage() {
   // Fetch recent invoices on mount
   useEffect(() => {
     fetchRecentInvoices();
+    fetchWaConfig();
   }, []);
+
+  // Load the WhatsApp quarantine/needs-review queue when the tab is opened.
+  useEffect(() => {
+    if (activeTab === 'whatsapp') {
+      fetchWaQueue();
+    }
+  }, [activeTab]);
+
+  const fetchWaConfig = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/config');
+      const data = await res.json();
+      setWaConfig(data);
+    } catch (error) {
+      console.error('Error fetching WhatsApp config:', error);
+    }
+  };
+
+  const fetchWaQueue = async () => {
+    try {
+      setLoadingWaQueue(true);
+      // Quarantined (failed validation, awaiting resend) + escalated to manual review.
+      const [quarantineRes, reviewRes] = await Promise.all([
+        fetch('/api/invoice/purchase?status=wa_quarantine'),
+        fetch('/api/invoice/purchase?status=needs_review&source=whatsapp'),
+      ]);
+      const quarantine = await quarantineRes.json();
+      const review = await reviewRes.json();
+      const combined = [
+        ...(quarantine.invoices || []),
+        ...(review.invoices || []),
+      ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setWaQueue(combined);
+    } catch (error) {
+      console.error('Error fetching WhatsApp queue:', error);
+    } finally {
+      setLoadingWaQueue(false);
+    }
+  };
 
   const fetchRecentInvoices = async () => {
     try {
@@ -297,22 +342,31 @@ export default function UploadInvoicesPage() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                {/* Connected Status */}
-               <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center relative">
-                    <MessageSquare className="h-8 w-8 text-emerald-600" />
-                    <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">WhatsApp Connected</h3>
-                    <p className="text-sm text-gray-600 mt-1">+91 98765 43210</p>
-                    <p className="text-xs text-emerald-600 mt-2 font-medium">Last synced: 2 mins ago</p>
-                  </div>
-                  <button className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">
-                    Configure Settings
-                  </button>
-               </div>
+               {(() => {
+                 const connected = Boolean(waConfig?.configured && waConfig?.webhookConfigured);
+                 const number = waConfig?.businessNumber || 'Not configured';
+                 return (
+                   <div className={`bg-gradient-to-br ${connected ? 'from-emerald-50' : 'from-amber-50'} to-white rounded-2xl border ${connected ? 'border-emerald-200' : 'border-amber-200'} shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4`}>
+                      <div className={`h-16 w-16 rounded-full ${connected ? 'bg-emerald-100' : 'bg-amber-100'} flex items-center justify-center relative`}>
+                        <MessageSquare className={`h-8 w-8 ${connected ? 'text-emerald-600' : 'text-amber-600'}`} />
+                        <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
+                          {connected
+                            ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            : <AlertCircle className="h-5 w-5 text-amber-600" />}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {connected ? 'WhatsApp Connected' : 'WhatsApp Setup Pending'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">{number}</p>
+                        <p className={`text-xs mt-2 font-medium ${connected ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {connected ? 'Auto-extraction active' : 'Configure Slide API + webhook secret'}
+                        </p>
+                      </div>
+                   </div>
+                 );
+               })()}
                
                {/* Instructions */}
                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
@@ -325,46 +379,95 @@ export default function UploadInvoicesPage() {
                      </ol>
                      <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                       Auto-extraction active for +91 98765 43210
+                       Invoices are validated automatically; only correct ones appear in your register. Vendors are asked over WhatsApp to fix and resend the rest.
                      </div>
                   </div>
                </div>
             </div>
 
-            {/* Pending Queue */}
+            {/* Quarantine / Needs-Review Queue */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                 <h3 className="font-semibold text-gray-900">Pending Processing Queue (WhatsApp)</h3>
+               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                 <div>
+                   <h3 className="font-semibold text-gray-900">Held for Correction (WhatsApp)</h3>
+                   <p className="text-xs text-gray-500 mt-0.5">Invoices that failed validation — the vendor has been asked to resend. These do not appear in your register.</p>
+                 </div>
+                 <button
+                   onClick={fetchWaQueue}
+                   className="text-gray-600 hover:text-gray-900 p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                   title="Refresh"
+                 >
+                   <RefreshCw className={`h-4 w-4 ${loadingWaQueue ? 'animate-spin' : ''}`} />
+                 </button>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left text-sm">
                     <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
                        <tr>
                          <th className="px-6 py-3">Vendor Phone</th>
-                         <th className="px-6 py-3">File Name</th>
-                         <th className="px-6 py-3">Received Time</th>
+                         <th className="px-6 py-3">Invoice #</th>
+                         <th className="px-6 py-3">Received</th>
+                         <th className="px-6 py-3">Attempts</th>
                          <th className="px-6 py-3">Status</th>
                          <th className="px-6 py-3 text-right">Action</th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                       {[1,2,3].map((i) => (
-                         <tr key={i} className="group hover:bg-gray-50 transition-colors">
-                           <td className="px-6 py-3 text-gray-900 font-medium">+91 99887 76655</td>
-                           <td className="px-6 py-3 text-gray-700 flex items-center gap-2">
-                             <FileText className="h-4 w-4 text-gray-400" /> img_invoice_00{i}.jpg
-                           </td>
-                           <td className="px-6 py-3 text-gray-600">10 mins ago</td>
-                           <td className="px-6 py-3">
-                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                               <Loader2 className="h-3 w-3 animate-spin" /> Processing
-                             </span>
-                           </td>
-                           <td className="px-6 py-3 text-right">
-                              <button className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">View</button>
+                       {loadingWaQueue ? (
+                         <tr>
+                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                             <Loader2 className="h-5 w-5 animate-spin inline mr-2" /> Loading…
                            </td>
                          </tr>
-                       ))}
+                       ) : waQueue.length === 0 ? (
+                         <tr>
+                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                             Nothing held for correction. 🎉
+                           </td>
+                         </tr>
+                       ) : (
+                         waQueue.map((inv) => {
+                           const isReview = inv.invoice_status === 'needs_review';
+                           const received = inv.created_at
+                             ? new Date(inv.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                             : 'N/A';
+                           return (
+                             <tr key={inv.id} className="group hover:bg-gray-50 transition-colors">
+                               <td className="px-6 py-3 text-gray-900 font-medium flex items-center gap-2">
+                                 <Phone className="h-3.5 w-3.5 text-gray-400" /> {inv.wa_sender_phone || 'Unknown'}
+                               </td>
+                               <td className="px-6 py-3 text-gray-700">{inv.invoice_number || '—'}</td>
+                               <td className="px-6 py-3 text-gray-600">{received}</td>
+                               <td className="px-6 py-3 text-gray-600">{inv.wa_attempt_count || 1}</td>
+                               <td className="px-6 py-3">
+                                 {isReview ? (
+                                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                                     <AlertCircle className="h-3 w-3" /> Needs Review
+                                   </span>
+                                 ) : (
+                                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                     <AlertCircle className="h-3 w-3" /> Awaiting Resend
+                                   </span>
+                                 )}
+                               </td>
+                               <td className="px-6 py-3 text-right">
+                                  {inv.invoice_bucket_url ? (
+                                    <a
+                                      href={inv.invoice_bucket_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors inline-block"
+                                    >
+                                      View File
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs">—</span>
+                                  )}
+                               </td>
+                             </tr>
+                           );
+                         })
+                       )}
                     </tbody>
                  </table>
                </div>

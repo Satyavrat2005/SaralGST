@@ -47,10 +47,29 @@ export interface PurchaseRegister {
   invoice_bucket_url?: string | null;
   ocr_raw_json?: any | null;
   ocr_confidence_score?: number | null;
-  invoice_status?: 'extracted' | 'verified' | 'error' | 'pending' | 'needs_review' | null;
+  invoice_status?: 'extracted' | 'verified' | 'error' | 'pending' | 'needs_review' | 'wa_quarantine' | null;
+  // WhatsApp intake tracking (single-tenant for now; TODO: multi-tenant number->account map)
+  wa_sender_phone?: string | null;
+  wa_attempt_count?: number | null;
   created_at?: string;
   updated_at?: string;
 }
+
+/**
+ * Statuses that are considered "validated / visible" in the dashboard tab.
+ * Anything not in this set (e.g. `wa_quarantine`) is hidden by default so that
+ * unvalidated WhatsApp invoices never surface until they pass the gate.
+ */
+export const VISIBLE_INVOICE_STATUSES = [
+  'extracted',
+  'verified',
+  'pending',
+  'needs_review',
+  'error',
+] as const;
+
+/** Statuses hidden from the default dashboard query. */
+export const HIDDEN_INVOICE_STATUSES = ['wa_quarantine'] as const;
 
 export interface PurchaseRemark {
   id?: string;
@@ -168,6 +187,8 @@ export async function getPurchaseInvoices(filters?: {
   startDate?: string;
   endDate?: string;
   vendor?: string;
+  /** Set true to include quarantined/hidden statuses (e.g. a "Needs Review" admin view). */
+  includeHidden?: boolean;
 }): Promise<{ data: PurchaseRegister[] | null; error: string | null }> {
   try {
     let query = supabase
@@ -180,7 +201,15 @@ export async function getPurchaseInvoices(filters?: {
     }
 
     if (filters?.status) {
+      // Explicit status filter wins (lets callers request `wa_quarantine` directly).
       query = query.eq('invoice_status', filters.status);
+    } else if (!filters?.includeHidden) {
+      // Default: hide quarantine/intake-only states from the dashboard tab.
+      query = query.not(
+        'invoice_status',
+        'in',
+        `(${HIDDEN_INVOICE_STATUSES.join(',')})`
+      );
     }
 
     if (filters?.startDate) {
@@ -282,6 +311,139 @@ export async function getPurchaseRemarks(
     return { data, error: null };
   } catch (err: any) {
     console.error('Exception fetching purchase remarks:', err);
+    return { data: null, error: err.message };
+  }
+}
+
+/**
+ * Find an existing (non-quarantined) purchase invoice with the same supplier
+ * GSTIN + invoice number. Used for duplicate detection at WhatsApp intake.
+ */
+export async function findDuplicateInvoice(
+  supplierGstin: string | null | undefined,
+  invoiceNumber: string | null | undefined,
+  excludeId?: string,
+  useAdmin = false
+): Promise<{ data: PurchaseRegister | null; error: string | null }> {
+  try {
+    if (!supplierGstin || !invoiceNumber) {
+      return { data: null, error: null };
+    }
+
+    const client = useAdmin ? supabaseAdmin : supabase;
+    let query = client
+      .from('purchase_register')
+      .select('*')
+      .eq('supplier_gstin', supplierGstin)
+      .eq('invoice_number', invoiceNumber)
+      // A quarantined record is not yet "received" — don't treat it as a dup.
+      .neq('invoice_status', 'wa_quarantine')
+      .limit(1);
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error checking for duplicate invoice:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
+  } catch (err: any) {
+    console.error('Exception checking for duplicate invoice:', err);
+    return { data: null, error: err.message };
+  }
+}
+
+// =====================================================
+// WhatsApp intake tracking (correlates resends)
+// =====================================================
+
+export interface WhatsAppIntake {
+  id?: string;
+  sender_phone: string;
+  invoice_number?: string | null;
+  attempt_count?: number | null;
+  last_status?: 'pending' | 'validated' | 'rejected' | 'needs_review' | null;
+  last_error_summary?: string | null;
+  linked_purchase_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Find an existing intake record for a sender + invoice number so we can
+ * correlate a resend with its prior attempts.
+ */
+export async function findWhatsAppIntake(
+  senderPhone: string,
+  invoiceNumber: string | null | undefined
+): Promise<{ data: WhatsAppIntake | null; error: string | null }> {
+  try {
+    let query = supabaseAdmin
+      .from('whatsapp_intake')
+      .select('*')
+      .eq('sender_phone', senderPhone)
+      .limit(1);
+
+    // Invoice number may be null on a first/unreadable attempt — match nulls too.
+    if (invoiceNumber) {
+      query = query.eq('invoice_number', invoiceNumber);
+    } else {
+      query = query.is('invoice_number', null);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching whatsapp_intake:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
+  } catch (err: any) {
+    console.error('Exception fetching whatsapp_intake:', err);
+    return { data: null, error: err.message };
+  }
+}
+
+/**
+ * Upsert an intake record (insert on first contact, update attempt_count/status
+ * on a resend). Returns the persisted record.
+ */
+export async function upsertWhatsAppIntake(
+  intake: WhatsAppIntake
+): Promise<{ data: WhatsAppIntake | null; error: string | null }> {
+  try {
+    const payload = { ...intake, updated_at: new Date().toISOString() };
+
+    let result;
+    if (intake.id) {
+      result = await supabaseAdmin
+        .from('whatsapp_intake')
+        .update(payload)
+        .eq('id', intake.id)
+        .select()
+        .single();
+    } else {
+      result = await supabaseAdmin
+        .from('whatsapp_intake')
+        .insert([payload])
+        .select()
+        .single();
+    }
+
+    if (result.error) {
+      console.error('Error upserting whatsapp_intake:', result.error);
+      return { data: null, error: result.error.message };
+    }
+
+    return { data: result.data, error: null };
+  } catch (err: any) {
+    console.error('Exception upserting whatsapp_intake:', err);
     return { data: null, error: err.message };
   }
 }
