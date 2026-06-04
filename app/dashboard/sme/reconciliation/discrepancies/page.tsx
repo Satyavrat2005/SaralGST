@@ -7,14 +7,12 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  Download,
   ChevronRight,
   HelpCircle,
   Loader2,
   Mail,
   MessageSquare,
   Phone,
-  Plus,
   X,
 } from 'lucide-react';
 import { InsightPanel } from '@/components/reconciliation/InsightPanel';
@@ -314,9 +312,6 @@ export default function DiscrepanciesPage() {
                 Fetch GSTR-2B first
               </button>
             )}
-            <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 flex items-center gap-2 shadow-sm">
-              <Download className="h-4 w-4" /> Export All
-            </button>
           </div>
         </div>
 
@@ -496,40 +491,26 @@ export default function DiscrepanciesPage() {
 
                   {expandedRows.includes(inv.id) && (
                     <div className="bg-gray-50 p-6 animate-in slide-in-from-top-2 duration-200">
-                      <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
-                        <div className="space-y-4 flex-1">
-                          <h4 className="text-sm font-semibold text-gray-900">GSTR-2B Details</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm max-w-xl">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-600">Taxable Value</span>
-                              <span className="text-gray-900 font-medium">₹{inv.amount.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-600">Tax Amount</span>
-                              <span className="text-gray-900 font-medium">₹{inv.gst.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-600">GSTIN</span>
-                              <span className="text-gray-900 font-medium font-mono text-xs">{inv.gstin || '—'}</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-600">Place of Supply</span>
-                              <span className="text-gray-900 font-medium">{inv.placeOfSupply || '—'}</span>
-                            </div>
-                          </div>
-                          {rowInsight('missing_in_books', inv.id, { gstr2b: inv.gstr2b })}
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">GSTR-2B Details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm max-w-xl mb-4">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-gray-600">Taxable Value</span>
+                          <span className="text-gray-900 font-medium">₹{inv.amount.toLocaleString()}</span>
                         </div>
-
-                        <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm w-full lg:w-80 shrink-0">
-                          <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Suggested Action</h4>
-                          <button className="w-full py-2.5 mb-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-2 shadow-sm">
-                            <Plus className="h-4 w-4" /> Add to Books
-                          </button>
-                          <button className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors">
-                            Mark as Duplicate
-                          </button>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-gray-600">Tax Amount</span>
+                          <span className="text-gray-900 font-medium">₹{inv.gst.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-gray-600">GSTIN</span>
+                          <span className="text-gray-900 font-medium font-mono text-xs">{inv.gstin || '—'}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-gray-600">Place of Supply</span>
+                          <span className="text-gray-900 font-medium">{inv.placeOfSupply || '—'}</span>
                         </div>
                       </div>
+                      {rowInsight('missing_in_books', inv.id, { gstr2b: inv.gstr2b })}
                     </div>
                   )}
                 </div>
