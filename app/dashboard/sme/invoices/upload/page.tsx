@@ -1,32 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  UploadCloud, 
-  FileText, 
-  MessageSquare, 
-  Mail, 
-  FileSpreadsheet, 
-  CheckCircle2, 
-  AlertCircle, 
-  X, 
-  Camera, 
-  Download, 
-  RefreshCw, 
-  Eye, 
-  Trash2, 
-  Edit3, 
-  HelpCircle,
-  MoreVertical,
-  Filter,
-  Loader2,
-  Phone,
-  Settings
+import {
+  UploadCloud, FileText, MessageSquare, CheckCircle2,
+  AlertCircle, X, Download, RefreshCw, Eye, Trash2,
+  HelpCircle, Filter, Loader2, Clock, Phone,
+  FileSpreadsheet, ChevronRight,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
-// Types
-type TabType = 'whatsapp' | 'email' | 'manual' | 'bulk';
+/* ─── types ─── */
+type TabType = 'whatsapp' | 'manual';
 type UploadStatus = 'uploading' | 'extracting' | 'validating' | 'completed' | 'failed';
 
 interface UploadedFile {
@@ -35,269 +20,287 @@ interface UploadedFile {
   size: string;
   progress: number;
   status: UploadStatus;
-  thumbnail?: string;
   errorMessage?: string;
 }
 
+interface PurchaseInvoice {
+  id: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  supplier_name: string | null;
+  supplier_gstin: string | null;
+  total_invoice_value: number | null;
+  cgst_amount: number | null;
+  sgst_amount: number | null;
+  igst_amount: number | null;
+  invoice_status: string | null;
+  invoice_bucket_url: string | null;
+  source: string | null;
+  created_at: string;
+}
+
+interface WaIntake {
+  id: string;
+  sender_phone: string;
+  invoice_number: string | null;
+  last_status: string | null;
+  attempt_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/* ─── helpers ─── */
+function statusLabel(s: string | null): string {
+  if (!s) return 'Pending';
+  const map: Record<string, string> = {
+    extracted: 'Validated', verified: 'Validated',
+    needs_review: 'Needs Review', error: 'Failed',
+    pending: 'Processing', validated: 'Validated',
+    rejected: 'Failed',
+  };
+  return map[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
+}
+function statusStyle(s: string | null): string {
+  const l = s ?? '';
+  if (l === 'extracted' || l === 'verified' || l === 'validated') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (l === 'needs_review' || l === 'pending') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (l === 'error' || l === 'rejected' || l === 'failed') return 'bg-red-50 text-red-700 border-red-200';
+  return 'bg-gray-100 text-gray-600 border-gray-200';
+}
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min${mins > 1 ? 's' : ''} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  return `${Math.floor(hrs / 24)} day${Math.floor(hrs / 24) > 1 ? 's' : ''} ago`;
+}
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-gray-200 rounded-lg ${className ?? ''}`} />;
+}
+
+/* ═══════════════════════════ PAGE ═══════════════════════════ */
 export default function UploadInvoicesPage() {
   const router = useRouter();
+  const supabase = createClient();
+
   const [activeTab, setActiveTab] = useState<TabType>('manual');
   const [dragActive, setDragActive] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadedFile[]>([]);
-  const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
+
+  /* recent invoices */
+  const [recentInvoices, setRecentInvoices] = useState<PurchaseInvoice[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
-  
-  // Tab Stats
-  const [stats, setStats] = useState({
-    whatsapp: 0,
-    email: 0
-  });
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch recent invoices on mount
-  useEffect(() => {
-    fetchRecentInvoices();
-  }, []);
+  /* whatsapp intake */
+  const [waQueue, setWaQueue] = useState<WaIntake[]>([]);
+  const [loadingWa, setLoadingWa] = useState(true);
+  const [waCount, setWaCount] = useState(0);
 
-  const fetchRecentInvoices = async () => {
+  /* ── fetch recent purchase invoices ── */
+  const fetchRecentInvoices = useCallback(async () => {
+    setLoadingRecent(true);
     try {
-      setLoadingRecent(true);
-      const response = await fetch('/api/invoice/purchase');
-      const data = await response.json();
-
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      const res = await fetch(`/api/invoice/purchase?${params}`);
+      const data = await res.json();
       if (data.success && data.invoices) {
-        // Get last 10 invoices sorted by created_at
-        const recent = data.invoices
-          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 10);
-        setRecentInvoices(recent);
-
-        // Calculate stats
-        const whatsappCount = data.invoices.filter((inv: any) => inv.source === 'whatsapp').length;
-        const emailCount = data.invoices.filter((inv: any) => inv.source === 'email').length;
-        setStats({ whatsapp: whatsappCount, email: emailCount });
+        const sorted = [...data.invoices].sort(
+          (a: PurchaseInvoice, b: PurchaseInvoice) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setRecentInvoices(sorted.slice(0, 15));
+      } else {
+        setRecentInvoices([]);
       }
-    } catch (error) {
-      console.error('Error fetching recent invoices:', error);
+    } catch {
+      setRecentInvoices([]);
     } finally {
       setLoadingRecent(false);
     }
-  };
+  }, [statusFilter, refreshKey]); // eslint-disable-line
 
-  // Helper to simulate upload progress
-  // Removed - using real API calls now
-
-  const handleDelete = async (invoiceId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    
-    if (!confirm('Are you sure you want to delete this invoice?')) {
-      return;
-    }
-
+  /* ── fetch whatsapp intake ── */
+  const fetchWaQueue = useCallback(async () => {
+    setLoadingWa(true);
     try {
-      const response = await fetch(`/api/invoice/purchase/${invoiceId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Remove from local state
-        setRecentInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-        alert('Invoice deleted successfully');
-      } else {
-        throw new Error(data.error || 'Failed to delete invoice');
+      const { data, count, error } = await supabase
+        .from('whatsapp_intake')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!error) {
+        setWaQueue((data as WaIntake[]) ?? []);
+        setWaCount(count ?? 0);
       }
-    } catch (error: any) {
-      console.error('Error deleting invoice:', error);
-      alert(`Failed to delete invoice: ${error.message}`);
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingWa(false);
     }
-  };
+  }, [supabase]);
 
+  useEffect(() => { fetchRecentInvoices(); }, [fetchRecentInvoices]);
+  useEffect(() => { fetchWaQueue(); }, [fetchWaQueue]);
+
+  /* ── upload handlers ── */
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
+    e.preventDefault(); e.stopPropagation();
+    setDragActive(e.type === 'dragenter' || e.type === 'dragover');
   };
-
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
+    if (e.dataTransfer.files?.[0]) handleFiles(e.dataTransfer.files);
+  };
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) handleFiles(e.target.files);
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFiles(e.target.files);
-    }
+  const updateFileStatus = (id: string, status: UploadStatus, progress: number, errorMessage?: string) => {
+    setUploadQueue(prev => prev.map(f => f.id === id ? { ...f, status, progress, errorMessage } : f));
   };
 
   const handleFiles = async (files: FileList) => {
-    const newFiles: UploadedFile[] = Array.from(files).map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+    const newFiles: UploadedFile[] = Array.from(files).map(f => ({
+      id: Math.random().toString(36).slice(2, 9),
+      name: f.name,
+      size: `${(f.size / 1024 / 1024).toFixed(2)} MB`,
       progress: 0,
-      status: 'uploading'
+      status: 'uploading',
     }));
     setUploadQueue(prev => [...newFiles, ...prev]);
 
-    // Process each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const fileId = newFiles[i].id;
-
+      const fid = newFiles[i].id;
       try {
-        // Update to uploading
-        updateFileStatus(fileId, 'uploading', 10);
-
-        // Create FormData and upload
+        updateFileStatus(fid, 'uploading', 20);
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('source', activeTab);
+        formData.append('source', 'manual');
 
-        // Simulate progress during upload
-        updateFileStatus(fileId, 'uploading', 30);
+        updateFileStatus(fid, 'uploading', 40);
+        const res = await fetch('/api/invoice/process', { method: 'POST', body: formData });
+        updateFileStatus(fid, 'extracting', 60);
+        const result = await res.json();
 
-        const response = await fetch('/api/invoice/process', {
-          method: 'POST',
-          body: formData,
-        });
+        if (!res.ok || !result.success) throw new Error(result.error || 'Failed to process');
+        updateFileStatus(fid, 'validating', 85);
+        await new Promise(r => setTimeout(r, 400));
+        updateFileStatus(fid, 'completed', 100);
 
-        updateFileStatus(fileId, 'extracting', 50);
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || 'Failed to process invoice');
-        }
-
-        updateFileStatus(fileId, 'validating', 80);
-
-        // Wait a bit for validation animation
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        if (result.validation?.isValid) {
-          updateFileStatus(fileId, 'completed', 100);
-        } else {
-          updateFileStatus(fileId, 'completed', 100, 'Completed with warnings');
-        }
-
-      } catch (error: any) {
-        console.error('Error uploading file:', error);
-        updateFileStatus(fileId, 'failed', 100, error.message);
+        // Refresh recent list after each successful upload
+        setRefreshKey(k => k + 1);
+      } catch (err: any) {
+        updateFileStatus(fid, 'failed', 100, err.message);
       }
     }
   };
 
-  const updateFileStatus = (
-    fileId: string,
-    status: UploadStatus,
-    progress: number,
-    errorMessage?: string
-  ) => {
-    setUploadQueue(prev =>
-      prev.map(f =>
-        f.id === fileId ? { ...f, status, progress, errorMessage } : f
-      )
-    );
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Validated': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'Processing': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'Failed': return 'bg-red-50 text-red-700 border-red-200';
-      case 'Partial Match': return 'bg-orange-50 text-orange-700 border-orange-200';
-      default: return 'bg-gray-100 text-gray-600 border-gray-200';
+  const handleDelete = async (invoiceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this invoice?')) return;
+    try {
+      const res = await fetch(`/api/invoice/purchase/${invoiceId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setRecentInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+      } else {
+        alert(data.error || 'Failed to delete');
+      }
+    } catch {
+      alert('Failed to delete invoice');
     }
   };
 
   const renderUploadStatus = (file: UploadedFile) => {
-    switch(file.status) {
-      case 'uploading': return <span className="text-blue-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Uploading...</span>;
-      case 'extracting': return <span className="text-amber-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Extracting Data...</span>;
-      case 'validating': return <span className="text-purple-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Validating...</span>;
-      case 'completed': return <span className="text-emerald-600 text-xs flex items-center gap-1 font-medium"><CheckCircle2 className="h-3 w-3" /> Completed</span>;
-      case 'failed': return <span className="text-red-600 text-xs flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3" /> Failed</span>;
-    }
+    const map: Record<UploadStatus, React.ReactNode> = {
+      uploading: <span className="text-blue-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</span>,
+      extracting: <span className="text-amber-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Extracting…</span>,
+      validating: <span className="text-purple-600 text-xs flex items-center gap-1 font-medium"><Loader2 className="h-3 w-3 animate-spin" /> Validating…</span>,
+      completed: <span className="text-emerald-600 text-xs flex items-center gap-1 font-medium"><CheckCircle2 className="h-3 w-3" /> Done</span>,
+      failed: <span className="text-red-600 text-xs flex items-center gap-1 font-medium"><AlertCircle className="h-3 w-3" /> Failed</span>,
+    };
+    return map[file.status];
   };
+
+  const filteredInvoices = statusFilter === 'all'
+    ? recentInvoices
+    : recentInvoices.filter(inv => {
+        const s = inv.invoice_status ?? '';
+        if (statusFilter === 'validated') return s === 'extracted' || s === 'verified';
+        if (statusFilter === 'failed') return s === 'error';
+        if (statusFilter === 'processing') return s === 'pending' || s === 'needs_review';
+        return true;
+      });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-emerald-50 to-teal-50">
       <div className="max-w-[1400px] mx-auto px-8 py-6 space-y-6 pb-20">
-      
-      {/* 1. PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-2">
-            <span className="text-emerald-700 text-xs font-semibold">INVOICE MANAGEMENT</span>
+
+        {/* ── HEADER ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-2">
+              <span className="text-emerald-700 text-xs font-semibold">INVOICE MANAGEMENT</span>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Upload Invoices</h1>
+            <p className="text-gray-600 text-sm mt-1">Automatically extract and validate GST details from your invoices.</p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Upload Invoices</h1>
-          <p className="text-gray-600 text-sm mt-1">Automatically extract and validate GST details from your invoices.</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/dashboard/sme/invoices/purchase')}
+              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm"
+            >
+              View All Invoices <ChevronRight className="h-4 w-4" />
+            </button>
+            <div className="relative group">
+              <button className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm">
+                <HelpCircle className="h-5 w-5" />
+              </button>
+              <div className="absolute right-0 top-12 w-64 p-3 rounded-xl bg-white border border-gray-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-xs text-gray-600">
+                Supported formats: PDF, JPG, PNG. Max size 10 MB per file.
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-           <button 
-             onClick={() => router.push('/dashboard/sme/invoices/purchase')}
-             className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm"
-           >
-             View All Invoices
-           </button>
-           <div className="relative group">
-             <button className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
-               <HelpCircle className="h-5 w-5" />
-             </button>
-             <div className="absolute right-0 top-12 w-64 p-3 rounded-xl bg-white border border-gray-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-xs text-gray-600">
-               Supported formats: PDF, JPG, PNG, Excel, CSV. Max size 10MB per file.
-             </div>
-           </div>
+
+        {/* ── TABS ── */}
+        <div className="flex border-b border-gray-200 bg-white rounded-t-2xl">
+          {[
+            { id: 'whatsapp' as TabType, label: 'WhatsApp', icon: MessageSquare, badge: waCount },
+            { id: 'manual' as TabType, label: 'Manual Upload', icon: UploadCloud },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                activeTab === tab.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {'badge' in tab && (tab.badge ?? 0) > 0 && (
+                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-semibold">{tab.badge}</span>
+              )}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* 2. TAB NAVIGATION */}
-      <div className="flex border-b border-gray-200 bg-white rounded-t-2xl">
-         {[
-           { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, badge: stats.whatsapp },
-         //   { id: 'email', label: 'Gmail', icon: Mail, badge: stats.email },
-           { id: 'manual', label: 'Manual Upload', icon: UploadCloud },
-           //{ id: 'bulk', label: 'Bulk Import (CSV)', icon: FileSpreadsheet },
-         ].map((tab) => (
-           <button
-             key={tab.id}
-             onClick={() => setActiveTab(tab.id as TabType)}
-             className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-               activeTab === tab.id 
-                 ? 'border-emerald-600 text-emerald-600' 
-                 : 'border-transparent text-gray-500 hover:text-gray-700'
-             }`}
-           >
-             <tab.icon className="h-4 w-4" />
-             {tab.label}
-             {tab.badge !== undefined && tab.badge > 0 && (
-               <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-semibold">
-                 {tab.badge}
-               </span>
-             )}
-           </button>
-         ))}
-      </div>
+        {/* ── UPLOAD AREA ── */}
+        <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg p-6 min-h-[280px]">
 
-      {/* 3. UPLOAD AREA (Changes per Tab) */}
-      <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg p-6 min-h-[300px]">
-        
-        {/* TAB 1: WHATSAPP */}
-        {activeTab === 'whatsapp' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-               {/* Connected Status */}
-               <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4">
+          {/* WHATSAPP TAB */}
+          {activeTab === 'whatsapp' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Status card */}
+                <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4">
                   <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center relative">
                     <MessageSquare className="h-8 w-8 text-emerald-600" />
                     <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
@@ -305,447 +308,350 @@ export default function UploadInvoicesPage() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">WhatsApp Connected</h3>
-                    <p className="text-sm text-gray-600 mt-1">+91 98765 43210</p>
-                    <p className="text-xs text-emerald-600 mt-2 font-medium">Last synced: 2 mins ago</p>
+                    <h3 className="text-lg font-semibold text-gray-900">WhatsApp Intake</h3>
+                    <p className="text-xs text-gray-500 mt-1">Invoices received via WhatsApp</p>
+                    {loadingWa ? (
+                      <Skeleton className="h-5 w-16 mx-auto mt-2" />
+                    ) : (
+                      <p className="text-2xl font-bold text-emerald-600 mt-2">{waCount}</p>
+                    )}
+                    <p className="text-xs text-gray-500">total entries</p>
                   </div>
-                  <button className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">
-                    Configure Settings
+                  <button
+                    onClick={fetchWaQueue}
+                    className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Refresh
                   </button>
-               </div>
-               
-               {/* Instructions */}
-               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+                </div>
+
+                {/* How it works */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">How it works</h3>
-                  <div className="space-y-4">
-                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                        <li>Share invoices (PDF/Image) to your registered WhatsApp Business number.</li>
-                        <li>Our system automatically extracts attachments and processes them.</li>
-                        <li>You receive a notification once the GST validation is complete.</li>
-                     </ol>
-                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
-                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                       Auto-extraction active for +91 98765 43210
-                     </div>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                    <li>Vendors share invoice PDFs/images to your registered WhatsApp Business number.</li>
+                    <li>Our system automatically extracts attachments and processes them via AI OCR.</li>
+                    <li>Extracted data appears in the table below for review.</li>
+                  </ol>
+                  <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-emerald-600" />
+                    Invoices are auto-linked to your purchase register after extraction.
                   </div>
-               </div>
+                </div>
+              </div>
+
+              {/* WhatsApp queue table */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900">WhatsApp Intake Queue</h3>
+                  <span className="text-xs text-gray-500">{waCount} total</span>
+                </div>
+                {loadingWa ? (
+                  <div className="p-8 space-y-3">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                  </div>
+                ) : waQueue.length === 0 ? (
+                  <div className="flex flex-col items-center py-14 text-gray-400 gap-2">
+                    <MessageSquare className="h-10 w-10 opacity-20" />
+                    <p className="text-sm">No WhatsApp invoices received yet.</p>
+                    <p className="text-xs text-gray-400">Ask vendors to share invoices to your WhatsApp number.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-xs">Sender Phone</th>
+                          <th className="px-6 py-3 text-xs">Invoice #</th>
+                          <th className="px-6 py-3 text-xs">Attempts</th>
+                          <th className="px-6 py-3 text-xs">Received</th>
+                          <th className="px-6 py-3 text-xs">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {waQueue.map(wa => (
+                          <tr key={wa.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-3 font-medium text-gray-900 flex items-center gap-2">
+                              <Phone className="h-3.5 w-3.5 text-emerald-500" />
+                              {wa.sender_phone}
+                            </td>
+                            <td className="px-6 py-3 text-gray-600 font-mono text-xs">
+                              {wa.invoice_number ?? <span className="text-gray-400 italic">—</span>}
+                            </td>
+                            <td className="px-6 py-3 text-gray-600 text-center">{wa.attempt_count}</td>
+                            <td className="px-6 py-3 text-gray-500 text-xs whitespace-nowrap">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {relativeTime(wa.created_at)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-3">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${statusStyle(wa.last_status)}`}>
+                                {wa.last_status === 'pending' && <Loader2 className="h-3 w-3 animate-spin" />}
+                                {wa.last_status === 'validated' && <CheckCircle2 className="h-3 w-3" />}
+                                {statusLabel(wa.last_status)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
+          )}
 
-            {/* Pending Queue */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                 <h3 className="font-semibold text-gray-900">Pending Processing Queue (WhatsApp)</h3>
-               </div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-left text-sm">
-                    <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
-                       <tr>
-                         <th className="px-6 py-3">Vendor Phone</th>
-                         <th className="px-6 py-3">File Name</th>
-                         <th className="px-6 py-3">Received Time</th>
-                         <th className="px-6 py-3">Status</th>
-                         <th className="px-6 py-3 text-right">Action</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                       {[1,2,3].map((i) => (
-                         <tr key={i} className="group hover:bg-gray-50 transition-colors">
-                           <td className="px-6 py-3 text-gray-900 font-medium">+91 99887 76655</td>
-                           <td className="px-6 py-3 text-gray-700 flex items-center gap-2">
-                             <FileText className="h-4 w-4 text-gray-400" /> img_invoice_00{i}.jpg
-                           </td>
-                           <td className="px-6 py-3 text-gray-600">10 mins ago</td>
-                           <td className="px-6 py-3">
-                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                               <Loader2 className="h-3 w-3 animate-spin" /> Processing
-                             </span>
-                           </td>
-                           <td className="px-6 py-3 text-right">
-                              <button className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">View</button>
-                           </td>
-                         </tr>
-                       ))}
-                    </tbody>
-                 </table>
-               </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: EMAIL */}
-        {/* {activeTab === 'email' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                <GlassPanel className="p-5">
-                   <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-semibold text-white">Connected Inboxes</h3>
-                      <button className="text-xs text-primary hover:underline">+ Add Account</button>
-                   </div>
-                   <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-white/5">
-                         <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-red-500/20 flex items-center justify-center text-red-500 font-bold">G</div>
-                            <div>
-                               <p className="text-sm font-medium text-white">accounts@company.com</p>
-                               <p className="text-xs text-zinc-500">Synced: Just now</p>
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Active</span>
-                            <button className="text-zinc-500 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
-                         </div>
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-white/5">
-                         <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">O</div>
-                            <div>
-                               <p className="text-sm font-medium text-white">purchase@company.com</p>
-                               <p className="text-xs text-zinc-500">Synced: 1 hour ago</p>
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Active</span>
-                            <button className="text-zinc-500 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
-                         </div>
-                      </div>
-                   </div>
-                </GlassPanel>
-
-                <BentoCard title="Email Auto-Capture">
-                   <p className="text-sm text-zinc-400 mb-4">
-                     We automatically scan your inbox for emails containing keywords like "Invoice", "Bill", or "GST" and extract attachments.
-                   </p>
-                   <div className="flex gap-2">
-                     <button className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
-                        Sync Now
-                     </button>
-                     <button className="flex-1 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors border border-white/5">
-                        Settings
-                     </button>
-                   </div>
-                </BentoCard>
-             </div>
-
-       
-             <GlassPanel className="p-0 overflow-hidden">
-               <div className="px-6 py-4 border-b border-white/5 bg-white/5">
-                 <h3 className="font-semibold text-white">Inbox Preview</h3>
-               </div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-left text-sm">
-                    <thead className="text-zinc-500 font-medium border-b border-white/5">
-                       <tr>
-                         <th className="px-6 py-3">From</th>
-                         <th className="px-6 py-3">Subject</th>
-                         <th className="px-6 py-3">Attachment</th>
-                         <th className="px-6 py-3">Date</th>
-                         <th className="px-6 py-3">Status</th>
-                         <th className="px-6 py-3 text-right">Action</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                       {[
-                         { from: 'billing@aws.com', subject: 'Invoice for Oct 2025', file: 'inv_oct.pdf', status: 'Extracted' },
-                         { from: 'vendors@steel.com', subject: 'Material Bill 123', file: 'bill.jpg', status: 'Pending' }
-                       ].map((mail, i) => (
-                         <tr key={i} className="group hover:bg-white/5 transition-colors">
-                           <td className="px-6 py-3 text-white">{mail.from}</td>
-                           <td className="px-6 py-3 text-zinc-300">{mail.subject}</td>
-                           <td className="px-6 py-3 text-zinc-400 flex items-center gap-2">
-                             <FileText className="h-3 w-3" /> {mail.file}
-                           </td>
-                           <td className="px-6 py-3 text-zinc-500">Today, 10:00 AM</td>
-                           <td className="px-6 py-3">
-                             {mail.status === 'Extracted' ? (
-                               <span className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Extracted</span>
-                             ) : (
-                               <span className="text-xs text-zinc-500 flex items-center gap-1"><Loader2 className="h-3 w-3" /> Pending</span>
-                             )}
-                           </td>
-                           <td className="px-6 py-3 text-right">
-                              <button className="text-zinc-400 hover:text-white px-2 py-1 border border-zinc-700 rounded text-xs">Process</button>
-                           </td>
-                         </tr>
-                       ))}
-                    </tbody>
-                 </table>
-               </div>
-            </GlassPanel>
-          </div>
-        )} */}
-
-        {/* TAB 3: MANUAL UPLOAD (Default) */}
-        {activeTab === 'manual' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
-             
-             {/* Upload Area */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Drag & Drop Zone */}
-                <div 
-                  className={`
-                    border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer h-64 relative overflow-hidden
-                    ${dragActive 
-                      ? 'border-emerald-500 bg-emerald-50' 
-                      : 'border-gray-300 hover:border-emerald-400 bg-white hover:bg-emerald-50/30'}
-                  `}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
+          {/* MANUAL UPLOAD TAB */}
+          {activeTab === 'manual' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Drop zone */}
+                <div
+                  className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer h-64 ${
+                    dragActive ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-emerald-400 bg-white hover:bg-emerald-50/30'
+                  }`}
+                  onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                   onClick={() => document.getElementById('file-upload')?.click()}
                 >
-                   <input type="file" id="file-upload" className="hidden" multiple onChange={handleFileInput} />
-                   
-                   <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                     <UploadCloud className="h-7 w-7 text-emerald-600" />
-                   </div>
-                   <h3 className="text-lg font-semibold text-gray-900">Drag & drop invoices here</h3>
-                   <p className="text-sm text-gray-600 mt-2">or click to browse from your computer</p>
-                   <p className="text-xs text-gray-500 mt-4 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                     Supports: PDF, JPG, PNG (Max 10MB)
-                   </p>
+                  <input type="file" id="file-upload" className="hidden" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileInput} />
+                  <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                    <UploadCloud className="h-7 w-7 text-emerald-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Drag & drop invoices here</h3>
+                  <p className="text-sm text-gray-600 mt-2">or click to browse from your computer</p>
+                  <p className="text-xs text-gray-500 mt-4 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                    Supports: PDF, JPG, PNG (Max 10 MB)
+                  </p>
                 </div>
 
-                {/* Camera / Instructions */}
+                {/* Info card */}
                 <div className="flex flex-col gap-4 h-64">
-                   {/* <div className="flex-1 rounded-xl bg-white border border-gray-200 p-6 flex flex-col items-center justify-center text-center hover:border-emerald-300 transition-colors cursor-pointer group shadow-sm">
-                      <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3 group-hover:bg-emerald-100 transition-colors">
-                        <Camera className="h-6 w-6 text-gray-600 group-hover:text-emerald-600" />
+                  <div className="flex-1 p-5 rounded-xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 shadow-sm flex flex-col justify-center">
+                    <div className="flex items-start gap-3">
+                      <div className="p-1.5 bg-emerald-100 rounded-full mt-0.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       </div>
-                      <h3 className="font-semibold text-gray-900">Capture from Camera</h3>
-                      <p className="text-xs text-gray-600 mt-1">Take a photo of physical invoice</p>
-                   </div> */}
-                   <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 shadow-sm">
-                      <div className="flex items-start gap-3">
-                         <div className="p-1.5 bg-emerald-100 rounded-full mt-0.5">
-                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                         </div>
-                         <div>
-                            <h4 className="text-sm font-semibold text-emerald-700">Smart OCR Enabled</h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Our AI automatically detects vendor GSTIN, Invoice #, Date, and tax amounts. No manual entry needed.
-                            </p>
-                         </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-emerald-700">Smart OCR Enabled</h4>
+                        <p className="text-xs text-gray-600 mt-1">
+                          AI automatically detects vendor GSTIN, Invoice #, Date, HSN codes, and all tax amounts.
+                        </p>
                       </div>
-                   </div>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-700 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
+                    <span>Each uploaded invoice is automatically added to your <strong>Purchase Register</strong> and flagged for reconciliation.</span>
+                  </div>
                 </div>
-             </div>
+              </div>
 
-             {/* Upload Progress List */}
-             {uploadQueue.length > 0 && (
-               <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Upload Progress</h3>
-                  {uploadQueue.map((file) => (
+              {/* Upload progress */}
+              {uploadQueue.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Upload Progress</h3>
+                    <button
+                      onClick={() => setUploadQueue(q => q.filter(f => f.status !== 'completed' && f.status !== 'failed'))}
+                      className="text-xs text-gray-500 hover:text-gray-700 hover:underline"
+                    >Clear done</button>
+                  </div>
+                  {uploadQueue.map(file => (
                     <div key={file.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
-                       <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center shrink-0">
-                          <FileText className="h-5 w-5 text-gray-600" />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                          <div className="flex justify-between mb-1">
-                             <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                             <span className="text-xs">{renderUploadStatus(file)}</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                             <div 
-                               className={`h-full rounded-full transition-all duration-300 ${file.status === 'failed' ? 'bg-red-500' : 'bg-emerald-600'}`} 
-                               style={{ width: `${file.progress}%` }}
-                             ></div>
-                          </div>
-                       </div>
-                       <div className="flex items-center gap-2 shrink-0">
-                          {file.status === 'completed' && (
-                             <button className="px-3 py-1.5 rounded-lg hover:bg-gray-50 text-emerald-600 font-medium text-xs border border-emerald-200 hover:border-emerald-300 transition-colors">View Details</button>
-                          )}
-                          <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-colors">
-                             <X className="h-4 w-4" />
-                          </button>
-                       </div>
+                      <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                        <FileText className={`h-5 w-5 ${file.status === 'failed' ? 'text-red-500' : file.status === 'completed' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between mb-1.5">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                          <span>{renderUploadStatus(file)}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${file.status === 'failed' ? 'bg-red-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${file.progress}%` }}
+                          />
+                        </div>
+                        {file.errorMessage && (
+                          <p className="text-xs text-red-600 mt-1">{file.errorMessage}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setUploadQueue(q => q.filter(f => f.id !== file.id))}
+                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   ))}
-               </div>
-             )}
-          </div>
-        )}
-
-        {/* TAB 4: BULK IMPORT */}
-        {activeTab === 'bulk' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Step 1: Download */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 1: Download Template</h3>
-                   <p className="text-sm text-gray-600 mb-6">Use our standardized template to ensure all fields are mapped correctly for bulk processing.</p>
-                   <div className="space-y-3">
-                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all group shadow-sm">
-                         <div className="flex items-center gap-3">
-                            <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
-                            <div className="text-left">
-                               <p className="text-sm font-medium text-gray-900">Excel Template (.xlsx)</p>
-                               <p className="text-[10px] text-gray-600">Recommended for most users</p>
-                            </div>
-                         </div>
-                         <Download className="h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                      </button>
-                      <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all group shadow-sm">
-                         <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-blue-500" />
-                            <div className="text-left">
-                               <p className="text-sm font-medium text-gray-900">CSV Template (.csv)</p>
-                               <p className="text-[10px] text-gray-600">For programmatic exports</p>
-                            </div>
-                         </div>
-                         <Download className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                      </button>
-                   </div>
                 </div>
-
-                {/* Step 2: Upload */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 2: Upload Filled File</h3>
-                   <div className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-50/30 transition-all cursor-pointer">
-                      <UploadCloud className="h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">Drag & drop your Excel/CSV here</p>
-                   </div>
-                   <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                      Ensure dates are in DD-MM-YYYY format and GSTINs are valid to avoid errors.
-                   </div>
-                </div>
-             </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. RECENTLY UPLOADED INVOICES */}
-      <div className="mt-8">
-         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-               <div className="flex items-center gap-2">
-                 <h3 className="text-lg font-semibold text-gray-900">Recently Uploaded</h3>
-                 <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">Last 24h</span>
-               </div>
-               
-               <div className="flex gap-2">
-                  <div className="relative">
-                     <select className="appearance-none bg-white border border-gray-200 text-xs rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-emerald-500 outline-none text-gray-700 cursor-pointer hover:bg-gray-50">
-                        <option>All Status</option>
-                        <option>Validated</option>
-                        <option>Failed</option>
-                        <option>Processing</option>
-                     </select>
-                     <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
-                  </div>
-               </div>
+              )}
             </div>
+          )}
+        </div>
 
-            <div className="grid grid-cols-1 gap-3">
-               {loadingRecent ? (
-                 <div className="flex items-center justify-center py-12">
-                   <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-                   <span className="ml-2 text-gray-500">Loading recent invoices...</span>
-                 </div>
-               ) : recentInvoices.length === 0 ? (
-                 <div className="flex flex-col items-center justify-center py-12">
-                   <FileText className="h-12 w-12 text-gray-300 mb-2" />
-                   <p className="text-gray-500 text-sm">No invoices uploaded yet</p>
-                 </div>
-               ) : (
-                 recentInvoices.map((invoice) => {
-                   const fileName = invoice.invoice_bucket_url 
-                     ? invoice.invoice_bucket_url.split('/').pop() 
-                     : 'invoice.pdf';
-                   const totalGst = (invoice.cgst_amount || 0) + (invoice.sgst_amount || 0) + (invoice.igst_amount || 0);
-                   const invoiceDate = invoice.invoice_date 
-                     ? new Date(invoice.invoice_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-                     : 'N/A';
-                   
-                   const statusLabel = invoice.invoice_status === 'extracted' || invoice.invoice_status === 'verified' 
-                     ? 'Validated' 
-                     : invoice.invoice_status === 'needs_review' 
-                     ? 'Needs Review' 
-                     : invoice.invoice_status === 'error' 
-                     ? 'Failed' 
-                     : 'Processing';
+        {/* ── RECENTLY UPLOADED SECTION ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-gray-900">Recently Uploaded</h3>
+              {!loadingRecent && (
+                <span className="bg-gray-100 text-gray-600 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                  {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Status filter */}
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="appearance-none bg-white border border-gray-200 text-xs rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-emerald-500 outline-none text-gray-700 cursor-pointer hover:bg-gray-50"
+                >
+                  <option value="all">All Status</option>
+                  <option value="validated">Validated</option>
+                  <option value="processing">Needs Review</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
+              </div>
+              <button
+                onClick={() => setRefreshKey(k => k + 1)}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-all"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingRecent ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+            </div>
+          </div>
 
-                   return (
-                     <div key={invoice.id} className="group p-4 rounded-xl bg-gray-50 border border-gray-200 hover:border-emerald-300 hover:bg-white transition-all cursor-pointer">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                           
-                           {/* Left: File Info */}
-                           <div className="flex items-center gap-4 min-w-0 flex-1">
-                              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                                 {fileName?.endsWith('.pdf') ? <FileText className="h-5 w-5 text-red-500" /> : <FileText className="h-5 w-5 text-blue-500" />}
-                              </div>
-                              <div className="min-w-0">
-                                 <p className="text-sm font-semibold text-gray-900 truncate">
-                                   {invoice.invoice_number || 'N/A'} 
-                                   <span className="text-gray-400 font-normal mx-1">•</span> 
-                                   {invoice.supplier_name || 'Unknown'}
-                                 </p>
-                                 <div className="flex items-center gap-2 mt-0.5">
-                                    <p className="text-xs text-gray-600">{invoiceDate}</p>
-                                    <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                                    <p className="text-xs text-gray-600">{fileName}</p>
-                                 </div>
-                              </div>
-                           </div>
+          {/* Invoice list */}
+          {loadingRecent ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            </div>
+          ) : filteredInvoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+              <FileText className="h-12 w-12 opacity-20" />
+              <p className="text-sm font-medium">
+                {statusFilter !== 'all' ? `No ${statusFilter} invoices found.` : 'No invoices uploaded yet.'}
+              </p>
+              {statusFilter !== 'all' ? (
+                <button onClick={() => setStatusFilter('all')} className="text-xs text-emerald-600 font-semibold hover:underline">Show all invoices</button>
+              ) : (
+                <button onClick={() => setActiveTab('manual')} className="text-xs text-emerald-600 font-semibold hover:underline">Upload your first invoice →</button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredInvoices.map(invoice => {
+                const fileName = invoice.invoice_bucket_url?.split('/').pop() ?? null;
+                const totalGst = (invoice.cgst_amount ?? 0) + (invoice.sgst_amount ?? 0) + (invoice.igst_amount ?? 0);
+                const invoiceDate = invoice.invoice_date
+                  ? new Date(invoice.invoice_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : null;
 
-                           {/* Middle: Amount */}
-                           <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0 pl-14 sm:pl-0">
-                              <p className="text-sm font-bold text-gray-900">₹{(invoice.total_invoice_value || 0).toLocaleString()}</p>
-                              <p className="text-xs text-gray-600">GST: ₹{totalGst.toLocaleString()}</p>
-                           </div>
-
-                           {/* Right: Status & Actions */}
-                           <div className="flex items-center gap-4 pl-14 sm:pl-0 w-full sm:w-auto justify-between sm:justify-end">
-                              <div className="flex flex-col items-end gap-1">
-                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(statusLabel)}`}>
-                                    {statusLabel}
-                                 </span>
-                                 <span className="text-[10px] text-blue-600 font-medium">
-                                    Purchase
-                                 </span>
-                              </div>
-                              
-                              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <button 
-                                   onClick={() => router.push('/dashboard/sme/invoices/purchase')}
-                                   className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" 
-                                   title="View Data"
-                                 >
-                                    <Eye className="h-4 w-4" />
-                                 </button>
-                                 {invoice.invoice_bucket_url && (
-                                   <a 
-                                     href={invoice.invoice_bucket_url}
-                                     target="_blank"
-                                     rel="noopener noreferrer"
-                                     className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" 
-                                     title="View PDF"
-                                   >
-                                      <FileText className="h-4 w-4" />
-                                   </a>
-                                 )}
-                                 <button 
-                                   onClick={(e) => handleDelete(invoice.id, e)}
-                                   className="p-1.5 hover:bg-red-50 rounded text-gray-600 hover:text-red-600 transition-colors" 
-                                   title="Delete"
-                                 >
-                                    <Trash2 className="h-4 w-4" />
-                                 </button>
-                              </div>
-                           </div>
+                return (
+                  <div
+                    key={invoice.id}
+                    className="group p-4 rounded-xl bg-gray-50 border border-gray-200 hover:border-emerald-300 hover:bg-white transition-all cursor-pointer"
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      {/* Left: info */}
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div className="h-10 w-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
+                          <FileText className={`h-5 w-5 ${fileName?.endsWith('.pdf') ? 'text-red-500' : 'text-blue-500'}`} />
                         </div>
-                     </div>
-                   );
-                 })
-               )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {invoice.invoice_number
+                              ? <span className="font-mono">{invoice.invoice_number}</span>
+                              : <span className="text-gray-400 italic text-xs">No invoice #</span>
+                            }
+                            {invoice.supplier_name && (
+                              <span className="text-gray-500 font-normal ml-2 text-xs">• {invoice.supplier_name}</span>
+                            )}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {invoiceDate && <span className="text-xs text-gray-500">{invoiceDate}</span>}
+                            {fileName && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-gray-300" />
+                                <span className="text-xs text-gray-400 truncate max-w-[120px]">{fileName}</span>
+                              </>
+                            )}
+                            {invoice.source && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-gray-300" />
+                                <span className="text-[10px] font-medium text-gray-500 capitalize">{invoice.source}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle: amounts */}
+                      <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-0.5 pl-14 sm:pl-0 shrink-0">
+                        <p className="text-sm font-bold text-gray-900">
+                          {invoice.total_invoice_value != null
+                            ? `₹${invoice.total_invoice_value.toLocaleString('en-IN')}`
+                            : <span className="text-gray-400 text-xs">—</span>
+                          }
+                        </p>
+                        <p className="text-xs text-gray-500">GST: ₹{totalGst.toLocaleString('en-IN')}</p>
+                      </div>
+
+                      {/* Right: status + actions */}
+                      <div className="flex items-center gap-3 pl-14 sm:pl-0 w-full sm:w-auto justify-between sm:justify-end">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusStyle(invoice.invoice_status)}`}>
+                          {statusLabel(invoice.invoice_status)}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => router.push('/dashboard/sme/invoices/purchase')}
+                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-900 transition-colors"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {invoice.invoice_bucket_url && (
+                            <a
+                              href={invoice.invoice_bucket_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-900 transition-colors"
+                              title="Open PDF"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          )}
+                          <button
+                            onClick={e => handleDelete(invoice.id, e)}
+                            className="p-1.5 hover:bg-red-50 rounded text-gray-500 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="mt-2 flex justify-center">
+                <button
+                  onClick={() => router.push('/dashboard/sme/invoices/purchase')}
+                  className="text-xs text-emerald-600 font-semibold hover:underline flex items-center gap-1"
+                >
+                  View all in Purchase Register <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
             </div>
-         </div>
-      </div>
+          )}
+        </div>
 
       </div>
     </div>

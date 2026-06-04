@@ -83,16 +83,18 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "Exception Dashboard", path: "/dashboard/sme/reconciliation/exceptions", icon: AlertOctagon },
       ]
     },
+    /* ── VENDOR MANAGEMENT (commented out — uncomment to restore) ──────────────
     {
       label: "Vendor Management",
       icon: Users,
-      path: "/dashboard/sme/vendors", // Parent path for matching
+      path: "/dashboard/sme/vendors",
       subItems: [
         { label: "Vendor List", path: "/dashboard/sme/vendors/list", icon: Users },
         { label: "Send Reminders", path: "/dashboard/sme/vendors/reminders", icon: Send },
         { label: "Vendor Reports", path: "/dashboard/sme/vendors/reports", icon: BarChart3 },
       ]
     },
+    */
     {
       label: "IMS Actions",
       path: "/dashboard/sme/ims",
@@ -113,7 +115,8 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "GSTR-1 Draft", path: "/dashboard/sme/returns/gstr1", icon: FileText },
         { label: "GSTR-2B Fetch", path: "/dashboard/sme/returns/gstr2b", icon: Upload },
         { label: "GSTR-3B Draft", path: "/dashboard/sme/returns/gstr3b", icon: FileText },
-        { label: "Filing History", path: "/dashboard/sme/returns/history", icon: BookOpen },
+        // ── FILING HISTORY (commented out — uncomment to restore) ──
+        // { label: "Filing History", path: "/dashboard/sme/returns/history", icon: BookOpen },
       ]
     },
     {
@@ -137,6 +140,7 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "Audit Trail", path: "/dashboard/sme/reports/audit", icon: FileText },
       ]
     },
+    /* ── ALERTS & NOTIFICATIONS (commented out — uncomment to restore) ─────────
     {
       label: "Alerts & Notifications",
       path: "/dashboard/sme/alerts",
@@ -144,6 +148,7 @@ const SIDEBAR_CONFIG: SidebarConfig = {
       badge: 3,
       badgeColor: "bg-primary"
     }
+    */
   ],
   ca: [
     { label: "CA Dashboard", path: "/dashboard/ca", icon: LayoutDashboard },
