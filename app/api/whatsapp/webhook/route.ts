@@ -11,6 +11,7 @@ import {
 } from '@/lib/services/purchaseInvoiceService';
 import {
   sendWhatsAppMessage,
+  downloadEvolutionMedia,
   composeConfirmationMessage,
   composeRejectionMessageWithAI,
 } from '@/lib/services/whatsappService';
@@ -18,21 +19,27 @@ import {
 /**
  * POST /api/whatsapp/webhook
  *
- * Inbound endpoint Slide (Synquic) calls when a vendor sends an invoice to our
- * WhatsApp Business number. Responsibilities:
+ * Inbound endpoint Evolution API calls (event `messages.upsert`) when a vendor
+ * sends a message to our WhatsApp Business number. Responsibilities:
  *   1. Verify a shared secret.
- *   2. Ack fast (200) so Slide doesn't retry/time out.
- *   3. Process in the background (`after`): download media → run the shared
+ *   2. Ack fast (200) so Evolution doesn't retry/time out.
+ *   3. Process in the background (`after`): pull media bytes → run the shared
  *      pipeline → branch valid / invalid → reply on WhatsApp.
  *
  * Only invoices that PASS validation are promoted to `extracted` (visible in the
  * dashboard). Failures stay in `wa_quarantine` (hidden) and trigger a correction
  * request. After too many failed attempts the invoice escalates to `needs_review`.
  *
- * NOTE: the Slide payload shape (§6 of the plan) is not yet confirmed, so the
- * parser below is defensive and accepts several common field names. Tighten it
- * once the real shape is known.
+ * SECURITY: Evolution lets you set the webhook URL freely, so configure it as
+ *   https://<your-domain>/api/whatsapp/webhook?secret=<WHATSAPP_WEBHOOK_SECRET>
+ * (the `apikey` header == EVOLUTION_API_KEY is also accepted as an auth fallback).
  */
+
+// Run on the Node runtime and allow up to 60s — the background worker downloads
+// media, runs Gemini extraction (with retries) and replies, which can exceed
+// the default serverless timeout. (Vercel caps this to your plan's limit.)
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 // After this many failed attempts, stop auto-rejecting and ask a human to look.
 const MAX_INTAKE_ATTEMPTS = 3;
@@ -47,10 +54,14 @@ export async function POST(request: NextRequest) {
 
   const providedSecret =
     request.headers.get('x-webhook-secret') ||
-    request.headers.get('x-slide-signature') ||
     new URL(request.url).searchParams.get('secret');
+  const apiKeyHeader = request.headers.get('apikey');
 
-  if (providedSecret !== expectedSecret) {
+  const authorized =
+    providedSecret === expectedSecret ||
+    (Boolean(process.env.EVOLUTION_API_KEY) && apiKeyHeader === process.env.EVOLUTION_API_KEY);
+
+  if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -62,10 +73,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const parsed = parseInboundPayload(payload);
-  if (!parsed.senderPhone || (!parsed.fileUrl && !parsed.base64)) {
-    // Nothing actionable (e.g. a plain text message with no attachment). Ack so
-    // Slide doesn't retry; nothing to process.
+  const parsed = parseEvolutionEvent(payload);
+  if (!parsed || !parsed.senderPhone || !parsed.hasMedia) {
+    // Nothing actionable (e.g. a plain text message, a status update, or an
+    // event we don't care about). Ack so Evolution doesn't retry.
     return NextResponse.json({
       success: true,
       message: 'No invoice attachment found; nothing to process.',
@@ -80,41 +91,64 @@ export async function POST(request: NextRequest) {
 
 interface ParsedInbound {
   senderPhone: string;
-  fileUrl: string | null;
-  base64: string | null;
+  base64: string | null; // inline base64 if the webhook included it (instance base64:true)
+  rawMessage: any; // full `data` object — used to fetch media via getBase64 fallback
   mimeType: string;
   fileName: string;
+  hasMedia: boolean;
 }
 
 /**
- * Extract the sender + attachment from Slide's webhook body. Accepts a few
- * common field-name variants so we don't have to guess the exact shape.
+ * Extract the sender + media from an Evolution `messages.upsert` webhook event.
+ * Evolution may deliver `data` as a single message object or (rarely) an array;
+ * we handle the single-object case and ignore everything that isn't an inbound
+ * document/image from a 1:1 chat.
  */
-function parseInboundPayload(p: any): ParsedInbound {
-  const senderPhone =
-    p?.from || p?.sender || p?.sender_phone || p?.phone || p?.wa_id || p?.contact?.phone || '';
+function parseEvolutionEvent(payload: any): ParsedInbound | null {
+  // Normalise event name across versions: "messages.upsert" / "MESSAGES_UPSERT".
+  const event = String(payload?.event || '').toLowerCase().replace(/_/g, '.');
+  if (event && event !== 'messages.upsert') return null;
 
-  // Attachment can arrive as a download URL or inline base64; field names vary.
-  const media = p?.media || p?.attachment || p?.file || p?.document || p || {};
+  // `data` carries the message; some setups wrap it in an array.
+  const data = Array.isArray(payload?.data) ? payload.data[0] : payload?.data || payload;
+  if (!data) return null;
 
-  const fileUrl =
-    media?.media_url || media?.url || media?.link || p?.media_url || p?.file_url || null;
+  const key = data.key || {};
+  const remoteJid: string = key.remoteJid || '';
 
-  const base64 =
-    media?.data || media?.base64 || media?.bytes || p?.file_base64 || null;
+  // Ignore our own outbound echoes, group chats, and status broadcasts.
+  if (key.fromMe) return null;
+  if (remoteJid.endsWith('@g.us') || remoteJid.includes('broadcast')) return null;
 
-  const mimeType =
-    media?.mime_type || media?.mimeType || media?.content_type || p?.mime_type || '';
+  const senderPhone = remoteJid.split('@')[0] || '';
 
-  const fileName =
-    media?.filename || media?.file_name || media?.name || p?.filename || '';
+  // Locate a document or image node (document can be nested under a caption msg).
+  const message = data.message || {};
+  const mediaNode =
+    message.documentMessage ||
+    message.documentWithCaptionMessage?.message?.documentMessage ||
+    message.imageMessage ||
+    null;
+
+  if (!mediaNode) {
+    // Not a media message — nothing to process.
+    return { senderPhone, base64: null, rawMessage: data, mimeType: '', fileName: '', hasMedia: false };
+  }
+
+  const mimeType = String(mediaNode.mimetype || '').toLowerCase();
+  const fileName = mediaNode.fileName || mediaNode.title || 'invoice';
+
+  // If the instance is configured with base64:true, Evolution inlines the bytes;
+  // otherwise we fetch them in the worker via getBase64FromMediaMessage.
+  const base64 = message.base64 || data.base64 || mediaNode.base64 || null;
 
   return {
-    senderPhone: String(senderPhone || '').trim(),
-    fileUrl,
+    senderPhone,
     base64,
-    mimeType: String(mimeType || '').toLowerCase(),
-    fileName: fileName || 'invoice',
+    rawMessage: data,
+    mimeType,
+    fileName,
+    hasMedia: true,
   };
 }
 
@@ -140,30 +174,35 @@ function ensureFileName(name: string, mimeType: string): string {
 }
 
 /**
- * Background worker: download the media, run the pipeline, branch on validity,
+ * Background worker: pull the media bytes, run the pipeline, branch on validity,
  * and reply to the vendor over WhatsApp.
  */
 async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
   const { senderPhone } = parsed;
   try {
-    // ── a. Materialise the file (download URL or decode base64). ─────────────
-    const mimeType = resolveMimeType(parsed);
-    const fileName = ensureFileName(parsed.fileName, mimeType);
+    // ── a. Materialise the file (inline base64 or fetch from Evolution). ──────
+    let base64 = parsed.base64;
+    let mimeType = parsed.mimeType;
+    let fileName = parsed.fileName;
 
-    let buffer: Buffer;
-    if (parsed.fileUrl) {
-      const res = await fetch(parsed.fileUrl);
-      if (!res.ok) {
-        throw new Error(`Failed to download media (${res.status})`);
+    if (!base64) {
+      const media = await downloadEvolutionMedia(parsed.rawMessage);
+      if (!media) {
+        await sendWhatsAppMessage(senderPhone, {
+          body:
+            "⚠️ We couldn't download this invoice. Please make sure it's a clear PDF or photo and resend. 🙏",
+        });
+        return;
       }
-      buffer = Buffer.from(await res.arrayBuffer());
-    } else {
-      // Strip any data-URL prefix before decoding.
-      const clean = (parsed.base64 || '').replace(/^data:[^;]+;base64,/, '');
-      buffer = Buffer.from(clean, 'base64');
+      base64 = media.base64;
+      if (media.mimetype) mimeType = media.mimetype.toLowerCase();
+      if (media.fileName) fileName = media.fileName;
     }
 
-    if (!ALLOWED_INVOICE_MIME_TYPES.includes(mimeType)) {
+    const resolvedMime = resolveMimeType({ ...parsed, mimeType, fileName });
+    fileName = ensureFileName(fileName, resolvedMime);
+
+    if (!ALLOWED_INVOICE_MIME_TYPES.includes(resolvedMime)) {
       await sendWhatsAppMessage(senderPhone, {
         body:
           '⚠️ We could only accept PDF, JPG or PNG invoices. Please resend your invoice as one of these. 🙏',
@@ -171,7 +210,18 @@ async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
       return;
     }
 
-    const file = new File([buffer], fileName, { type: mimeType });
+    // Strip any data-URL prefix before decoding.
+    const clean = (base64 || '').replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(clean, 'base64');
+    if (!buffer.length) {
+      await sendWhatsAppMessage(senderPhone, {
+        body:
+          "⚠️ We couldn't read this invoice. Please make sure it's a clear PDF or photo and resend. 🙏",
+      });
+      return;
+    }
+
+    const file = new File([buffer], fileName, { type: resolvedMime });
 
     // ── b. Look up prior attempts for this sender to drive escalation. ───────
     // (invoice_number isn't known until after extraction; we re-correlate below

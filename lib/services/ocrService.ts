@@ -232,39 +232,48 @@ async function fallbackTextExtraction(base64File: string, mimeType: string = 'im
       };
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
+    const requestBody = {
+      contents: [
+        {
+          parts: [
             {
-              parts: [
-                {
-                  text: 'Extract all text from this invoice document. Return only the raw text content, maintaining the original layout and structure as much as possible.',
-                },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64File,
-                  },
-                },
-              ],
+              text: 'Extract all text from this invoice document. Return only the raw text content, maintaining the original layout and structure as much as possible.',
+            },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64File,
+              },
             },
           ],
-        }),
-      }
-    );
+        },
+      ],
+      generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+    };
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+    // Retry on transient overload (Gemini free tier 429/500/503).
+    let response: Response | null = null;
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        }
+      );
+      if (response.ok) break;
+      const transient = response.status === 429 || response.status === 500 || response.status === 503;
+      if (transient && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+        continue;
+      }
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
-    
+    const data = await response!.json();
+
     if (data.candidates && data.candidates[0]) {
       const text = data.candidates[0].content?.parts?.[0]?.text || '';
       

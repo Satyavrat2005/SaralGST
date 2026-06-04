@@ -9,7 +9,7 @@ import { isWhatsAppConfigured } from '@/lib/services/whatsappService';
 export async function GET() {
   return NextResponse.json({
     configured: isWhatsAppConfigured(),
-    businessNumber: process.env.WHATSAPP_BUSINESS_NUMBER || null,
+    businessNumber: (process.env.WHATSAPP_BUSINESS_NUMBER || '').trim() || null,
     webhookConfigured: Boolean(process.env.WHATSAPP_WEBHOOK_SECRET),
   });
 }
