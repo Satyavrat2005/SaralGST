@@ -25,9 +25,12 @@ import {
   getPortalGstinIssues,
   getReturnPeriodDateRange,
   invoiceDateInPeriod,
+  buildDksMarchMockInvoices,
   type BusinessProfileContext,
   type Gstr1ReturnData,
+  type Gstr1InvoiceInsert,
 } from '@/lib/gstr1';
+import { DKS_MARCH_PERIOD } from '@/lib/reconciliation/dksMarchConstants';
 import {
   parseGstr2bResponse,
   buildGstr2bReturnData,
@@ -642,9 +645,15 @@ export async function GET(req: NextRequest) {
               .in('id', unassignedIds);
           }
 
-          const gstr1Invoices = salesInPeriod.map((inv) =>
+          let gstr1Invoices: Gstr1InvoiceInsert[] = salesInPeriod.map((inv) =>
             mapSalesInvoiceToGstr1(inv, profile, returnId, user.id)
           );
+
+          const usedDksDemo =
+            gstr1Invoices.length === 0 && period === DKS_MARCH_PERIOD;
+          if (usedDksDemo) {
+            gstr1Invoices = buildDksMarchMockInvoices(returnId, user.id);
+          }
 
           if (gstr1Invoices.length > 0) {
             const { error: insertErr } = await supabase.from('gstr1_invoices').insert(gstr1Invoices);
@@ -685,6 +694,7 @@ export async function GET(req: NextRequest) {
             salesInPeriod: salesInPeriod.length,
             salesTotal: totalSalesCount ?? 0,
             unassignedClaimed: unassignedIds.length,
+            dksMarchDemo: usedDksDemo,
           };
 
           return NextResponse.json({
@@ -696,7 +706,9 @@ export async function GET(req: NextRequest) {
             message:
               gstr1Invoices.length === 0
                 ? `No sales invoices found between ${startDate} and ${endDate}. Upload invoices in Sales Register for this month.`
-                : undefined,
+                : usedDksDemo
+                  ? 'GSTR-1 draft generated using DKS March 2025 demo data.'
+                  : undefined,
             totals: {
               taxable: totals.value,
               igst: totals.igst,
@@ -1116,88 +1128,102 @@ export async function POST(req: NextRequest) {
 
       // ============ SAVE GSTR1 TO PORTAL ============
       case 'save-gstr1': {
-        const { returnId, period } = body;
+        try {
+          const { returnId, period } = body;
 
-        const portalConfig = getPortalFilerConfig();
-        const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
+          const portalConfig = getPortalFilerConfig();
+          const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
 
-        if (!txn) {
-          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
-        }
+          if (!txn) {
+            return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
+          }
 
-        const { data: returnRow } = await supabase
-          .from('gst_returns')
-          .select('return_data')
-          .eq('id', returnId)
-          .eq('user_id', user.id)
-          .single();
+          const { data: returnRow } = await supabase
+            .from('gst_returns')
+            .select('return_data')
+            .eq('id', returnId)
+            .eq('user_id', user.id)
+            .single();
 
-        const { data: invoices } = await supabase
-          .from('gstr1_invoices')
-          .select('*')
-          .eq('return_id', returnId);
+          const { data: invoices } = await supabase
+            .from('gstr1_invoices')
+            .select('*')
+            .eq('return_id', returnId);
 
-        const gstinIssues = getPortalGstinIssues(invoices || [], portalConfig.gstin);
-        if (gstinIssues.length > 0) {
+          const gstinIssues = getPortalGstinIssues(invoices || [], portalConfig.gstin);
+          if (gstinIssues.length > 0) {
+            return NextResponse.json({
+              error: gstinIssues.map((i) => i.message).join(' '),
+              gstinIssues,
+            }, { status: 400 });
+          }
+
+          const returnData = (returnRow?.return_data || {}) as Gstr1ReturnData;
+          const payload = buildGstnPayload(invoices || [], returnData, period, portalConfig.gstin);
+          const result = await saveGSTR1(period, txn, payload, portalConfig);
+
+          if (result?.error === true) {
+            return NextResponse.json({ error: result.message || 'Failed to save GSTR-1 to portal' }, { status: 500 });
+          }
+
+          if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+            return NextResponse.json({
+              error: getPortalErrorMessage(result?.error, 'Failed to save GSTR-1 to portal'),
+            }, { status: 409 });
+          }
+
+          await supabase.from('gst_returns').update({
+            status: 'submitted',
+            api_reference_id: result.reference_id || result.ref_id,
+            api_status: result.status_cd === '1' ? 'success' : 'error',
+            api_response: result,
+          }).eq('id', returnId);
+
+          return NextResponse.json(result);
+        } catch (err: unknown) {
+          console.error('[Returns API] save-gstr1 failed:', err);
           return NextResponse.json({
-            error: gstinIssues.map((i) => i.message).join(' '),
-            gstinIssues,
-          }, { status: 400 });
+            error: err instanceof Error ? err.message : 'Failed to save GSTR-1 to portal',
+          }, { status: 500 });
         }
-
-        const returnData = (returnRow?.return_data || {}) as Gstr1ReturnData;
-        const payload = buildGstnPayload(invoices || [], returnData, period, portalConfig.gstin);
-        const result = await saveGSTR1(period, txn, payload, portalConfig);
-
-        if (result?.error === true) {
-          return NextResponse.json({ error: result.message || 'Failed to save GSTR-1 to portal' }, { status: 500 });
-        }
-
-        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
-          return NextResponse.json({
-            error: getPortalErrorMessage(result?.error, 'Failed to save GSTR-1 to portal'),
-          }, { status: 409 });
-        }
-
-        await supabase.from('gst_returns').update({
-          status: 'submitted',
-          api_reference_id: result.reference_id || result.ref_id,
-          api_status: result.status_cd === '1' ? 'success' : 'error',
-          api_response: result,
-        }).eq('id', returnId);
-
-        return NextResponse.json(result);
       }
 
       // ============ SUBMIT GSTR1 TO PORTAL ============
       case 'submit-gstr1': {
-        const { returnId, period } = body;
-        const portalConfig = getPortalFilerConfig();
-        const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
+        try {
+          const { returnId, period } = body;
+          const portalConfig = getPortalFilerConfig();
+          const txn = await getPortalTxn(supabase, user.id, MASTERGST_CONFIG.gstin);
 
-        if (!txn) {
-          return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
-        }
+          if (!txn) {
+            return NextResponse.json({ error: 'Not authenticated with GST portal. Please verify OTP first.' }, { status: 401 });
+          }
 
-        const result = await submitGSTR1(period, txn, portalConfig);
+          const result = await submitGSTR1(period, txn, portalConfig);
 
-        if (result?.error === true) {
-          return NextResponse.json({ error: result.message || 'Failed to submit GSTR-1' }, { status: 500 });
-        }
+          if (result?.error === true) {
+            return NextResponse.json({ error: result.message || 'Failed to submit GSTR-1' }, { status: 500 });
+          }
 
-        if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+          if (result?.status_cd !== '1' && result?.status_cd !== 1 && result?.status !== 'Success' && result?.success !== true) {
+            return NextResponse.json({
+              error: getPortalErrorMessage(result?.error, 'Failed to submit GSTR-1'),
+            }, { status: 409 });
+          }
+
+          await supabase.from('gst_returns').update({
+            status: 'submitted',
+            api_reference_id: result.reference_id || result.ref_id,
+            api_response: result,
+          }).eq('id', returnId);
+
+          return NextResponse.json({ success: true, ...result });
+        } catch (err: unknown) {
+          console.error('[Returns API] submit-gstr1 failed:', err);
           return NextResponse.json({
-            error: getPortalErrorMessage(result?.error, 'Failed to submit GSTR-1'),
-          }, { status: 409 });
+            error: err instanceof Error ? err.message : 'Failed to submit GSTR-1',
+          }, { status: 500 });
         }
-
-        await supabase.from('gst_returns').update({
-          status: 'submitted',
-          api_reference_id: result.reference_id || result.ref_id,
-          api_response: result,
-        }).eq('id', returnId);
-
-        return NextResponse.json({ success: true, ...result });
       }
 
       // ============ FILE GSTR1 WITH EVC ============

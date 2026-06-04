@@ -92,22 +92,69 @@ export default function UploadInvoicesPage() {
   /* recent invoices */
   const [recentInvoices, setRecentInvoices] = useState<PurchaseInvoice[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  /* whatsapp intake */
-  const [waQueue, setWaQueue] = useState<WaIntake[]>([]);
-  const [loadingWa, setLoadingWa] = useState(true);
-  const [waCount, setWaCount] = useState(0);
+  // WhatsApp integration state
+  const [waConfig, setWaConfig] = useState<{ configured: boolean; businessNumber: string | null; webhookConfigured: boolean } | null>(null);
+  const [waQueue, setWaQueue] = useState<any[]>([]);
+  const [loadingWaQueue, setLoadingWaQueue] = useState(false);
 
-  /* ── fetch recent purchase invoices ── */
-  const fetchRecentInvoices = useCallback(async () => {
-    setLoadingRecent(true);
+  // Tab Stats
+  const [stats, setStats] = useState({
+    whatsapp: 0,
+    email: 0
+  });
+
+  // Fetch recent invoices on mount
+  useEffect(() => {
+    fetchRecentInvoices();
+    fetchWaConfig();
+  }, []);
+
+  // Load the WhatsApp quarantine/needs-review queue when the tab is opened.
+  useEffect(() => {
+    if (activeTab === 'whatsapp') {
+      fetchWaQueue();
+    }
+  }, [activeTab]);
+
+  const fetchWaConfig = async () => {
     try {
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.set('status', statusFilter);
-      const res = await fetch(`/api/invoice/purchase?${params}`);
+      const res = await fetch('/api/whatsapp/config');
       const data = await res.json();
+      setWaConfig(data);
+    } catch (error) {
+      console.error('Error fetching WhatsApp config:', error);
+    }
+  };
+
+  const fetchWaQueue = async () => {
+    try {
+      setLoadingWaQueue(true);
+      // Quarantined (failed validation, awaiting resend) + escalated to manual review.
+      const [quarantineRes, reviewRes] = await Promise.all([
+        fetch('/api/invoice/purchase?status=wa_quarantine'),
+        fetch('/api/invoice/purchase?status=needs_review&source=whatsapp'),
+      ]);
+      const quarantine = await quarantineRes.json();
+      const review = await reviewRes.json();
+      const combined = [
+        ...(quarantine.invoices || []),
+        ...(review.invoices || []),
+      ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setWaQueue(combined);
+    } catch (error) {
+      console.error('Error fetching WhatsApp queue:', error);
+    } finally {
+      setLoadingWaQueue(false);
+    }
+  };
+
+  const fetchRecentInvoices = async () => {
+    try {
+      setLoadingRecent(true);
+      const response = await fetch('/api/invoice/purchase');
+      const data = await response.json();
+
       if (data.success && data.invoices) {
         const sorted = [...data.invoices].sort(
           (a: PurchaseInvoice, b: PurchaseInvoice) =>
@@ -292,115 +339,249 @@ export default function UploadInvoicesPage() {
           ))}
         </div>
 
-        {/* ── UPLOAD AREA ── */}
-        <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg p-6 min-h-[280px]">
-
-          {/* WHATSAPP TAB */}
-          {activeTab === 'whatsapp' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Status card */}
-                <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center relative">
-                    <MessageSquare className="h-8 w-8 text-emerald-600" />
-                    <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">WhatsApp Intake</h3>
-                    <p className="text-xs text-gray-500 mt-1">Invoices received via WhatsApp</p>
-                    {loadingWa ? (
-                      <Skeleton className="h-5 w-16 mx-auto mt-2" />
-                    ) : (
-                      <p className="text-2xl font-bold text-emerald-600 mt-2">{waCount}</p>
-                    )}
-                    <p className="text-xs text-gray-500">total entries</p>
-                  </div>
-                  <button
-                    onClick={fetchWaQueue}
-                    className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  >
-                    <RefreshCw className="h-3 w-3" /> Refresh
-                  </button>
-                </div>
-
-                {/* How it works */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
+      {/* 3. UPLOAD AREA (Changes per Tab) */}
+      <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg p-6 min-h-[300px]">
+        
+        {/* TAB 1: WHATSAPP */}
+        {activeTab === 'whatsapp' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+               {/* Connected Status */}
+               {(() => {
+                 const connected = Boolean(waConfig?.configured && waConfig?.webhookConfigured);
+                 const number = waConfig?.businessNumber || 'Not configured';
+                 return (
+                   <div className={`bg-gradient-to-br ${connected ? 'from-emerald-50' : 'from-amber-50'} to-white rounded-2xl border ${connected ? 'border-emerald-200' : 'border-amber-200'} shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4`}>
+                      <div className={`h-16 w-16 rounded-full ${connected ? 'bg-emerald-100' : 'bg-amber-100'} flex items-center justify-center relative`}>
+                        <MessageSquare className={`h-8 w-8 ${connected ? 'text-emerald-600' : 'text-amber-600'}`} />
+                        <div className="absolute -right-1 -bottom-1 h-6 w-6 rounded-full bg-white border-2 border-emerald-200 flex items-center justify-center">
+                          {connected
+                            ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            : <AlertCircle className="h-5 w-5 text-amber-600" />}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {connected ? 'WhatsApp Connected' : 'WhatsApp Setup Pending'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">{number}</p>
+                        <p className={`text-xs mt-2 font-medium ${connected ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {connected ? 'Auto-extraction active' : 'Configure Slide API + webhook secret'}
+                        </p>
+                      </div>
+                   </div>
+                 );
+               })()}
+               
+               {/* Instructions */}
+               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">How it works</h3>
-                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                    <li>Vendors share invoice PDFs/images to your registered WhatsApp Business number.</li>
-                    <li>Our system automatically extracts attachments and processes them via AI OCR.</li>
-                    <li>Extracted data appears in the table below for review.</li>
-                  </ol>
-                  <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                    Invoices are auto-linked to your purchase register after extraction.
+                  <div className="space-y-4">
+                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                        <li>Share invoices (PDF/Image) to your registered WhatsApp Business number.</li>
+                        <li>Our system automatically extracts attachments and processes them.</li>
+                        <li>You receive a notification once the GST validation is complete.</li>
+                     </ol>
+                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
+                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                       Invoices are validated automatically; only correct ones appear in your register. Vendors are asked over WhatsApp to fix and resend the rest.
+                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* WhatsApp queue table */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900">WhatsApp Intake Queue</h3>
-                  <span className="text-xs text-gray-500">{waCount} total</span>
-                </div>
-                {loadingWa ? (
-                  <div className="p-8 space-y-3">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-                  </div>
-                ) : waQueue.length === 0 ? (
-                  <div className="flex flex-col items-center py-14 text-gray-400 gap-2">
-                    <MessageSquare className="h-10 w-10 opacity-20" />
-                    <p className="text-sm">No WhatsApp invoices received yet.</p>
-                    <p className="text-xs text-gray-400">Ask vendors to share invoices to your WhatsApp number.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-xs">Sender Phone</th>
-                          <th className="px-6 py-3 text-xs">Invoice #</th>
-                          <th className="px-6 py-3 text-xs">Attempts</th>
-                          <th className="px-6 py-3 text-xs">Received</th>
-                          <th className="px-6 py-3 text-xs">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {waQueue.map(wa => (
-                          <tr key={wa.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-3 font-medium text-gray-900 flex items-center gap-2">
-                              <Phone className="h-3.5 w-3.5 text-emerald-500" />
-                              {wa.sender_phone}
-                            </td>
-                            <td className="px-6 py-3 text-gray-600 font-mono text-xs">
-                              {wa.invoice_number ?? <span className="text-gray-400 italic">—</span>}
-                            </td>
-                            <td className="px-6 py-3 text-gray-600 text-center">{wa.attempt_count}</td>
-                            <td className="px-6 py-3 text-gray-500 text-xs whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {relativeTime(wa.created_at)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${statusStyle(wa.last_status)}`}>
-                                {wa.last_status === 'pending' && <Loader2 className="h-3 w-3 animate-spin" />}
-                                {wa.last_status === 'validated' && <CheckCircle2 className="h-3 w-3" />}
-                                {statusLabel(wa.last_status)}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+            {/* Quarantine / Needs-Review Queue */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                 <div>
+                   <h3 className="font-semibold text-gray-900">Held for Correction (WhatsApp)</h3>
+                   <p className="text-xs text-gray-500 mt-0.5">Invoices that failed validation — the vendor has been asked to resend. These do not appear in your register.</p>
+                 </div>
+                 <button
+                   onClick={fetchWaQueue}
+                   className="text-gray-600 hover:text-gray-900 p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                   title="Refresh"
+                 >
+                   <RefreshCw className={`h-4 w-4 ${loadingWaQueue ? 'animate-spin' : ''}`} />
+                 </button>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left text-sm">
+                    <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
+                       <tr>
+                         <th className="px-6 py-3">Vendor Phone</th>
+                         <th className="px-6 py-3">Invoice #</th>
+                         <th className="px-6 py-3">Received</th>
+                         <th className="px-6 py-3">Attempts</th>
+                         <th className="px-6 py-3">Status</th>
+                         <th className="px-6 py-3 text-right">Action</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                       {loadingWaQueue ? (
+                         <tr>
+                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                             <Loader2 className="h-5 w-5 animate-spin inline mr-2" /> Loading…
+                           </td>
+                         </tr>
+                       ) : waQueue.length === 0 ? (
+                         <tr>
+                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                             Nothing held for correction. 🎉
+                           </td>
+                         </tr>
+                       ) : (
+                         waQueue.map((inv) => {
+                           const isReview = inv.invoice_status === 'needs_review';
+                           const received = inv.created_at
+                             ? new Date(inv.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                             : 'N/A';
+                           return (
+                             <tr key={inv.id} className="group hover:bg-gray-50 transition-colors">
+                               <td className="px-6 py-3 text-gray-900 font-medium flex items-center gap-2">
+                                 <Phone className="h-3.5 w-3.5 text-gray-400" /> {inv.wa_sender_phone || 'Unknown'}
+                               </td>
+                               <td className="px-6 py-3 text-gray-700">{inv.invoice_number || '—'}</td>
+                               <td className="px-6 py-3 text-gray-600">{received}</td>
+                               <td className="px-6 py-3 text-gray-600">{inv.wa_attempt_count || 1}</td>
+                               <td className="px-6 py-3">
+                                 {isReview ? (
+                                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                                     <AlertCircle className="h-3 w-3" /> Needs Review
+                                   </span>
+                                 ) : (
+                                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                     <AlertCircle className="h-3 w-3" /> Awaiting Resend
+                                   </span>
+                                 )}
+                               </td>
+                               <td className="px-6 py-3 text-right">
+                                  {inv.invoice_bucket_url ? (
+                                    <a
+                                      href={inv.invoice_bucket_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors inline-block"
+                                    >
+                                      View File
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs">—</span>
+                                  )}
+                               </td>
+                             </tr>
+                           );
+                         })
+                       )}
+                    </tbody>
+                 </table>
+               </div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* TAB 2: EMAIL */}
+        {/* {activeTab === 'email' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <GlassPanel className="p-5">
+                   <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold text-white">Connected Inboxes</h3>
+                      <button className="text-xs text-primary hover:underline">+ Add Account</button>
+                   </div>
+                   <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-white/5">
+                         <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded bg-red-500/20 flex items-center justify-center text-red-500 font-bold">G</div>
+                            <div>
+                               <p className="text-sm font-medium text-white">accounts@company.com</p>
+                               <p className="text-xs text-zinc-500">Synced: Just now</p>
+                            </div>
+                         </div>
+                         <div className="flex items-center gap-3">
+                            <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Active</span>
+                            <button className="text-zinc-500 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
+                         </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-white/5">
+                         <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">O</div>
+                            <div>
+                               <p className="text-sm font-medium text-white">purchase@company.com</p>
+                               <p className="text-xs text-zinc-500">Synced: 1 hour ago</p>
+                            </div>
+                         </div>
+                         <div className="flex items-center gap-3">
+                            <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Active</span>
+                            <button className="text-zinc-500 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
+                         </div>
+                      </div>
+                   </div>
+                </GlassPanel>
+
+                <BentoCard title="Email Auto-Capture">
+                   <p className="text-sm text-zinc-400 mb-4">
+                     We automatically scan your inbox for emails containing keywords like "Invoice", "Bill", or "GST" and extract attachments.
+                   </p>
+                   <div className="flex gap-2">
+                     <button className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+                        Sync Now
+                     </button>
+                     <button className="flex-1 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors border border-white/5">
+                        Settings
+                     </button>
+                   </div>
+                </BentoCard>
+             </div>
+
+       
+             <GlassPanel className="p-0 overflow-hidden">
+               <div className="px-6 py-4 border-b border-white/5 bg-white/5">
+                 <h3 className="font-semibold text-white">Inbox Preview</h3>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left text-sm">
+                    <thead className="text-zinc-500 font-medium border-b border-white/5">
+                       <tr>
+                         <th className="px-6 py-3">From</th>
+                         <th className="px-6 py-3">Subject</th>
+                         <th className="px-6 py-3">Attachment</th>
+                         <th className="px-6 py-3">Date</th>
+                         <th className="px-6 py-3">Status</th>
+                         <th className="px-6 py-3 text-right">Action</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                       {[
+                         { from: 'billing@aws.com', subject: 'Invoice for Oct 2025', file: 'inv_oct.pdf', status: 'Extracted' },
+                         { from: 'vendors@steel.com', subject: 'Material Bill 123', file: 'bill.jpg', status: 'Pending' }
+                       ].map((mail, i) => (
+                         <tr key={i} className="group hover:bg-white/5 transition-colors">
+                           <td className="px-6 py-3 text-white">{mail.from}</td>
+                           <td className="px-6 py-3 text-zinc-300">{mail.subject}</td>
+                           <td className="px-6 py-3 text-zinc-400 flex items-center gap-2">
+                             <FileText className="h-3 w-3" /> {mail.file}
+                           </td>
+                           <td className="px-6 py-3 text-zinc-500">Today, 10:00 AM</td>
+                           <td className="px-6 py-3">
+                             {mail.status === 'Extracted' ? (
+                               <span className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Extracted</span>
+                             ) : (
+                               <span className="text-xs text-zinc-500 flex items-center gap-1"><Loader2 className="h-3 w-3" /> Pending</span>
+                             )}
+                           </td>
+                           <td className="px-6 py-3 text-right">
+                              <button className="text-zinc-400 hover:text-white px-2 py-1 border border-zinc-700 rounded text-xs">Process</button>
+                           </td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+               </div>
+            </GlassPanel>
+          </div>
+        )} */}
 
           {/* MANUAL UPLOAD TAB */}
           {activeTab === 'manual' && (

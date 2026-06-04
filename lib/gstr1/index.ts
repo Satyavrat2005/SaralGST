@@ -8,3 +8,5 @@ export * from './mapSalesToGstr1';
 export * from './buildSummaries';
 export * from './validateGstr1';
 export * from './buildGstnPayload';
+export * from './dksMarchDemo';
+export * from './exportGstr1Excel';
