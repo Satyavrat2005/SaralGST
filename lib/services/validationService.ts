@@ -195,6 +195,7 @@ function validateMandatoryFields(data: ExtractedInvoiceData, errors: ValidationE
     { field: 'description', value: data.description, label: 'Description of Goods/Services', critical: false },
     { field: 'quantity', value: data.quantity, label: 'Quantity', critical: false },
     { field: 'unit', value: data.unit, label: 'Unit of Measure', critical: false },
+    { field: 'rate_per_unit', value: (data as ExtractedInvoiceData & { rate_per_unit?: string | number }).rate_per_unit, label: 'Rate per Unit', critical: false },
   ];
 
   mandatoryFields.forEach(({ field, value, confidence, label, critical }) => {

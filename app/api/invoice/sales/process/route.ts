@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  uploadSalesInvoice,
-  createNewSalesInvoice,
-  updateNewSalesInvoice,
-  createSalesRemarks,
-  SalesInvoice,
-} from '@/lib/services/salesInvoiceService';
-import { extractSalesInvoiceWithGemini } from '@/lib/services/geminiSalesExtractionService';
+  processSalesInvoiceFile,
+  ALLOWED_SALES_MIME_TYPES,
+  MAX_SALES_FILE_SIZE,
+} from '@/lib/services/salesInvoicePipeline';
 
 /**
  * POST /api/invoice/sales/process
- * Upload PDF/image → Gemini reads the file natively → structured JSON → save to sales_invoices
- *
- * NOTE: No OCR step — Gemini receives the raw file bytes directly.
+ * Upload PDF/image → Gemini → structured JSON → save to sales_invoices
  */
 export async function POST(request: NextRequest) {
   try {
@@ -23,252 +18,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
+    if (!ALLOWED_SALES_MIME_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: 'Invalid file type. Only PDF, JPG, and PNG are allowed.' },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 10 MB)
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_SALES_FILE_SIZE) {
       return NextResponse.json(
         { error: 'File size exceeds 10 MB limit.' },
         { status: 400 }
       );
     }
 
-    // ── Step 1: Upload file to Supabase Storage ──────────────────────────────
-    const { data: uploadData, error: uploadError } = await uploadSalesInvoice(file, true);
-    if (uploadError || !uploadData) {
+    const result = await processSalesInvoiceFile(file, 'manual');
+
+    if (!result.success && !result.invoiceId) {
       return NextResponse.json(
-        { error: `Failed to upload file: ${uploadError}` },
+        { error: result.error || 'Failed to process invoice' },
         { status: 500 }
       );
     }
 
-    // ── Step 2: Create a placeholder record so we have an ID immediately ─────
-    const { data: placeholder, error: createError } = await createNewSalesInvoice(
-      { invoice_file_url: uploadData.url, extraction_status: 'pending' },
-      true
-    );
-
-    if (createError || !placeholder) {
-      return NextResponse.json(
-        { error: `Failed to create invoice record: ${createError}` },
-        { status: 500 }
-      );
-    }
-
-    const invoiceId = placeholder.id!;
-
-    // ── Step 3: Send file directly to Gemini for structured extraction ────────
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const { data: extracted, error: extractionError } = await extractSalesInvoiceWithGemini(
-      fileBuffer,
-      file.type
-    );
-
-    if (extractionError || !extracted) {
-      console.error('[ProcessRoute] Gemini extraction failed:', extractionError);
-      await updateNewSalesInvoice(invoiceId, { extraction_status: 'needs_review' }, true);
+    if (!result.success) {
       return NextResponse.json({
         success: true,
-        invoiceId,
-        message: extractionError?.includes('API key')
-          ? 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env.local file.'
-          : 'Invoice uploaded but extraction failed. Please fill in the details manually.',
-        invoice: placeholder,
-        extractionError,
+        invoiceId: result.invoiceId,
+        message:
+          result.error?.includes('API key') || result.error?.includes('Gemini')
+            ? 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env.local file.'
+            : 'Invoice uploaded but extraction failed. Please fill in the details manually.',
+        invoice: result.invoice,
+        extractionError: result.error,
       });
     }
 
-    // ── Step 4: Map GeminiSalesData → SalesInvoice DB row ────────────────────
-    const invoiceData: Partial<SalesInvoice> = {
-      // 1. Basic Invoice Information
-      invoice_date:   extracted.invoice_date,
-      voucher_type:   extracted.voucher_type,
-      invoice_number: extracted.invoice_number,
-      invoice_type:   extracted.invoice_type,
-
-      // 2. Customer Details
-      customer_name:   extracted.customer_name,
-      customer_gstin:  extracted.customer_gstin,
-      place_of_supply: extracted.place_of_supply,
-
-      // 3. Product & Pricing
-      hsn_sac_code: extracted.hsn_sac_code,
-      quantity:     extracted.quantity,       // already a number | null
-      uqc:          extracted.uqc,
-      rate:         extracted.rate,
-
-      // 4. Financial & Tax Breakdown
-      local_sales_taxable_18: extracted.local_sales_taxable_18,
-      local_sales_taxable_12: extracted.local_sales_taxable_12,
-      oms_sales_taxable_12:   extracted.oms_sales_taxable_12,
-      taxable_value:          extracted.taxable_value,
-      cgst_amount:            extracted.cgst_amount,
-      sgst_amount:            extracted.sgst_amount,
-      igst_amount:            extracted.igst_amount,
-      tcs_cess:               extracted.tcs_cess,
-      round_off:              extracted.round_off,
-      gross_total:            extracted.gross_total,
-
-      // 5. Advanced Compliance
-      reverse_charge:   extracted.reverse_charge,
-      eway_bill_number: extracted.eway_bill_number,
-      irn:              extracted.irn,
-
-      // Processing metadata
-      invoice_file_url:  uploadData.url,
-      gemini_raw_json:   extracted,
-      extraction_status: determineExtractionStatus(extracted),
-    };
-
-    const validation = validateSalesInvoice(invoiceData);
-
-    // ── Step 5: Persist extracted data ───────────────────────────────────────
-    const { data: updatedInvoice, error: updateError } = await updateNewSalesInvoice(
-      invoiceId,
-      invoiceData,
-      true
-    );
-
-    if (updateError) {
-      console.error('[ProcessRoute] DB update failed:', updateError);
-      return NextResponse.json({
-        success: true,
-        invoiceId,
-        invoice: invoiceData,
-        message: 'Data extracted but could not save to database. Please retry.',
-      });
-    }
-
-    const remarks = buildSalesRemarks(invoiceId, validation);
-    if (remarks.length > 0) {
-      const { error: remarkError } = await createSalesRemarks(remarks, true);
-      if (remarkError) {
-        console.warn('[ProcessRoute] Could not save sales remarks:', remarkError);
-      }
-    }
+    const validation = result.validation!;
 
     return NextResponse.json({
       success: true,
-      invoiceId,
-      invoice: updatedInvoice,
+      invoiceId: result.invoiceId,
+      invoice: result.invoice,
       validation: {
         isValid: validation.isValid,
         errors: validation.errors,
         warnings: validation.warnings,
-        missingFields: getMissingSalesFields(invoiceData),
+        missingFields: validation.missingFields,
       },
       message: validation.isValid
-        ? `Invoice processed successfully: ${invoiceData.invoice_number || invoiceId}`
+        ? `Invoice processed successfully: ${result.invoice?.invoice_number || result.invoiceId}`
         : 'Invoice uploaded with some missing fields. Please review.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('[ProcessRoute] Unhandled error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: message },
       { status: 500 }
     );
   }
 }
-
-/**
- * Decide extraction_status based on which critical fields were found.
- */
-function determineExtractionStatus(
-  data: Partial<{
-    invoice_number: string | null;
-    invoice_date: string | null;
-    taxable_value: number | null;
-    gross_total: number | null;
-  }>
-): SalesInvoice['extraction_status'] {
-  const hasCritical =
-    data.invoice_number &&
-    data.invoice_date &&
-    (data.taxable_value !== null || data.gross_total !== null);
-  return hasCritical ? 'extracted' : 'needs_review';
-}
-
-function getMissingSalesFields(invoice: Partial<SalesInvoice>): string[] {
-  const missing: string[] = [];
-
-  if (!invoice.invoice_number) missing.push('Invoice Number');
-  if (!invoice.invoice_date) missing.push('Invoice Date');
-  if (!invoice.invoice_type) missing.push('Invoice Type');
-  if (!invoice.customer_name) missing.push('Customer Name');
-  if (!invoice.place_of_supply) missing.push('Place of Supply');
-  if (invoice.taxable_value === null || invoice.taxable_value === undefined) missing.push('Taxable Value');
-  if (!invoice.hsn_sac_code) missing.push('HSN/SAC Code');
-  if (!invoice.invoice_file_url) missing.push('Invoice File');
-
-  return missing;
-}
-
-function validateSalesInvoice(invoice: Partial<SalesInvoice>) {
-  const missingFields = getMissingSalesFields(invoice);
-  const warnings: Array<{ field: string; message: string }> = [];
-
-  if (invoice.invoice_type === 'B2B' && !invoice.customer_gstin) {
-    missingFields.push('Customer GSTIN');
-  }
-
-  if (invoice.gross_total === null || invoice.gross_total === undefined) {
-    warnings.push({ field: 'gross_total', message: 'Gross total could not be confirmed from the extracted data.' });
-  }
-
-  return {
-    isValid: missingFields.length === 0,
-    errors: missingFields.map((field) => ({
-      field,
-      issue_type: 'missing' as const,
-      detected_value: null,
-      message: `${field} is required for sales register and GSTR-1 review`,
-    })),
-    warnings,
-  };
-}
-
-function buildSalesRemarks(
-  salesId: string,
-  validation: ReturnType<typeof validateSalesInvoice>
-) {
-  const remarks: Array<{
-    sales_id: string;
-    field_name: string;
-    issue_type: 'missing' | 'mismatch' | 'invalid' | 'low_confidence';
-    detected_value: string | null;
-    expected_value: string | null;
-    comment: string;
-    status: 'open';
-  }> = validation.errors.map((error) => ({
-    sales_id: salesId,
-    field_name: error.field,
-    issue_type: error.issue_type,
-    detected_value: null,
-    expected_value: null,
-    comment: error.message,
-    status: 'open' as const,
-  }));
-
-  validation.warnings.forEach((warning) => {
-    remarks.push({
-      sales_id: salesId,
-      field_name: warning.field,
-      issue_type: 'low_confidence',
-      detected_value: null,
-      expected_value: null,
-      comment: warning.message,
-      status: 'open' as const,
-    });
-  });
-
-  return remarks;
-}
-
-

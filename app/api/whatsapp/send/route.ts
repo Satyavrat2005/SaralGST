@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     if (!isWhatsAppConfigured()) {
       return NextResponse.json(
-        { error: 'WhatsApp (Slide) is not configured. Set SLIDE_API_BASE_URL and SLIDE_API_KEY.' },
+        { error: 'WhatsApp (OpenWA) is not configured. Set OPENWA_BASE_URL, OPENWA_API_KEY, and OPENWA_SESSION_ID.' },
         { status: 503 }
       );
     }

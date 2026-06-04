@@ -362,14 +362,24 @@ export async function findDuplicateInvoice(
 // WhatsApp intake tracking (correlates resends)
 // =====================================================
 
+export type InvoiceKind = 'purchase' | 'sales';
+
 export interface WhatsAppIntake {
   id?: string;
   sender_phone: string;
   invoice_number?: string | null;
+  invoice_kind?: InvoiceKind | null;
   attempt_count?: number | null;
-  last_status?: 'pending' | 'validated' | 'rejected' | 'needs_review' | null;
+  last_status?:
+    | 'pending'
+    | 'validated'
+    | 'rejected'
+    | 'needs_review'
+    | 'awaiting_kind'
+    | null;
   last_error_summary?: string | null;
   linked_purchase_id?: string | null;
+  linked_sales_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -418,14 +428,20 @@ export async function upsertWhatsAppIntake(
   intake: WhatsAppIntake
 ): Promise<{ data: WhatsAppIntake | null; error: string | null }> {
   try {
-    const payload = { ...intake, updated_at: new Date().toISOString() };
+    const { id, ...fields } = intake;
+    const payload: Record<string, unknown> = {
+      ...fields,
+      updated_at: new Date().toISOString(),
+    };
+    // Omit id on insert so Postgres DEFAULT uuid_generate_v4() applies.
+    // Explicit `id: undefined` would otherwise be sent as NULL.
 
     let result;
-    if (intake.id) {
+    if (id) {
       result = await supabaseAdmin
         .from('whatsapp_intake')
-        .update(payload)
-        .eq('id', intake.id)
+        .update({ ...payload, id })
+        .eq('id', id)
         .select()
         .single();
     } else {

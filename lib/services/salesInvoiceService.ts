@@ -387,8 +387,12 @@ export interface SalesInvoice {
 
   // File & AI Processing
   invoice_file_url?: string | null;
-  extraction_status?: 'pending' | 'extracted' | 'needs_review' | null;
+  extraction_status?: 'pending' | 'extracted' | 'needs_review' | 'wa_quarantine' | null;
   gemini_raw_json?: any | null;
+
+  source?: 'whatsapp' | 'email' | 'manual' | 'bulk' | null;
+  wa_sender_phone?: string | null;
+  wa_attempt_count?: number | null;
 
   created_at?: string;
   updated_at?: string;

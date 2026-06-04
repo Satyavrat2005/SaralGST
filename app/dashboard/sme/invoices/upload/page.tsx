@@ -48,7 +48,15 @@ export default function UploadInvoicesPage() {
   const [loadingRecent, setLoadingRecent] = useState(true);
 
   // WhatsApp integration state
-  const [waConfig, setWaConfig] = useState<{ configured: boolean; businessNumber: string | null; webhookConfigured: boolean } | null>(null);
+  const [waConfig, setWaConfig] = useState<{
+    configured: boolean;
+    openwaConfigured?: boolean;
+    openwaHealthy?: boolean;
+    openwaSessionId?: string | null;
+    businessNumber: string | null;
+    webhookConfigured: boolean;
+    businessGstinConfigured?: boolean;
+  } | null>(null);
   const [waQueue, setWaQueue] = useState<any[]>([]);
   const [loadingWaQueue, setLoadingWaQueue] = useState(false);
 
@@ -84,18 +92,9 @@ export default function UploadInvoicesPage() {
   const fetchWaQueue = async () => {
     try {
       setLoadingWaQueue(true);
-      // Quarantined (failed validation, awaiting resend) + escalated to manual review.
-      const [quarantineRes, reviewRes] = await Promise.all([
-        fetch('/api/invoice/purchase?status=wa_quarantine'),
-        fetch('/api/invoice/purchase?status=needs_review&source=whatsapp'),
-      ]);
-      const quarantine = await quarantineRes.json();
-      const review = await reviewRes.json();
-      const combined = [
-        ...(quarantine.invoices || []),
-        ...(review.invoices || []),
-      ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setWaQueue(combined);
+      const res = await fetch('/api/whatsapp/queue');
+      const data = await res.json();
+      setWaQueue(data.invoices || []);
     } catch (error) {
       console.error('Error fetching WhatsApp queue:', error);
     } finally {
@@ -343,8 +342,15 @@ export default function UploadInvoicesPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                {/* Connected Status */}
                {(() => {
-                 const connected = Boolean(waConfig?.configured && waConfig?.webhookConfigured);
+                 const connected = Boolean(
+                   waConfig?.openwaConfigured &&
+                   waConfig?.webhookConfigured &&
+                   waConfig?.openwaHealthy
+                 );
                  const number = waConfig?.businessNumber || 'Not configured';
+                 const sessionLabel = waConfig?.openwaSessionId
+                   ? `Session: ${waConfig.openwaSessionId}`
+                   : 'OpenWA session not set';
                  return (
                    <div className={`bg-gradient-to-br ${connected ? 'from-emerald-50' : 'from-amber-50'} to-white rounded-2xl border ${connected ? 'border-emerald-200' : 'border-amber-200'} shadow-lg p-6 flex flex-col items-center justify-center text-center space-y-4`}>
                       <div className={`h-16 w-16 rounded-full ${connected ? 'bg-emerald-100' : 'bg-amber-100'} flex items-center justify-center relative`}>
@@ -357,12 +363,18 @@ export default function UploadInvoicesPage() {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {connected ? 'WhatsApp Connected' : 'WhatsApp Setup Pending'}
+                          {connected ? 'WhatsApp Connected (OpenWA)' : 'WhatsApp Setup Pending'}
                         </h3>
                         <p className="text-sm text-gray-600 mt-1">{number}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{sessionLabel}</p>
                         <p className={`text-xs mt-2 font-medium ${connected ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {connected ? 'Auto-extraction active' : 'Configure Slide API + webhook secret'}
+                          {connected
+                            ? 'Auto-extraction active'
+                            : 'Set OPENWA_* env vars, webhook secret, and register webhook in OpenWA'}
                         </p>
+                        {!waConfig?.businessGstinConfigured && (
+                          <p className="text-xs text-amber-700 mt-1">BUSINESS_GSTIN not set — auto purchase/sales routing disabled</p>
+                        )}
                       </div>
                    </div>
                  );
@@ -373,9 +385,9 @@ export default function UploadInvoicesPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">How it works</h3>
                   <div className="space-y-4">
                      <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                        <li>Share invoices (PDF/Image) to your registered WhatsApp Business number.</li>
-                        <li>Our system automatically extracts attachments and processes them.</li>
-                        <li>You receive a notification once the GST validation is complete.</li>
+                        <li>Send purchase or sales invoices (PDF/image) to your WhatsApp number linked in OpenWA.</li>
+                        <li>Include <strong>purchase</strong> or <strong>sales</strong> in the caption; otherwise we detect from your GSTIN or ask you to reply.</li>
+                        <li>You get a WhatsApp reply with validation results; good invoices appear in the register automatically.</li>
                      </ol>
                      <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -404,7 +416,8 @@ export default function UploadInvoicesPage() {
                  <table className="w-full text-left text-sm">
                     <thead className="text-gray-500 font-medium border-b border-gray-200 bg-gray-50">
                        <tr>
-                         <th className="px-6 py-3">Vendor Phone</th>
+                         <th className="px-6 py-3">Type</th>
+                         <th className="px-6 py-3">Sender Phone</th>
                          <th className="px-6 py-3">Invoice #</th>
                          <th className="px-6 py-3">Received</th>
                          <th className="px-6 py-3">Attempts</th>
@@ -415,13 +428,13 @@ export default function UploadInvoicesPage() {
                     <tbody className="divide-y divide-gray-100">
                        {loadingWaQueue ? (
                          <tr>
-                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                           <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                              <Loader2 className="h-5 w-5 animate-spin inline mr-2" /> Loading…
                            </td>
                          </tr>
                        ) : waQueue.length === 0 ? (
                          <tr>
-                           <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                           <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                              Nothing held for correction. 🎉
                            </td>
                          </tr>
@@ -433,6 +446,11 @@ export default function UploadInvoicesPage() {
                              : 'N/A';
                            return (
                              <tr key={inv.id} className="group hover:bg-gray-50 transition-colors">
+                               <td className="px-6 py-3">
+                                 <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${inv.register === 'sales' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
+                                   {inv.register === 'sales' ? 'Sales' : 'Purchase'}
+                                 </span>
+                               </td>
                                <td className="px-6 py-3 text-gray-900 font-medium flex items-center gap-2">
                                  <Phone className="h-3.5 w-3.5 text-gray-400" /> {inv.wa_sender_phone || 'Unknown'}
                                </td>
@@ -451,9 +469,9 @@ export default function UploadInvoicesPage() {
                                  )}
                                </td>
                                <td className="px-6 py-3 text-right">
-                                  {inv.invoice_bucket_url ? (
+                                  {(inv.invoice_bucket_url || inv.invoice_file_url) ? (
                                     <a
-                                      href={inv.invoice_bucket_url}
+                                      href={inv.invoice_bucket_url || inv.invoice_file_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors inline-block"
