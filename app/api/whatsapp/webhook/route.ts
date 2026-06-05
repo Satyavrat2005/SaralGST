@@ -16,6 +16,7 @@ import {
   composeConfirmationMessage,
   composeRejectionMessageWithAI,
 } from '@/lib/services/whatsappService';
+import { handleInboundText } from '@/lib/services/whatsappAssistant';
 
 /**
  * POST /api/whatsapp/webhook
@@ -75,19 +76,26 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = parseEvolutionEvent(payload);
-  if (!parsed || !parsed.senderPhone || !parsed.hasMedia) {
-    // Nothing actionable (e.g. a plain text message, a status update, or an
-    // event we don't care about). Ack so Evolution doesn't retry.
-    return NextResponse.json({
-      success: true,
-      message: 'No invoice attachment found; nothing to process.',
-    });
+  if (!parsed || !parsed.senderPhone) {
+    // Not an inbound 1:1 message we care about (status update, group, our own
+    // echo, etc.). Ack so Evolution doesn't retry.
+    return NextResponse.json({ success: true, message: 'Nothing to process.' });
   }
 
   // ── 3. Ack fast, process in the background ─────────────────────────────────
-  after(() => handleInboundInvoice(parsed));
+  if (parsed.hasMedia) {
+    // An attachment → run the invoice intake pipeline.
+    after(() => handleInboundInvoice(parsed));
+    return NextResponse.json({ success: true, message: 'Received, validating…' });
+  }
 
-  return NextResponse.json({ success: true, message: 'Received, validating…' });
+  if (parsed.text.trim()) {
+    // A plain text message → the conversational assistant (scoped to the sender).
+    after(() => handleInboundText(parsed.senderPhone, parsed.text));
+    return NextResponse.json({ success: true, message: 'Received, replying…' });
+  }
+
+  return NextResponse.json({ success: true, message: 'Nothing to process.' });
 }
 
 interface ParsedInbound {
@@ -97,6 +105,7 @@ interface ParsedInbound {
   mimeType: string;
   fileName: string;
   hasMedia: boolean;
+  text: string; // plain text body (for the conversational assistant)
 }
 
 /**
@@ -125,6 +134,15 @@ function parseEvolutionEvent(payload: any): ParsedInbound | null {
 
   // Locate a document or image node (document can be nested under a caption msg).
   const message = data.message || {};
+
+  // Plain text body across Evolution message shapes.
+  const text =
+    message.conversation ||
+    message.extendedTextMessage?.text ||
+    message.ephemeralMessage?.message?.conversation ||
+    message.ephemeralMessage?.message?.extendedTextMessage?.text ||
+    '';
+
   const mediaNode =
     message.documentMessage ||
     message.documentWithCaptionMessage?.message?.documentMessage ||
@@ -132,8 +150,8 @@ function parseEvolutionEvent(payload: any): ParsedInbound | null {
     null;
 
   if (!mediaNode) {
-    // Not a media message — nothing to process.
-    return { senderPhone, base64: null, rawMessage: data, mimeType: '', fileName: '', hasMedia: false };
+    // Not a media message — may still carry text for the assistant.
+    return { senderPhone, base64: null, rawMessage: data, mimeType: '', fileName: '', hasMedia: false, text };
   }
 
   const mimeType = String(mediaNode.mimetype || '').toLowerCase();
@@ -150,6 +168,7 @@ function parseEvolutionEvent(payload: any): ParsedInbound | null {
     mimeType,
     fileName,
     hasMedia: true,
+    text,
   };
 }
 
