@@ -57,7 +57,13 @@ export default function PurchaseRegisterPage() {
   const [remarks, setRemarks] = useState<Remark[]>([]);
   const [loadingRemarks, setLoadingRemarks] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  
+
+  // WhatsApp (Evolution) outbound state
+  const [waSendingId, setWaSendingId] = useState<string | null>(null);
+  const [waBulkSending, setWaBulkSending] = useState(false);
+  const [waModalSending, setWaModalSending] = useState(false);
+  const [waDocSending, setWaDocSending] = useState(false);
+
   // Filter states
   const [dateFilter, setDateFilter] = useState('This Month');
   const [vendorFilter, setVendorFilter] = useState('All Vendors');
@@ -323,6 +329,111 @@ export default function PurchaseRegisterPage() {
     } finally {
       setActiveDropdown(null);
     }
+  };
+
+  // --- WhatsApp (Evolution) outbound helpers ---
+
+  // Low-level call to the existing /api/whatsapp/send endpoint.
+  const sendWhatsAppToVendor = async (payload: Record<string, any>): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send WhatsApp message');
+      }
+      return true;
+    } catch (error) {
+      console.error('WhatsApp send error:', error);
+      return false;
+    }
+  };
+
+  // Builds a human-readable "what's wrong" summary for a vendor message.
+  const buildVendorIssueDetail = (invoice: PurchaseRegister): string => {
+    const missing = getMissingFields(invoice);
+    if (missing.length > 0) return `Missing/invalid fields: ${missing.join(', ')}`;
+    return 'Please review and confirm the invoice details.';
+  };
+
+  // Per-row: chase the vendor about a single invoice.
+  const handleMessageVendor = async (invoice: PurchaseRegister) => {
+    if (!invoice.wa_sender_phone) return;
+    setWaSendingId(invoice.id || null);
+    const ok = await sendWhatsAppToVendor({
+      to: invoice.wa_sender_phone,
+      kind: 'discrepancy_found',
+      invoiceNo: invoice.invoice_number || '',
+      detail: buildVendorIssueDetail(invoice),
+    });
+    setWaSendingId(null);
+    setActiveDropdown(null);
+    alert(ok ? 'WhatsApp message sent to vendor.' : 'Failed to send WhatsApp message.');
+  };
+
+  // Bulk: chase every selected invoice that has a WhatsApp number.
+  const handleBulkWhatsApp = async () => {
+    const targets = purchaseInvoices.filter(
+      inv => inv.id && selectedRows.includes(inv.id) && inv.wa_sender_phone
+    );
+    const skipped = selectedRows.length - targets.length;
+
+    if (targets.length === 0) {
+      alert('None of the selected invoices have a WhatsApp contact number.');
+      return;
+    }
+
+    setWaBulkSending(true);
+    let sent = 0;
+    for (const inv of targets) {
+      const ok = await sendWhatsAppToVendor({
+        to: inv.wa_sender_phone,
+        kind: 'discrepancy_found',
+        invoiceNo: inv.invoice_number || '',
+        detail: buildVendorIssueDetail(inv),
+      });
+      if (ok) sent++;
+    }
+    setWaBulkSending(false);
+    alert(`WhatsApp: ${sent} sent${skipped > 0 ? `, ${skipped} skipped (no number)` : ''}.`);
+  };
+
+  // Modal: send a correction request based on missing fields + validation remarks.
+  const handleSendCorrectionRequest = async () => {
+    if (!selectedInvoice?.wa_sender_phone) return;
+    setWaModalSending(true);
+    const missing = getMissingFields(selectedInvoice);
+    const remarkSummary = remarks.map(
+      r => `${r.field_name.replace(/_/g, ' ')}: ${r.comment || r.issue_type}`
+    );
+    const detail =
+      [...(missing.length ? [`Missing: ${missing.join(', ')}`] : []), ...remarkSummary].join('; ') ||
+      'Please review the invoice.';
+    const ok = await sendWhatsAppToVendor({
+      to: selectedInvoice.wa_sender_phone,
+      kind: 'discrepancy_found',
+      invoiceNo: selectedInvoice.invoice_number || '',
+      detail,
+    });
+    setWaModalSending(false);
+    alert(ok ? 'Correction request sent to vendor on WhatsApp.' : 'Failed to send WhatsApp message.');
+  };
+
+  // Modal: send the stored invoice copy back to the vendor.
+  const handleSendInvoiceCopy = async () => {
+    if (!selectedInvoice?.wa_sender_phone || !selectedInvoice.invoice_bucket_url) return;
+    setWaDocSending(true);
+    const ok = await sendWhatsAppToVendor({
+      to: selectedInvoice.wa_sender_phone,
+      kind: 'document',
+      fileUrl: selectedInvoice.invoice_bucket_url,
+      caption: `Invoice ${selectedInvoice.invoice_number || ''}`.trim(),
+    });
+    setWaDocSending(false);
+    alert(ok ? 'Invoice copy sent to vendor on WhatsApp.' : 'Failed to send invoice copy.');
   };
 
   const exportToCSV = () => {
@@ -873,6 +984,14 @@ export default function PurchaseRegisterPage() {
               <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                  <span className="text-sm text-gray-700">{selectedRows.length} selected</span>
                  <div className="flex items-center rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
+                    <button
+                      onClick={handleBulkWhatsApp}
+                      disabled={waBulkSending}
+                      className="px-3 py-1.5 text-xs hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 border-r border-gray-200 flex items-center gap-1 disabled:opacity-50"
+                      title="Send a correction/chase message on WhatsApp to vendors of the selected invoices"
+                    >
+                      {waBulkSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />} WhatsApp
+                    </button>
                     <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200">Mark Reviewed</button>
                     <button className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200">Re-validate</button>
                     <button className="px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 hover:text-red-700">Delete</button>
@@ -1016,6 +1135,18 @@ export default function PurchaseRegisterPage() {
                                  >
                                    <Edit3 className="h-3 w-3" /> Edit
                                  </button>
+                                 {inv.wa_sender_phone && (
+                                   <button
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleMessageVendor(inv);
+                                     }}
+                                     disabled={waSendingId === inv.id}
+                                     className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 disabled:opacity-50"
+                                   >
+                                     {waSendingId === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />} Message vendor
+                                   </button>
+                                 )}
                                  <button
                                    onClick={(e) => {
                                      e.stopPropagation();
@@ -1067,9 +1198,19 @@ export default function PurchaseRegisterPage() {
                  <div className="flex justify-between items-center mb-4">
                     <h3 className="text-gray-900 font-semibold">Original Invoice</h3>
                     <div className="flex gap-2">
+                       {selectedInvoice.wa_sender_phone && selectedInvoice.invoice_bucket_url && (
+                         <button
+                           onClick={handleSendInvoiceCopy}
+                           disabled={waDocSending}
+                           title="Send invoice copy to vendor on WhatsApp"
+                           className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600 hover:text-emerald-700 transition-colors disabled:opacity-50"
+                         >
+                           {waDocSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                         </button>
+                       )}
                        {selectedInvoice.invoice_bucket_url && (
-                         <a 
-                           href={selectedInvoice.invoice_bucket_url} 
+                         <a
+                           href={selectedInvoice.invoice_bucket_url}
                            target="_blank"
                            rel="noopener noreferrer"
                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-gray-900 transition-colors"
@@ -1372,6 +1513,18 @@ export default function PurchaseRegisterPage() {
                                   </div>
                                 </div>
                               )}
+
+                              {/* Ask the vendor to fix issues over WhatsApp */}
+                              {selectedInvoice.wa_sender_phone &&
+                                (getMissingFields(selectedInvoice).length > 0 || remarks.length > 0) && (
+                                  <button
+                                    onClick={handleSendCorrectionRequest}
+                                    disabled={waModalSending}
+                                    className="w-full mt-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                    {waModalSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />} Request correction via WhatsApp
+                                  </button>
+                                )}
                             </>
                           )}
                        </div>

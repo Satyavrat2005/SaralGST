@@ -467,6 +467,50 @@ function checkConfidenceThresholds(data: ExtractedInvoiceData, errors: Validatio
 }
 
 /**
+ * Fields whose problems genuinely block auto-accepting an invoice — i.e. things
+ * the SENDER can and must fix. Everything else (our own buyer GSTIN, derivable
+ * place of supply, recommended fields, low-confidence heuristics, the TCS/round-off
+ * -sensitive total check) must NOT bounce an otherwise-valid invoice back to the
+ * vendor with a "there's an error, please resend" message.
+ */
+const BLOCKING_FIELDS = new Set([
+  'supplier_gstin',
+  'supplier_name',
+  'invoice_number',
+  'invoice_date',
+  'taxable_value',
+]);
+
+/**
+ * Narrow a full validation result down to the errors that should actually stop
+ * an invoice from being accepted (and warrant asking the sender to correct it).
+ *
+ * Excludes:
+ *  - `unreadable` (low-confidence) flags — that's our extraction uncertainty,
+ *    not a defect in the invoice the vendor can fix.
+ *  - non-blocking fields (buyer_gstin, place_of_supply, hsn_or_sac, invoice_type,
+ *    description/quantity/unit, total_invoice_value rounding/TCS mismatches).
+ * Keeps:
+ *  - missing/malformed critical identity & amount fields.
+ *  - contradictory taxes (both CGST+SGST and IGST present).
+ *  - duplicate-invoice mismatches (flagged on invoice_number with type `mismatch`).
+ */
+export function getBlockingValidationErrors(
+  validation: ValidationResult
+): ValidationError[] {
+  return validation.errors.filter((e) => {
+    // Contradictory tax combination is a real, sender-fixable problem.
+    if (e.field === 'tax_values') {
+      return e.issue_type === 'mismatch';
+    }
+    if (!BLOCKING_FIELDS.has(e.field)) return false;
+    // A present-but-low-confidence field isn't the sender's fault — don't block.
+    if (e.issue_type === 'unreadable') return false;
+    return true;
+  });
+}
+
+/**
  * Get state code from GSTIN
  */
 export function getStateCodeFromGSTIN(gstin: string): string | null {

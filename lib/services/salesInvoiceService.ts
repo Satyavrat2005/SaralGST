@@ -360,6 +360,7 @@ export interface SalesInvoice {
   // 2. Customer Details
   customer_name?: string | null;
   customer_gstin?: string | null;
+  customer_phone?: string | null;        // Contact number for outbound WhatsApp (Evolution API)
   place_of_supply?: string | null;       // e.g. "27-Maharashtra"
 
   // 3. Product & Pricing

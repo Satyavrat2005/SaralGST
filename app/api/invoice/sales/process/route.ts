@@ -74,12 +74,21 @@ export async function POST(request: NextRequest) {
     if (extractionError || !extracted) {
       console.error('[ProcessRoute] Gemini extraction failed:', extractionError);
       await updateNewSalesInvoice(invoiceId, { extraction_status: 'needs_review' }, true);
+
+      let message: string;
+      if (extractionError?.includes('API key')) {
+        message = 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env file.';
+      } else if (extractionError?.toLowerCase().includes('rate-limit') || extractionError?.includes('429')) {
+        message = 'Extraction service is rate-limited (Gemini API quota exhausted). The invoice was saved — please wait a few minutes and re-run extraction, or fill the details manually.';
+      } else {
+        message = 'Invoice uploaded but automatic extraction failed. Please fill in the details manually.';
+      }
+
       return NextResponse.json({
         success: true,
         invoiceId,
-        message: extractionError?.includes('API key')
-          ? 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env.local file.'
-          : 'Invoice uploaded but extraction failed. Please fill in the details manually.',
+        extractionFailed: true,
+        message,
         invoice: placeholder,
         extractionError,
       });

@@ -309,8 +309,9 @@ ${JSON.stringify(
 ${opts.willEscalate ? 'End by saying our team will review it manually.' : 'End by asking them to correct and resend.'}
 Return ONLY the message text.`;
 
+    const composerModel = process.env.GEMINI_MESSAGE_MODEL || 'gemini-2.5-flash-lite';
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${composerModel}:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
