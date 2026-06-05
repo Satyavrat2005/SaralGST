@@ -171,7 +171,7 @@ export default function SalesRegisterPage() {
     if (statusFilter !== 'All Status') {
       const statusMap: { [key: string]: string[] } = {
         'Validated': ['extracted', 'verified'],
-        'Partial': ['pending'],
+        'Partial': ['needs_review', 'pending'],
         'Failed': ['error'],
         'Processing': ['pending']
       };
@@ -680,6 +680,7 @@ export default function SalesRegisterPage() {
       case 'extracted':
       case 'verified':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'needs_review':
       case 'pending':
         return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'error':
@@ -693,7 +694,8 @@ export default function SalesRegisterPage() {
     switch (status) {
       case 'extracted': return 'Validated';
       case 'verified': return 'Verified';
-      case 'pending': return 'Partial';
+      case 'needs_review': return 'Needs Review';
+      case 'pending': return 'Processing';
       case 'error': return 'Failed';
       default: return 'Unknown';
     }

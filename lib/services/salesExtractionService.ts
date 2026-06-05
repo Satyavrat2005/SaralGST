@@ -133,7 +133,7 @@ CRITICAL INSTRUCTIONS:
 12. place_of_supply should be state name or code`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -225,7 +225,7 @@ CRITICAL INSTRUCTIONS:
   }
 }
 
-function parseSalesInvoiceFromText(ocrText: string): SalesInvoiceData {
+export function parseSalesInvoiceFromText(ocrText: string): SalesInvoiceData {
   const normalized = ocrText
     .replace(/\r/g, '\n')
     .replace(/[\t ]+/g, ' ')

@@ -31,7 +31,7 @@ export interface ExtractedInvoiceData {
 }
 
 const GEMINI_GENERATE_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 /**
  * POST to Gemini's generateContent with retry on transient overload (429/500/503).
@@ -146,7 +146,7 @@ Important instructions:
           topK: 1,
           topP: 1,
           // Higher cap + thinking disabled so the full JSON fits in the output
-          // (gemini-2.5-flash otherwise spends output tokens "thinking" and the
+          // (gemini-2.0-flash otherwise spends output tokens "thinking" and the
           // JSON gets truncated → "Unterminated string" parse errors).
           maxOutputTokens: 4096,
           response_mime_type: 'application/json',

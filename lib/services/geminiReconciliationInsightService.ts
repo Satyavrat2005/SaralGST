@@ -14,7 +14,7 @@ import type {
 } from '@/lib/reconciliation/insightTypes';
 
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 function readGeminiApiKey(): string | null {
   const rawValue =
