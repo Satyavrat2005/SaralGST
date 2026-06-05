@@ -244,6 +244,11 @@ function RunReconciliationContent() {
   } | null>(null);
   const [lastRun, setLastRun] = useState<{ ran_at: string; match_pct: number } | null>(null);
   const [dksSources, setDksSources] = useState<{ gstr2bFile: string; gstr1File: string } | null>(null);
+  const [purchaseInfo, setPurchaseInfo] = useState<{
+    source: 'supabase' | 'seed' | 'empty';
+    count: number;
+    duplicatesRemoved: number;
+  } | null>(null);
 
   // Holds the fetched API result while the timer is running
   const pendingResultRef = useRef<{
@@ -261,8 +266,13 @@ function RunReconciliationContent() {
         setReturnId('dks-mar25');
         setDksSources(data.sources || null);
         setLastRun({ ran_at: data.stats.ran_at, match_pct: data.stats.match_pct });
+        setPurchaseInfo({
+          source: data.purchaseSource ?? 'seed',
+          count: data.purchaseCount ?? 0,
+          duplicatesRemoved: data.duplicatesRemoved ?? 0,
+        });
       } else {
-        setReturnId(null); setDksSources(null); setLastRun(null);
+        setReturnId(null); setDksSources(null); setLastRun(null); setPurchaseInfo(null);
       }
       return;
     }
@@ -314,6 +324,13 @@ function RunReconciliationContent() {
       if (data.error) {
         pendingResultRef.current = { success: false, error: String(data.error) };
       } else {
+        if (data.purchaseSource) {
+          setPurchaseInfo({
+            source: data.purchaseSource as 'supabase' | 'seed' | 'empty',
+            count: (data.purchaseCount as number) ?? 0,
+            duplicatesRemoved: (data.duplicatesRemoved as number) ?? 0,
+          });
+        }
         pendingResultRef.current = {
           success: true,
           stats: data.stats as typeof stats,
@@ -390,12 +407,35 @@ function RunReconciliationContent() {
               <p className="text-gray-600 text-sm">
                 {returnId
                   ? selectedPeriod === DKS_MARCH_PERIOD
-                    ? 'DKS March 2025 files are loaded. Reconciliation uses the GSTR-1 PDF and GSTR-2B Excel.'
+                    ? 'GSTR-2B (Excel) loaded. Will reconcile against your purchase register from books of accounts.'
                     : 'GSTR-2B is loaded for this period. Click below to match against your purchase register.'
                   : selectedPeriod === DKS_MARCH_PERIOD
-                    ? 'Place DKS March files in the project to run reconciliation.'
+                    ? 'Place DKS March GSTR-2B Excel in the public folder to run reconciliation.'
                     : 'No GSTR-2B data for this period. Fetch from the GSTR-2B page first.'}
               </p>
+              {/* Purchase register source info */}
+              {purchaseInfo && (
+                <div className={`text-xs rounded-lg px-3 py-2 border ${
+                  purchaseInfo.source === 'supabase'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : purchaseInfo.source === 'empty'
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}>
+                  {purchaseInfo.source === 'supabase' ? (
+                    <>
+                      ✅ <strong>{purchaseInfo.count}</strong> purchase invoices from your books
+                      {purchaseInfo.duplicatesRemoved > 0 && (
+                        <span className="ml-1 text-gray-500">({purchaseInfo.duplicatesRemoved} duplicates removed)</span>
+                      )}
+                    </>
+                  ) : purchaseInfo.source === 'empty' ? (
+                    <>⚠️ No purchase invoices found in your books. Upload invoices first for a real reconciliation. Using demo data.</>
+                  ) : (
+                    <>🔵 Using demo purchase data (no invoices uploaded yet)</>
+                  )}
+                </div>
+              )}
               {lastRun && (
                 <p className="text-xs text-gray-500">
                   Last run: {new Date(lastRun.ran_at).toLocaleString()} — {lastRun.match_pct}% matched

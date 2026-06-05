@@ -69,7 +69,7 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "Upload Invoices", path: "/dashboard/sme/invoices/upload", icon: Upload },
         { label: "Purchase Register", path: "/dashboard/sme/invoices/purchase", icon: ShoppingCart },
         { label: "Sales Register", path: "/dashboard/sme/invoices/sales", icon: Tag },
-        { label: "Validation Queue", path: "/dashboard/sme/invoices/validation", icon: AlertCircle, badge: 12, badgeColor: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" },
+        // { label: "Validation Queue", path: "/dashboard/sme/invoices/validation", icon: AlertCircle, badge: 12, badgeColor: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" },
       ]
     },
     {
@@ -94,7 +94,7 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "Vendor Reports", path: "/dashboard/sme/vendors/reports", icon: BarChart3 },
       ]
     },
-    */
+    
     {
       label: "IMS Actions",
       path: "/dashboard/sme/ims",
@@ -106,7 +106,7 @@ const SIDEBAR_CONFIG: SidebarConfig = {
         { label: "Pending Approvals", path: "/dashboard/sme/ims/pending", icon: Clock, badge: 3, badgeColor: "bg-amber-500" },
         { label: "Action History", path: "/dashboard/sme/ims/history", icon: History },
       ]
-    },
+    },*/
     {
       label: "GST Returns",
       icon: FileSpreadsheet,

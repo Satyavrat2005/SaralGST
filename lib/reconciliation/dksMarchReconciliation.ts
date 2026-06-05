@@ -10,8 +10,7 @@ import {
 } from './parseDksGstr2bFile';
 
 /**
- * Build purchase-register rows from GSTR-2B lines for DKS demo.
- * Represents books / purchase data paired with portal GSTR-2B (supplier GSTR-1 chain).
+ * Build purchase-register rows from GSTR-2B lines (synthetic / dev seed only).
  * Applies light deterministic variance so matched + discrepancy views are meaningful.
  */
 export function buildDksMarchPurchaseBooks(
@@ -70,8 +69,50 @@ export interface DksMarchReconciliationResult {
     gstr2bFile: string;
     gstr1File: string;
   };
+  /** 'supabase' = real books, 'seed' = synthetic fallback, 'empty' = no data */
+  purchaseSource: 'supabase' | 'seed' | 'empty';
+  purchaseCount: number;
+  duplicatesRemoved: number;
 }
 
+/**
+ * Run reconciliation with REAL purchase rows supplied from Supabase.
+ * Falls back to synthetic seed if purchaseRows is empty.
+ */
+export function reconcileDksMarchWithRealBooks(
+  purchaseRows: PurchaseRegisterRow[],
+  source: 'supabase' | 'seed' | 'empty'
+): DksMarchReconciliationResult | null {
+  const gstr2b = loadDksGstr2bFromExcel();
+  if (!gstr2b || gstr2b.rows.length === 0) return null;
+
+  const rows = purchaseRows.length > 0
+    ? purchaseRows
+    : buildDksMarchPurchaseBooks(gstr2b.rows); // fallback
+
+  const effectiveSource = purchaseRows.length > 0 ? source : 'seed';
+
+  const recon = reconcileGstr2bWithPurchase(gstr2b.rows, rows);
+  const pdfText = loadDksGstr1PdfText();
+  const gstr1Meta = pdfText ? parseDksGstr1PdfMeta(pdfText) : null;
+
+  return {
+    period: DKS_MARCH_PERIOD,
+    gstr2bRows: gstr2b.rows,
+    purchaseRows: rows,
+    recon,
+    gstr1Meta,
+    sources: {
+      gstr2bFile: "DKS - GSTR-2B_MAR'25 - FINAL.xlsx",
+      gstr1File: "DKS - GSTR1_MAR'25 - OK.pdf",
+    },
+    purchaseSource: effectiveSource,
+    purchaseCount: rows.length,
+    duplicatesRemoved: 0, // set by caller
+  };
+}
+
+/** Original loader — kept for backward compatibility / dev tooling. */
 export function loadDksMarchReconciliationSources(): DksMarchReconciliationResult | null {
   const gstr2b = loadDksGstr2bFromExcel();
   if (!gstr2b || gstr2b.rows.length === 0) return null;
@@ -92,5 +133,8 @@ export function loadDksMarchReconciliationSources(): DksMarchReconciliationResul
       gstr2bFile: "DKS - GSTR-2B_MAR'25 - FINAL.xlsx",
       gstr1File: "DKS - GSTR1_MAR'25 - OK.pdf",
     },
+    purchaseSource: 'seed',
+    purchaseCount: purchaseRows.length,
+    duplicatesRemoved: 0,
   };
 }
