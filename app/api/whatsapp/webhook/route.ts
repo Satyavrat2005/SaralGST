@@ -9,6 +9,7 @@ import {
   findWhatsAppIntake,
   upsertWhatsAppIntake,
 } from '@/lib/services/purchaseInvoiceService';
+import { getBlockingValidationErrors } from '@/lib/services/validationService';
 import {
   sendWhatsAppMessage,
   downloadEvolutionMedia,
@@ -251,6 +252,12 @@ async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
     const invoiceNumber = result.extractedData?.invoice_number || null;
     const validation = result.validation!;
 
+    // Only genuinely sender-fixable problems should bounce the invoice back.
+    // Heuristic/our-side flags (low confidence, our own buyer GSTIN, derivable
+    // place of supply, recommended fields, TCS/round-off total mismatches) must
+    // NOT trigger a "there's an error, please resend" reply on a valid invoice.
+    const blockingErrors = getBlockingValidationErrors(validation);
+
     // Re-correlate using the (now known) invoice number to count THIS invoice's
     // attempts more precisely.
     const priorByInvoice = invoiceNumber
@@ -258,8 +265,15 @@ async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
       : { data: null };
     const attemptCount = (priorByInvoice.data?.attempt_count || priorAttempts) + 1;
 
-    // ── d. VALID → promote & confirm. ────────────────────────────────────────
-    if (validation.isValid) {
+    // ── d. No blocking issues → promote & confirm. ───────────────────────────
+    if (blockingErrors.length === 0) {
+      // Promote to a visible/extracted invoice even if minor non-blocking
+      // remarks exist (they're stored as remarks for review in the dashboard).
+      await updatePurchaseInvoice(
+        result.invoiceId,
+        { invoice_status: 'extracted', wa_attempt_count: attemptCount },
+        true
+      );
       await recordIntake(senderPhone, invoiceNumber, attemptCount, 'validated', null, result.invoiceId);
       await sendWhatsAppMessage(senderPhone, {
         body: composeConfirmationMessage(invoiceNumber),
@@ -285,7 +299,7 @@ async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
       );
     }
 
-    const errorSummary = validation.errors.map((e) => e.message).join('; ');
+    const errorSummary = blockingErrors.map((e) => e.message).join('; ');
     await recordIntake(
       senderPhone,
       invoiceNumber,
@@ -296,7 +310,7 @@ async function handleInboundInvoice(parsed: ParsedInbound): Promise<void> {
     );
 
     const message = await composeRejectionMessageWithAI(
-      validation.errors,
+      blockingErrors,
       result.extractedData || {},
       { invoiceNumber, willEscalate }
     );

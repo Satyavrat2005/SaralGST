@@ -21,6 +21,7 @@ import {
   XCircle,
   Save,
   Loader2,
+  MessageSquare,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import type { SalesInvoice } from '@/lib/services/salesInvoiceService';
@@ -51,7 +52,13 @@ export default function SalesRegisterPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  
+
+  // WhatsApp (Evolution) outbound state
+  const [waSendingId, setWaSendingId] = useState<string | null>(null);
+  const [waBulkSending, setWaBulkSending] = useState(false);
+  const [waModalSending, setWaModalSending] = useState(false);
+  const [waDocSending, setWaDocSending] = useState(false);
+
   // Filter states
   const [dateFilter, setDateFilter] = useState('This Month');
   const [CustomerFilter, setCustomerFilter] = useState('All Customers');
@@ -330,9 +337,15 @@ export default function SalesRegisterPage() {
         }
 
         const missingFields = data.validation?.missingFields || [];
-        const message = data.validation?.isValid 
-          ? `Invoice processed successfully: ${data.invoice?.invoice_number || 'Invoice'}`
-          : `Invoice uploaded with ${missingFields.length} missing field(s). Please review.`;
+        let message: string;
+        if (data.extractionFailed) {
+          // Extraction itself failed (e.g. Gemini quota/rate limit) — nothing was read.
+          message = data.message || 'Automatic extraction failed. Please fill in the details manually.';
+        } else if (data.validation?.isValid) {
+          message = `Invoice processed successfully: ${data.invoice?.invoice_number || 'Invoice'}`;
+        } else {
+          message = `Invoice uploaded with ${missingFields.length} missing field(s). Please review.`;
+        }
         alert(message);
         setUploadModalOpen(false);
         setSelectedFile(null);
@@ -376,6 +389,111 @@ export default function SalesRegisterPage() {
     } finally {
       setActiveDropdown(null);
     }
+  };
+
+  // --- WhatsApp (Evolution) outbound helpers ---
+
+  // Low-level call to the existing /api/whatsapp/send endpoint.
+  const sendWhatsAppToCustomer = async (payload: Record<string, any>): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send WhatsApp message');
+      }
+      return true;
+    } catch (error) {
+      console.error('WhatsApp send error:', error);
+      return false;
+    }
+  };
+
+  // Builds a human-readable "what's wrong" summary for a customer message.
+  const buildCustomerIssueDetail = (invoice: SalesInvoice): string => {
+    const missing = getMissingFields(invoice);
+    if (missing.length > 0) return `Missing/invalid fields: ${missing.join(', ')}`;
+    return 'Please review and confirm the invoice details.';
+  };
+
+  // Per-row: message the customer about a single invoice.
+  const handleMessageCustomer = async (invoice: SalesInvoice) => {
+    if (!invoice.customer_phone) return;
+    setWaSendingId(invoice.id || null);
+    const ok = await sendWhatsAppToCustomer({
+      to: invoice.customer_phone,
+      kind: 'discrepancy_found',
+      invoiceNo: invoice.invoice_number || '',
+      detail: buildCustomerIssueDetail(invoice),
+    });
+    setWaSendingId(null);
+    setActiveDropdown(null);
+    alert(ok ? 'WhatsApp message sent to customer.' : 'Failed to send WhatsApp message.');
+  };
+
+  // Bulk: message every selected invoice that has a customer phone number.
+  const handleBulkWhatsApp = async () => {
+    const targets = salesInvoices.filter(
+      inv => inv.id && selectedRows.includes(inv.id) && inv.customer_phone
+    );
+    const skipped = selectedRows.length - targets.length;
+
+    if (targets.length === 0) {
+      alert('None of the selected invoices have a customer phone number. Add one in the invoice editor first.');
+      return;
+    }
+
+    setWaBulkSending(true);
+    let sent = 0;
+    for (const inv of targets) {
+      const ok = await sendWhatsAppToCustomer({
+        to: inv.customer_phone,
+        kind: 'discrepancy_found',
+        invoiceNo: inv.invoice_number || '',
+        detail: buildCustomerIssueDetail(inv),
+      });
+      if (ok) sent++;
+    }
+    setWaBulkSending(false);
+    alert(`WhatsApp: ${sent} sent${skipped > 0 ? `, ${skipped} skipped (no number)` : ''}.`);
+  };
+
+  // Modal: send a correction request based on missing fields + validation remarks.
+  const handleSendCorrectionRequest = async () => {
+    if (!selectedInvoice?.customer_phone) return;
+    setWaModalSending(true);
+    const missing = getMissingFields(selectedInvoice);
+    const remarkSummary = remarks.map(
+      r => `${r.field_name.replace(/_/g, ' ')}: ${r.comment || r.issue_type}`
+    );
+    const detail =
+      [...(missing.length ? [`Missing: ${missing.join(', ')}`] : []), ...remarkSummary].join('; ') ||
+      'Please review the invoice.';
+    const ok = await sendWhatsAppToCustomer({
+      to: selectedInvoice.customer_phone,
+      kind: 'discrepancy_found',
+      invoiceNo: selectedInvoice.invoice_number || '',
+      detail,
+    });
+    setWaModalSending(false);
+    alert(ok ? 'Correction request sent to customer on WhatsApp.' : 'Failed to send WhatsApp message.');
+  };
+
+  // Modal: send the stored invoice copy to the customer.
+  const handleSendInvoiceCopy = async () => {
+    if (!selectedInvoice?.customer_phone || !selectedInvoice.invoice_file_url) return;
+    setWaDocSending(true);
+    const ok = await sendWhatsAppToCustomer({
+      to: selectedInvoice.customer_phone,
+      kind: 'document',
+      fileUrl: selectedInvoice.invoice_file_url,
+      caption: `Invoice ${selectedInvoice.invoice_number || ''}`.trim(),
+    });
+    setWaDocSending(false);
+    alert(ok ? 'Invoice copy sent to customer on WhatsApp.' : 'Failed to send invoice copy.');
   };
 
   const exportToCSV = () => {
@@ -900,6 +1018,14 @@ export default function SalesRegisterPage() {
               <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                  <span className="text-sm text-gray-700">{selectedRows.length} selected</span>
                  <div className="flex items-center rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
+                    <button
+                      onClick={handleBulkWhatsApp}
+                      disabled={waBulkSending}
+                      className="px-3 py-1.5 text-xs hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 border-r border-gray-200 flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Send a message on WhatsApp to customers of the selected invoices"
+                    >
+                      {waBulkSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />} WhatsApp
+                    </button>
                     <button onClick={handleBulkMarkReviewed} className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Mark Reviewed</button>
                     <button onClick={handleBulkRevalidate} className="px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700 border-r border-gray-200 transition-colors">Re-validate</button>
                     <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors">Delete</button>
@@ -1064,6 +1190,18 @@ export default function SalesRegisterPage() {
                                  >
                                    <Edit3 className="h-3 w-3" /> Edit
                                  </button>
+                                 {inv.customer_phone && (
+                                   <button
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleMessageCustomer(inv);
+                                     }}
+                                     disabled={waSendingId === inv.id}
+                                     className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                   >
+                                     {waSendingId === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />} Message customer
+                                   </button>
+                                 )}
                                  <button
                                    onClick={(e) => {
                                      e.stopPropagation();
@@ -1115,9 +1253,19 @@ export default function SalesRegisterPage() {
                  <div className="flex justify-between items-center mb-4">
                     <h3 className="text-gray-900 font-semibold">Original Invoice</h3>
                     <div className="flex gap-2">
+                       {selectedInvoice.customer_phone && selectedInvoice.invoice_file_url && (
+                         <button
+                           onClick={handleSendInvoiceCopy}
+                           disabled={waDocSending}
+                           title="Send invoice copy to customer on WhatsApp"
+                           className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600 hover:text-emerald-700 transition-colors disabled:opacity-50"
+                         >
+                           {waDocSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                         </button>
+                       )}
                        {selectedInvoice.invoice_file_url && (
-                         <a 
-                           href={selectedInvoice.invoice_file_url} 
+                         <a
+                           href={selectedInvoice.invoice_file_url}
                            target="_blank"
                            rel="noopener noreferrer"
                            className="p-2 hover:bg-gray-200 rounded-lg text-gray-600 hover:text-gray-900 transition-colors"
@@ -1262,12 +1410,23 @@ export default function SalesRegisterPage() {
                                 </div>
                                 <div className="space-y-2">
                                    <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">GSTIN</label>
-                                   <input 
-                                     type="text" 
-                                     value={isEditing ? (editedData.customer_gstin ?? selectedInvoice.customer_gstin ?? '') : (selectedInvoice.customer_gstin || '')} 
+                                   <input
+                                     type="text"
+                                     value={isEditing ? (editedData.customer_gstin ?? selectedInvoice.customer_gstin ?? '') : (selectedInvoice.customer_gstin || '')}
                                      onChange={(e) => handleFieldChange('customer_gstin', e.target.value)}
                                      disabled={!isEditing}
-                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100" 
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100"
+                                   />
+                                </div>
+                                <div className="space-y-2">
+                                   <label className="text-xs text-gray-600 font-medium uppercase tracking-wider">Phone (WhatsApp)</label>
+                                   <input
+                                     type="tel"
+                                     placeholder="e.g. 919876543210"
+                                     value={isEditing ? (editedData.customer_phone ?? selectedInvoice.customer_phone ?? '') : (selectedInvoice.customer_phone || '')}
+                                     onChange={(e) => handleFieldChange('customer_phone', e.target.value)}
+                                     disabled={!isEditing}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none disabled:opacity-50 disabled:bg-gray-100"
                                    />
                                 </div>
                              </div>
@@ -1551,6 +1710,18 @@ export default function SalesRegisterPage() {
                                   <p className="text-sm text-gray-600">This invoice passes all validation checks and is ready for filing.</p>
                                 </div>
                               )}
+
+                              {/* Ask the customer to fix issues over WhatsApp */}
+                              {selectedInvoice.customer_phone &&
+                                (getMissingFields(selectedInvoice).length > 0 || remarks.length > 0) && (
+                                  <button
+                                    onClick={handleSendCorrectionRequest}
+                                    disabled={waModalSending}
+                                    className="w-full mt-4 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                    {waModalSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />} Request correction via WhatsApp
+                                  </button>
+                                )}
                             </>
                           )}
                        </div>

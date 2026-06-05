@@ -130,6 +130,12 @@ export default function DiscrepanciesPage() {
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
+  // WhatsApp (Evolution) outbound state
+  const [waSendingId, setWaSendingId] = useState<string | null>(null);
+  const [waBulkSending, setWaBulkSending] = useState(false);
+  // Cache of vendor WhatsApp numbers, keyed by purchase id (for display + sending)
+  const [vendorPhones, setVendorPhones] = useState<Record<string, string | null>>({});
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -228,6 +234,46 @@ export default function DiscrepanciesPage() {
     loadData();
   }, [loadData]);
 
+  // Prefetch vendor WhatsApp numbers for the actionable tabs (so the number is
+  // visible on each row and ready to send without an extra click).
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        [...missingInGSTR2B, ...valueMismatches]
+          .map((r) => r.purchase?.id)
+          .filter((x): x is string => Boolean(x))
+      )
+    );
+    const toFetch = ids.filter((id) => !(id in vendorPhones));
+    if (toFetch.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        toFetch.map(async (id) => {
+          try {
+            const res = await fetch(`/api/invoice/purchase/${id}`);
+            const data = await res.json();
+            const phone = data?.invoice?.wa_sender_phone;
+            return [id, phone ? String(phone) : null] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setVendorPhones((prev) => {
+        const next = { ...prev };
+        for (const [id, phone] of results) next[id] = phone;
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingInGSTR2B, valueMismatches]);
+
   const stats = useMemo(() => {
     const booksGst = missingInBooks.reduce((s, r) => s + r.gst, 0);
     const gstr2bGst = missingInGSTR2B.reduce((s, r) => s + r.gst, 0);
@@ -272,6 +318,161 @@ export default function DiscrepanciesPage() {
       enabled={expandedRows.includes(rowId) && Boolean(returnId)}
     />
   );
+
+  // --- WhatsApp (Evolution) outbound helpers ---
+
+  // On-demand: pull the vendor's WhatsApp number from the linked purchase row.
+  // Only vendors who previously sent an invoice via WhatsApp have a saved number.
+  const lookupVendorPhone = async (purchaseId?: string): Promise<string | null> => {
+    if (!purchaseId) return null;
+    try {
+      const res = await fetch(`/api/invoice/purchase/${purchaseId}`);
+      const data = await res.json();
+      const phone = data?.invoice?.wa_sender_phone;
+      return phone ? String(phone) : null;
+    } catch (err) {
+      console.error('Vendor phone lookup failed:', err);
+      return null;
+    }
+  };
+
+  // Reuse the reconciliation insight engine to compose a vendor-facing message body.
+  const fetchInsightDetail = async (
+    type: DiscrepancyType,
+    opts: {
+      gstr2b?: InsightInvoicePayload | null;
+      purchase?: InsightPurchasePayload | null;
+      diff?: { taxable?: number; tax?: number };
+    }
+  ): Promise<string | null> => {
+    if (!returnId) return null;
+    try {
+      const res = await fetch('/api/reconciliation/insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnId,
+          dksMarch: selectedPeriod === DKS_MARCH_PERIOD,
+          discrepancyType: type,
+          period: selectedPeriod,
+          gstr2b: opts.gstr2b || null,
+          purchase: opts.purchase || null,
+          diff: opts.diff || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return null;
+      const narrative = data?.insight?.narrative;
+      if (!narrative?.summary) return null;
+      const actions =
+        Array.isArray(narrative.actions) && narrative.actions.length
+          ? `\n\nNext steps:\n${narrative.actions
+              .map((a: string, i: number) => `${i + 1}. ${a}`)
+              .join('\n')}`
+          : '';
+      return `${narrative.summary}${actions}`;
+    } catch (err) {
+      console.error('Insight fetch failed:', err);
+      return null;
+    }
+  };
+
+  // Low-level call to the existing /api/whatsapp/send endpoint.
+  const sendVendorMessage = async (payload: Record<string, any>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send WhatsApp message');
+      }
+      return true;
+    } catch (err) {
+      console.error('WhatsApp send error:', err);
+      return false;
+    }
+  };
+
+  // Build the insight options for a row based on its discrepancy type.
+  const insightOptsForRow = (
+    row: DiscrepancyInvoiceRow | ValueMismatchRow,
+    type: DiscrepancyType
+  ) => {
+    if (type === 'value_mismatch') {
+      const vm = row as ValueMismatchRow;
+      return {
+        gstr2b: vm.gstr2b,
+        purchase: vm.purchase,
+        diff: { taxable: vm.diff, tax: vm.taxDiff },
+      };
+    }
+    return { purchase: row.purchase };
+  };
+
+  // Send one vendor a WhatsApp message for a discrepancy row.
+  const sendRowToVendor = async (
+    row: DiscrepancyInvoiceRow | ValueMismatchRow,
+    type: DiscrepancyType
+  ): Promise<'sent' | 'no_number' | 'failed'> => {
+    const phone = await lookupVendorPhone(row.purchase?.id);
+    if (!phone) return 'no_number';
+    const opts = insightOptsForRow(row, type);
+    const detail =
+      (await fetchInsightDetail(type, opts)) ||
+      `Invoice ${row.id} needs your attention for GST reconciliation.`;
+    const ok = await sendVendorMessage({
+      to: phone,
+      kind: 'discrepancy_found',
+      invoiceNo: row.id,
+      detail,
+    });
+    return ok ? 'sent' : 'failed';
+  };
+
+  // Per-row handler (with UI feedback).
+  const handleSendVendorWhatsApp = async (
+    row: DiscrepancyInvoiceRow | ValueMismatchRow,
+    type: DiscrepancyType
+  ) => {
+    setWaSendingId(row.id);
+    try {
+      const result = await sendRowToVendor(row, type);
+      if (result === 'no_number') {
+        alert(
+          'No WhatsApp number on file for this vendor.\nOnly vendors who previously sent an invoice via WhatsApp have a saved number.'
+        );
+      } else {
+        alert(result === 'sent' ? 'WhatsApp message sent to vendor.' : 'Failed to send WhatsApp message.');
+      }
+    } finally {
+      setWaSendingId(null);
+    }
+  };
+
+  // Bulk handler: message every selected row in a tab that has a linked book entry.
+  const handleBulkVendorWhatsApp = async (
+    rows: Array<DiscrepancyInvoiceRow | ValueMismatchRow>,
+    type: DiscrepancyType
+  ) => {
+    const targets = rows.filter((r) => selectedRows.includes(r.id) && r.purchase?.id);
+    if (targets.length === 0) {
+      alert('Select one or more rows that have a linked book entry first.');
+      return;
+    }
+    setWaBulkSending(true);
+    let sent = 0;
+    let noNumber = 0;
+    for (const r of targets) {
+      const result = await sendRowToVendor(r, type);
+      if (result === 'sent') sent++;
+      else if (result === 'no_number') noNumber++;
+    }
+    setWaBulkSending(false);
+    alert(`WhatsApp: ${sent} sent${noNumber > 0 ? `, ${noNumber} skipped (no number)` : ''}.`);
+  };
 
   if (loading) {
     return (
@@ -520,9 +721,21 @@ export default function DiscrepanciesPage() {
 
           {activeTab === 'gstr2b' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                These invoices are in your books but missing from GSTR-2B. Follow up with vendor to avoid ITC reversal.
+              <div className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-sm flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  These invoices are in your books but missing from GSTR-2B. Follow up with vendor to avoid ITC reversal.
+                </span>
+                {missingInGSTR2B.some((r) => selectedRows.includes(r.id)) && (
+                  <button
+                    onClick={() => handleBulkVendorWhatsApp(missingInGSTR2B, 'missing_in_gstr2b')}
+                    disabled={waBulkSending}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                  >
+                    {waBulkSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageSquare className="h-3.5 w-3.5" />}
+                    WhatsApp {missingInGSTR2B.filter((r) => selectedRows.includes(r.id)).length} vendor(s)
+                  </button>
+                )}
               </div>
 
               {missingInGSTR2B.length === 0 && (
@@ -554,6 +767,15 @@ export default function DiscrepanciesPage() {
                           <span className="text-xs text-gray-500">{inv.date}</span>
                         </div>
                         <p className="text-sm text-gray-600 mt-0.5">{inv.vendor}</p>
+                        {inv.purchase?.id && (
+                          <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                            {vendorPhones[inv.purchase.id] === undefined
+                              ? 'Loading number…'
+                              : vendorPhones[inv.purchase.id]
+                                ? `📱 ${vendorPhones[inv.purchase.id]}`
+                                : 'No WhatsApp number on file'}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-8">
@@ -565,6 +787,18 @@ export default function DiscrepanciesPage() {
                         <p className="text-sm font-bold text-red-600">₹{inv.gst.toLocaleString()}</p>
                         <p className="text-[10px] text-gray-500">ITC at Risk</p>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendVendorWhatsApp(inv, 'missing_in_gstr2b');
+                        }}
+                        disabled={waSendingId === inv.id}
+                        title="Send a WhatsApp reminder to the vendor"
+                        className="shrink-0 px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                      >
+                        {waSendingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                        WhatsApp
+                      </button>
                     </div>
                   </div>
 
@@ -595,8 +829,17 @@ export default function DiscrepanciesPage() {
                         </div>
 
                         <div className="flex flex-col gap-3 justify-start">
-                          <button className="w-full py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2 shadow-sm">
-                            <MessageSquare className="h-4 w-4" /> Send Reminder
+                          <button
+                            onClick={() => handleSendVendorWhatsApp(inv, 'missing_in_gstr2b')}
+                            disabled={waSendingId === inv.id}
+                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
+                            title="Send a WhatsApp reminder to the vendor (uses the AI insight as the message)"
+                          >
+                            {waSendingId === inv.id ? (
+                              <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+                            ) : (
+                              <><MessageSquare className="h-4 w-4" /> Send WhatsApp Reminder</>
+                            )}
                           </button>
                           <div className="flex gap-2">
                             <button className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
@@ -617,9 +860,21 @@ export default function DiscrepanciesPage() {
 
           {activeTab === 'value' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="p-4 bg-yellow-50 border-b border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
-                <HelpCircle className="h-4 w-4" />
-                Invoice numbers match but amounts differ. Verify if differences are due to rounding or calculation errors.
+              <div className="p-4 bg-yellow-50 border-b border-yellow-200 text-yellow-700 text-sm flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4" />
+                  Invoice numbers match but amounts differ. Verify if differences are due to rounding or calculation errors.
+                </span>
+                {valueMismatches.some((r) => selectedRows.includes(r.id)) && (
+                  <button
+                    onClick={() => handleBulkVendorWhatsApp(valueMismatches, 'value_mismatch')}
+                    disabled={waBulkSending}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                  >
+                    {waBulkSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageSquare className="h-3.5 w-3.5" />}
+                    WhatsApp {valueMismatches.filter((r) => selectedRows.includes(r.id)).length} vendor(s)
+                  </button>
+                )}
               </div>
 
               {valueMismatches.length === 0 && (
@@ -651,6 +906,15 @@ export default function DiscrepanciesPage() {
                           <span className="text-xs text-gray-500">{inv.date}</span>
                         </div>
                         <p className="text-sm text-gray-600 mt-0.5">{inv.vendor}</p>
+                        {inv.purchase?.id && (
+                          <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                            {vendorPhones[inv.purchase.id] === undefined
+                              ? 'Loading number…'
+                              : vendorPhones[inv.purchase.id]
+                                ? `📱 ${vendorPhones[inv.purchase.id]}`
+                                : 'No WhatsApp number on file'}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-8">
@@ -681,6 +945,18 @@ export default function DiscrepanciesPage() {
                           </span>
                         )}
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendVendorWhatsApp(inv, 'value_mismatch');
+                        }}
+                        disabled={waSendingId === inv.id}
+                        title="Ask the vendor to amend via WhatsApp"
+                        className="shrink-0 px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-medium hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                      >
+                        {waSendingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                        WhatsApp
+                      </button>
                     </div>
                   </div>
 
@@ -725,8 +1001,17 @@ export default function DiscrepanciesPage() {
                         <button className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm">
                           Accept GSTR-2B Value
                         </button>
-                        <button className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors">
-                          Request Vendor Amendment
+                        <button
+                          onClick={() => handleSendVendorWhatsApp(inv, 'value_mismatch')}
+                          disabled={waSendingId === inv.id}
+                          className="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-sm hover:bg-emerald-50 transition-colors flex items-center gap-2 disabled:opacity-60"
+                          title="Ask the vendor to amend via WhatsApp (uses the AI insight as the message)"
+                        >
+                          {waSendingId === inv.id ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+                          ) : (
+                            <><MessageSquare className="h-4 w-4" /> Request Vendor Amendment</>
+                          )}
                         </button>
                       </div>
                     </div>

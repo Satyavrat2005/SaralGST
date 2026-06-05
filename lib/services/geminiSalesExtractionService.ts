@@ -43,8 +43,32 @@ export interface GeminiSalesData {
   irn: string | null;                     // 64-char Invoice Reference Number
 }
 
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_BASE =
+  'https://generativelanguage.googleapis.com/v1beta/models';
+
+/**
+ * Models tried in order. Each Gemini model has its own separate free-tier
+ * quota, so when the primary model is rate-limited (HTTP 429) we transparently
+ * fall back to the next one instead of failing the whole extraction.
+ * Can be overridden with GEMINI_SALES_MODELS (comma-separated) in env.
+ */
+const DEFAULT_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
+];
+
+function getModelCandidates(): string[] {
+  const override = process.env.GEMINI_SALES_MODELS;
+  if (override) {
+    const list = override
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean);
+    if (list.length > 0) return list;
+  }
+  return DEFAULT_MODELS;
+}
 
 function readGeminiApiKey(): string | null {
   const rawValue = 
@@ -136,66 +160,102 @@ export async function extractSalesInvoiceWithGemini(
     return { data: null, error: `Unsupported file type: ${mimeType}` };
   }
 
-  try {
-    const requestUrl = new URL(GEMINI_API_URL);
-    requestUrl.searchParams.set('key', apiKey);
-
-    const response = await fetch(requestUrl.toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
+  const requestBody = JSON.stringify({
+    contents: [
+      {
+        parts: [
           {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: normalizedMime,
-                  data: base64Data,
-                },
-              },
-              { text: EXTRACTION_PROMPT },
-            ],
+            inlineData: {
+              mimeType: normalizedMime,
+              data: base64Data,
+            },
           },
+          { text: EXTRACTION_PROMPT },
         ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2048,
-          response_mime_type: 'application/json',
-        },
-      }),
-    });
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      // Raised from 2048: the 2.5 models reserve part of the output budget for
+      // internal "thinking" tokens, which previously starved the JSON output
+      // and produced an empty/truncated response.
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+      // Disable thinking so the whole output budget goes to the JSON answer
+      // (and to make extraction faster/cheaper). Ignored by non-thinking models.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+  const models = getModelCandidates();
+  let lastError = 'Unknown error';
+  let rateLimited = false;
+
+  for (const model of models) {
+    try {
+      const requestUrl = new URL(`${GEMINI_API_BASE}/${model}:generateContent`);
+      requestUrl.searchParams.set('key', apiKey);
+
+      const response = await fetch(requestUrl.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = `Gemini API error ${response.status} (${model}): ${errorText}`;
+        // 429 = quota/rate limit, 503 = overloaded → try the next model.
+        if (response.status === 429 || response.status === 503) {
+          rateLimited = rateLimited || response.status === 429;
+          console.warn(`[GeminiSalesExtraction] ${model} unavailable (${response.status}), trying fallback model...`);
+          continue;
+        }
+        // Any other status is a hard error (bad key, bad request) — stop.
+        console.error('[GeminiSalesExtraction] Error:', lastError);
+        return { data: null, error: lastError };
+      }
+
+      const result = await response.json();
+      const candidate = result?.candidates?.[0];
+      const rawText: string | undefined =
+        candidate?.content?.parts?.find((p: any) => typeof p?.text === 'string')?.text;
+
+      if (!rawText) {
+        // Truncated/blocked response — try the next model rather than saving blanks.
+        lastError = `Empty response from Gemini (${model}, finishReason: ${candidate?.finishReason ?? 'unknown'})`;
+        console.warn(`[GeminiSalesExtraction] ${lastError}, trying fallback model...`);
+        continue;
+      }
+
+      // Strip markdown code fences if present
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const extracted: GeminiSalesData = JSON.parse(cleaned);
+
+      // Sanitise: convert empty strings to null, remove stray "N/A" strings
+      const sanitized = sanitizeExtractedData(extracted);
+
+      return { data: sanitized, error: null };
+    } catch (err: any) {
+      lastError = `${err.message} (${model})`;
+      console.warn(`[GeminiSalesExtraction] ${lastError}, trying fallback model...`);
+      continue;
     }
-
-    const result = await response.json();
-    const rawText: string | undefined =
-      result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      return { data: null, error: 'Empty response from Gemini' };
-    }
-
-    // Strip markdown code fences if present
-    let cleaned = rawText.trim();
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-
-    const extracted: GeminiSalesData = JSON.parse(cleaned);
-
-    // Sanitise: convert empty strings to null, remove stray "N/A" strings
-    const sanitized = sanitizeExtractedData(extracted);
-
-    return { data: sanitized, error: null };
-  } catch (err: any) {
-    console.error('[GeminiSalesExtraction] Error:', err.message);
-    return { data: null, error: err.message };
   }
+
+  console.error('[GeminiSalesExtraction] All models failed:', lastError);
+  return {
+    data: null,
+    error: rateLimited
+      ? 'Gemini extraction is rate-limited — the API quota is exhausted. Please wait a few minutes and try again, or upgrade the Gemini API plan.'
+      : lastError,
+  };
 }
 
 /**

@@ -30,42 +30,87 @@ export interface ExtractedInvoiceData {
   };
 }
 
-const GEMINI_GENERATE_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
- * POST to Gemini's generateContent with retry on transient overload (429/500/503).
+ * Models tried in order. Each Gemini model has its OWN free-tier quota, so when
+ * the primary model is rate-limited (HTTP 429, quota exhausted) we transparently
+ * fall back to the next one instead of failing the whole extraction — which
+ * previously made the WhatsApp webhook reply "couldn't read / please resend" to
+ * vendors who had actually sent a perfectly valid invoice.
+ * Override with GEMINI_EXTRACTION_MODELS (comma-separated) in env.
+ */
+const DEFAULT_EXTRACTION_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
+];
+
+function getExtractionModels(): string[] {
+  const override = process.env.GEMINI_EXTRACTION_MODELS;
+  if (override) {
+    const list = override.split(',').map((m) => m.trim()).filter(Boolean);
+    if (list.length > 0) return list;
+  }
+  return DEFAULT_EXTRACTION_MODELS;
+}
+
+/**
+ * POST to Gemini's generateContent with model fallback + retry on transient errors.
  *
- * Gemini's free tier returns 503 "Service Unavailable" under load; a couple of
- * spaced retries recover most of these without bothering the vendor. Permanent
- * errors (4xx other than 429) fail fast.
+ * Strategy:
+ *   - Try each candidate model in order.
+ *   - 429 (quota/rate limit) → move straight to the next model (a per-day quota
+ *     won't recover within a short backoff, so don't waste time retrying it).
+ *   - 500/503 (transient overload) → a couple of spaced retries on the SAME model.
+ *   - Any other 4xx (bad key/request) → fail fast.
  */
 async function geminiGenerateContent(
   body: Record<string, any>,
   apiKey: string
 ): Promise<any> {
-  const maxAttempts = 3;
-  let lastErr = '';
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await fetch(`${GEMINI_GENERATE_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+  const models = getExtractionModels();
+  const maxAttemptsPerModel = 3;
+  let lastErr = 'Gemini request failed';
 
-    if (response.ok) return response.json();
+  for (const model of models) {
+    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
 
-    const errorData = await response.text();
-    lastErr = `Gemini API error: ${response.status} ${response.statusText} - ${errorData}`;
+    for (let attempt = 1; attempt <= maxAttemptsPerModel; attempt++) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-    const transient = response.status === 429 || response.status === 500 || response.status === 503;
-    if (transient && attempt < maxAttempts) {
-      // Linear backoff: 1.5s, 3s.
-      await new Promise((r) => setTimeout(r, attempt * 1500));
-      continue;
+      if (response.ok) return response.json();
+
+      const errorData = await response.text();
+      lastErr = `Gemini API error (${model}): ${response.status} ${response.statusText} - ${errorData}`;
+
+      // Quota/rate limit → this model is unavailable; try the next model.
+      if (response.status === 429) {
+        console.warn(`[llmExtraction] ${model} quota/rate-limited (429), trying fallback model...`);
+        break;
+      }
+
+      // Transient overload → retry the same model with linear backoff (1.5s, 3s).
+      if ((response.status === 500 || response.status === 503) && attempt < maxAttemptsPerModel) {
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+        continue;
+      }
+
+      // 500/503 on the final attempt → try the next model instead of giving up.
+      if (response.status === 500 || response.status === 503) {
+        console.warn(`[llmExtraction] ${model} overloaded (${response.status}), trying fallback model...`);
+        break;
+      }
+
+      // Any other status (bad key, malformed request) is a hard error — stop.
+      throw new Error(lastErr);
     }
-    throw new Error(lastErr);
   }
+
   throw new Error(lastErr);
 }
 
